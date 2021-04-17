@@ -33,27 +33,21 @@ import (
 	"sync"
 )
 
-const (
-	WORK_DIR = "data/"
-)
-
-var (
-	containerRegistry = "http://container-worker.momoko:5000"
-)
-
 type transition struct {
 	tagFrom string
 	tagTo   string
 }
 
-type StarlightProxy struct {
+type StarlightProxyClient struct {
 	http.Server
 
 	ctx      context.Context
 	database *bolt.DB
+
+	containerRegistry string
 }
 
-func (a *StarlightProxy) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
+func (a *StarlightProxyClient) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
 
 	fromImages := strings.Split(from, ",")
 	toImages := strings.Split(to, ",")
@@ -110,7 +104,7 @@ func (a *StarlightProxy) getDeltaImage(w http.ResponseWriter, req *http.Request,
 		}
 	}
 
-	ib, err := NewPreloadImageBuilder(a.ctx, c, containerRegistry)
+	ib, err := NewPreloadImageBuilder(a.ctx, c, a.containerRegistry)
 	if err != nil {
 		return err
 	}
@@ -143,13 +137,13 @@ func (a *StarlightProxy) getDeltaImage(w http.ResponseWriter, req *http.Request,
 	return nil
 }
 
-func (a *StarlightProxy) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
+func (a *StarlightProxyClient) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
 	arr := strings.Split(strings.Trim(image, ""), ":")
 	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
 		return util.ErrWrongImageFormat
 	}
 
-	err := CacheToc(a.ctx, a.database, arr[0], arr[1], containerRegistry)
+	err := CacheToc(a.ctx, a.database, arr[0], arr[1], a.containerRegistry)
 	if err != nil {
 		return err
 	}
@@ -162,11 +156,11 @@ func (a *StarlightProxy) getPrepared(w http.ResponseWriter, req *http.Request, i
 	return nil
 }
 
-func (a *StarlightProxy) getDefault(w http.ResponseWriter, req *http.Request) {
+func (a *StarlightProxyClient) getDefault(w http.ResponseWriter, req *http.Request) {
 	_, _ = fmt.Fprint(w, "Starlight Proxy OK!\n")
 }
 
-func (a *StarlightProxy) rootFunc(w http.ResponseWriter, req *http.Request) {
+func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request) {
 	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
 	log.G(a.ctx).WithFields(logrus.Fields{
 		"remote": req.RemoteAddr,
@@ -198,7 +192,7 @@ func (a *StarlightProxy) rootFunc(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxy {
+func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyClient {
 	ctx := util.ConfigLoggerWithLevel(logLevel)
 
 	log.G(ctx).WithFields(logrus.Fields{
@@ -206,22 +200,19 @@ func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxy {
 		"log-level": logLevel,
 	}).Info("Starlight Proxy")
 
-	if registry != "" {
-		containerRegistry = registry
-	}
-
-	db, err := util.OpenDatabase(ctx, WORK_DIR)
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
 	if err != nil {
 		log.G(ctx).WithError(err).Error("open database error")
 		return nil
 	}
 
-	server := &StarlightProxy{
+	server := &StarlightProxyClient{
 		Server: http.Server{
 			Addr: ":8090",
 		},
-		database: db,
-		ctx:      ctx,
+		database:          db,
+		ctx:               ctx,
+		containerRegistry: registry,
 	}
 	http.HandleFunc("/", server.rootFunc)
 

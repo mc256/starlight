@@ -30,7 +30,7 @@ const (
 	metadataStorage = "metadata.db"
 )
 
-func OpenDatabase(ctx context.Context, workDir string) (*bolt.DB, error) {
+func OpenDatabase(ctx context.Context, workDir, dbName string) (*bolt.DB, error) {
 	// Open Database
 	db, err := bolt.Open(path.Join(workDir, metadataStorage), 0600, nil)
 	if err != nil {

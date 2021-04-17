@@ -28,4 +28,8 @@ const (
 	TestPullLabel         = "containerd.io/snapshot/remote/test.pull.label"
 	UserRwLayerText       = "containerd.io/layer/user-rw-layer"
 	UserMountingPointText = "containerd.io/layer/mounting-point"
+
+	SnapshotterDbName = "metadata.db"
+	ProxyDbName       = "toc.db"
+	DataPath          = "data/"
 )

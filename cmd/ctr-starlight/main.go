@@ -20,7 +20,7 @@ package main
 
 import (
 	"fmt"
-	runCommand "github.com/mc256/starlight/cmd/starlight-grpc/run"
+	cmdPrepare "github.com/mc256/starlight/cmd/ctr-starlight/prepare"
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -33,26 +33,46 @@ func init() {
 }
 
 func main() {
-	app := New()
+	app := NewApp()
 	if err := app.Run(os.Args); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "starlight-grpc: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func New() *cli.App {
+func NewApp() *cli.App {
 	app := cli.NewApp()
 
-	app.Name = "starlight-grpc"
+	app.Name = "ctr-starlight"
 	app.Version = util.Version
-	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment`
+	app.Usage = `starlight container deployment with remote delta image`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
-	app.Flags = []cli.Flag{}
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:        "namespace",
+			Aliases:     []string{"n"},
+			Value:       "default",
+			DefaultText: "default",
+			EnvVars:     []string{"CONTAINERD_NAMESPACE"},
+			Usage:       "namespace to use with commands",
+			Required:    false,
+		},
+		&cli.StringFlag{
+			Name:        "address",
+			Aliases:     []string{"a"},
+			Value:       "/run/containerd/containerd.sock",
+			DefaultText: "/run/containerd/containerd.sock",
+			EnvVars:     []string{"CONTAINERD_ADDRESS"},
+			Usage:       "address for containerd's GRPC server",
+			Required:    false,
+		},
+	}
 	app.Commands = append([]*cli.Command{
 		util.VersionCommand(),
-		runCommand.RunCommand(),
+		cmdPrepare.Command(),
+		//cmdRun.Command(),
 	})
 
 	return app

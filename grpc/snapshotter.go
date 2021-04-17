@@ -76,7 +76,7 @@ func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy) (s
 		return nil, err
 	}
 
-	db, err := util.OpenDatabase(ctx, root)
+	db, err := util.OpenDatabase(ctx, root, util.SnapshotterDbName)
 	if err != nil {
 		return nil, err
 	}

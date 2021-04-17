@@ -16,7 +16,7 @@
    file created by maverick in 2021
 */
 
-package main
+package run
 
 import (
 	"github.com/containerd/containerd/log"
