@@ -1,17 +1,21 @@
+######################################################################
+# Build
+######################################################################
 TARGETS=starlight-proxy starlight-grpc ctr-starlight
 
-.PHONY: build clean
-
+.PHONY: build clean build-starlight-proxy build-starlight-grpc
 
 ######################################################################
 # Build
 ######################################################################
-build: starlight-proxy starlight-grpc
+build: build-starlight-proxy build-starlight-grpc
 
-starlight-proxy:
+build-starlight-proxy:
+	-mkdir ./out
 	go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
 
-starlight-grpc:
+build-starlight-grpc:
+	-mkdir ./out
 	go build -o ./out/starlight-grpc ./cmd/starlight-grpc/main.go
 
 
@@ -19,5 +23,5 @@ starlight-grpc:
 # Clean
 ######################################################################
 clean:
-	rm -rf ./out/*
+	-rm -rf ./out/*
 
