@@ -23,20 +23,21 @@ import (
 	"encoding/binary"
 	"github.com/containerd/containerd/log"
 	bolt "go.etcd.io/bbolt"
+	"path"
 )
 
 const (
-	TocStorage = "data/tocStorage.db"
+	metadataStorage = "metadata.db"
 )
 
-func OpenDatabase(ctx context.Context) *bolt.DB {
+func OpenDatabase(ctx context.Context, workDir string) (*bolt.DB, error) {
 	// Open Database
-	db, err := bolt.Open(TocStorage, 0600, nil)
+	db, err := bolt.Open(path.Join(workDir, metadataStorage), 0600, nil)
 	if err != nil {
 		log.G(ctx).Fatal(err)
-		return nil
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
 func Int32ToB(v uint32) []byte {

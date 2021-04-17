@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	SERVER_VERSION = "1.0.0"
+	WORK_DIR = "data/"
 )
 
 var (
@@ -46,14 +46,14 @@ type transition struct {
 	tagTo   string
 }
 
-type AcceleratorServer struct {
+type StarlightProxy struct {
 	http.Server
 
 	ctx      context.Context
 	database *bolt.DB
 }
 
-func (a *AcceleratorServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
+func (a *StarlightProxy) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
 
 	fromImages := strings.Split(from, ",")
 	toImages := strings.Split(to, ",")
@@ -125,9 +125,9 @@ func (a *AcceleratorServer) getDeltaImage(w http.ResponseWriter, req *http.Reque
 	header := w.Header()
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
-	header.Set("Accelerator-Header-Size", fmt.Sprintf("%d", headerSize))
-	header.Set("Accelerator-Version", SERVER_VERSION)
-	header.Set("Content-Disposition", `attachment; filename="accelerated-image.img"`)
+	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
+	header.Set("Starlight-Version", util.Version)
+	header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
 	w.WriteHeader(http.StatusOK)
 
 	if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
@@ -143,7 +143,7 @@ func (a *AcceleratorServer) getDeltaImage(w http.ResponseWriter, req *http.Reque
 	return nil
 }
 
-func (a *AcceleratorServer) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
+func (a *StarlightProxy) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
 	arr := strings.Split(strings.Trim(image, ""), ":")
 	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
 		return util.ErrWrongImageFormat
@@ -156,17 +156,17 @@ func (a *AcceleratorServer) getPrepared(w http.ResponseWriter, req *http.Request
 
 	header := w.Header()
 	header.Set("Content-Type", "text/plain")
-	header.Set("Accelerator-Version", SERVER_VERSION)
+	header.Set("Starlight-Version", util.Version)
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprintf(w, "Cached TOC: %s\n", image)
 	return nil
 }
 
-func (a *AcceleratorServer) getDefault(w http.ResponseWriter, req *http.Request) {
-	_, _ = fmt.Fprint(w, "Accelerator Server!\n")
+func (a *StarlightProxy) getDefault(w http.ResponseWriter, req *http.Request) {
+	_, _ = fmt.Fprint(w, "Starlight Proxy OK!\n")
 }
 
-func (a *AcceleratorServer) rootFunc(w http.ResponseWriter, req *http.Request) {
+func (a *StarlightProxy) rootFunc(w http.ResponseWriter, req *http.Request) {
 	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
 	log.G(a.ctx).WithFields(logrus.Fields{
 		"remote": req.RemoteAddr,
@@ -186,7 +186,7 @@ func (a *AcceleratorServer) rootFunc(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		header := w.Header()
 		header.Set("Content-Type", "text/plain")
-		header.Set("Accelerator-Version", SERVER_VERSION)
+		header.Set("Starlight-Version", util.Version)
 		w.WriteHeader(http.StatusInternalServerError)
 
 		_, _ = fmt.Fprintf(w, "Opoos! Something went wrong: \n\n%s\n", err)
@@ -198,23 +198,29 @@ func (a *AcceleratorServer) rootFunc(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func NewServer(registry, logLevel string, wg *sync.WaitGroup) *AcceleratorServer {
+func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxy {
 	ctx := util.ConfigLoggerWithLevel(logLevel)
 
 	log.G(ctx).WithFields(logrus.Fields{
 		"registry":  registry,
 		"log-level": logLevel,
-	}).Info("accelerator-server")
+	}).Info("Starlight Proxy")
 
 	if registry != "" {
 		containerRegistry = registry
 	}
 
-	server := &AcceleratorServer{
+	db, err := util.OpenDatabase(ctx, WORK_DIR)
+	if err != nil {
+		log.G(ctx).WithError(err).Error("open database error")
+		return nil
+	}
+
+	server := &StarlightProxy{
 		Server: http.Server{
 			Addr: ":8090",
 		},
-		database: util.OpenDatabase(ctx),
+		database: db,
 		ctx:      ctx,
 	}
 	http.HandleFunc("/", server.rootFunc)
