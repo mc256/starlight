@@ -17,7 +17,6 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
           registry: registry.yuri.moe
           repository: starlight-proxy
-          dockerfile: cmd/starlight-proxy/Dockerfile
           pull: true
           target: starlight-proxy
           tag_with_ref: true
