@@ -1,4 +1,4 @@
-FROM golang:1.15
+FROM golang:1.15 AS starlight-proxy
 
 WORKDIR /go/src/app
 COPY . .

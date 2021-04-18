@@ -19,4 +19,5 @@ jobs:
           repository: starlight-proxy
           dockerfile: cmd/starlight-proxy/Dockerfile
           pull: true
+          target: starlight-proxy
           tag_with_ref: true
