@@ -1,0 +1,12 @@
+version: "3"
+services:
+  starlightproxy:
+    image: registry.yuri.moe/starlight-proxy:latest
+    container_name: starlightproxy
+    ports:
+      - 8090:8090
+    env_file:
+      - config.env
+    volumes:
+      - "./data:/go/src/app/data:rw"
+    restart: always
