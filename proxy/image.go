@@ -49,11 +49,13 @@ func (ib *ImageBuilder) WriteBody(w io.Writer) (err error) {
 	q := ib.c.GetOutputQueue()
 	for _, ent := range *q {
 		sr := io.NewSectionReader(ib.layerReaders[ent.Source-1], ent.SourceOffset, ent.CompressedSize)
-		log.G(ib.ctx).WithFields(logrus.Fields{
-			"offset": ent.SourceOffset,
-			"length": ent.CompressedSize,
-			"source": ent.Source,
-		}).Trace("request range")
+		/*
+			log.G(ib.ctx).WithFields(logrus.Fields{
+				"offset": ent.SourceOffset,
+				"length": ent.CompressedSize,
+				"source": ent.Source,
+			}).Trace("request range")
+		*/
 
 		_, err := io.CopyN(w, sr, ent.CompressedSize)
 		if err != nil {
