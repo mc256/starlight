@@ -58,10 +58,17 @@ func (b ByPriority) Len() int {
 }
 
 func (b ByPriority) Less(i, j int) bool {
-	if b[i].landmarkScore == b[j].landmarkScore {
+	// should return true is i has higher priority
+	if b[i].landmarkScore != b[j].landmarkScore {
+		return b[i].landmarkScore < b[j].landmarkScore
+	}
+	if len(b[i].entries) != len(b[j].entries) {
 		return len(b[i].entries) > len(b[j].entries)
 	}
-	return b[i].landmarkScore < b[j].landmarkScore
+	if b[i].entries[0].Source != b[j].entries[0].Source {
+		return b[i].entries[0].Source > b[j].entries[0].Source
+	}
+	return b[i].entries[0].Offset < b[j].entries[0].Offset
 }
 func (b ByPriority) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
