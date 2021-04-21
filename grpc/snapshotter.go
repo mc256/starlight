@@ -25,8 +25,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
-	"sync"
-
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	starlightfs "github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/util"
@@ -59,9 +57,9 @@ type snapshotter struct {
 	remote     *StarlightProxy
 	layerStore *starlightfs.LayerStore
 
-	imageReaders    map[string]*starlightfs.ImageReader
-	imageReadersMux sync.Mutex
-	fsMap           map[string]*starlightfs.FsInstance
+	imageReaders map[string]*starlightfs.ImageReader
+	//imageReadersMux sync.Mutex
+	fsMap map[string]*starlightfs.FsInstance
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
@@ -102,7 +100,7 @@ func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy) (s
 		imageReaders: make(map[string]*starlightfs.ImageReader, 0),
 		fsMap:        make(map[string]*starlightfs.FsInstance, 0),
 
-		imageReadersMux: sync.Mutex{},
+		//imageReadersMux: sync.Mutex{},
 	}, nil
 }
 
@@ -210,8 +208,8 @@ func (o *snapshotter) getSnDir(id string) string {
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	o.imageReadersMux.Lock()
-	defer o.imageReadersMux.Unlock()
+	//o.imageReadersMux.Lock()
+	//defer o.imageReadersMux.Unlock()
 	var config snapshots.Info
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
