@@ -79,12 +79,12 @@ func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy) (s
 		return nil, err
 	}
 
-	layerStore, err := starlightfs.NewLayerStore(ctx, db, filepath.Join(root, "acc"))
+	layerStore, err := starlightfs.NewLayerStore(ctx, db, filepath.Join(root, "sfs"))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "acc"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(root, "sfs"), 0700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	return &snapshotter{
@@ -204,7 +204,7 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 func (o *snapshotter) getSnDir(id string) string {
-	return path.Join(o.root, "acc", id)
+	return path.Join(o.root, "sfs", id)
 }
 
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -259,7 +259,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 				fsi, err := ir.NewFsInstance(
 					config.Labels[util.ImageNameLabel],
 					config.Labels[util.ImageTagLabel],
-					path.Join(o.root, "acc", sn.ID),
+					path.Join(o.root, "sfs", sn.ID),
 					config.Labels[util.CheckpointLabel],
 				)
 				if err != nil {
@@ -268,7 +268,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 				o.fsMap[path.Base(_key)] = fsi
 
 				// mounting point
-				mp := filepath.Join(o.root, "acc", sn.ID, "m")
+				mp := filepath.Join(o.root, "sfs", sn.ID, "m")
 				if err := os.MkdirAll(mp, 0755); err != nil {
 					return nil, err
 				}
@@ -328,7 +328,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 			return nil, err
 		}
 
-		snd := filepath.Join(o.root, "acc", sn.ID)
+		snd := filepath.Join(o.root, "sfs", sn.ID)
 		if err := os.MkdirAll(snd, 0755); err != nil {
 			return nil, err
 		}
