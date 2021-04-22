@@ -71,7 +71,7 @@ func RunCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:     "fs",
-				Value:    "/var/lib/starlight-grpc/fs",
+				Value:    "/var/lib/starlight-grpc",
 				Usage:    "snapshotter file system path",
 				Required: false,
 			},
@@ -87,9 +87,11 @@ func RunCommand() *cli.Command {
 				Required: false,
 			},
 			&cli.BoolFlag{
-				Name:     "log-fs-trace",
-				Usage:    "collect file system traces",
-				Required: false,
+				Name:        "log-fs-trace",
+				Usage:       "collect file system traces",
+				Value:       false,
+				DefaultText: "false",
+				Required:    false,
 			},
 		},
 	}

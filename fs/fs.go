@@ -34,6 +34,10 @@ import (
 	"syscall"
 )
 
+const (
+	DebugTrace = false
+)
+
 type StarlightFsNode struct {
 	//I is a pointer to fs.Inode
 	fs.Inode
@@ -48,12 +52,14 @@ func (n *StarlightFsNode) Lookup(ctx context.Context, name string, out *fuse.Ent
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"child":  name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("LOOKUP")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"child":  name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("LOOKUP")
+	}
 
 	if child, hasChild := n.Ent.LookUp(name); hasChild {
 		if inode, err := func() (*fs.Inode, syscall.Errno) {
@@ -87,12 +93,13 @@ func (n *StarlightFsNode) Lookup(ctx context.Context, name string, out *fuse.Ent
 var _ = (fs.NodeGetattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Getattr(ctx context.Context, fh fs.FileHandle, out *fuse.AttrOut) syscall.Errno {
-
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("GETATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("GETATTR")
+	}
 
 	if n.Ent.AtomicGetFileState() == EnRwLayer {
 		if fh != nil {
@@ -124,11 +131,13 @@ func (n *StarlightFsNode) Readdir(ctx context.Context) (fs.DirStream, syscall.Er
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("READDIR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("READDIR")
+	}
 
 	children := n.Ent.GetChildren()
 	cl := make([]fuse.DirEntry, 0, len(*children)+2)
@@ -187,12 +196,13 @@ func (n *StarlightFsNode) Readdir(ctx context.Context) (fs.DirStream, syscall.Er
 var _ = (fs.NodeReadlinker)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
-
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("READLINK")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("READLINK")
+	}
 
 	buf, err := syscall.ByteSliceFromString(n.Ent.LinkName)
 	if err != nil {
@@ -207,11 +217,13 @@ func (n *StarlightFsNode) Unlink(ctx context.Context, name string) syscall.Errno
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("UNLINK")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("UNLINK")
+	}
 
 	// remove a child
 	if child, hasChild := n.Ent.LookUp(name); hasChild {
@@ -246,11 +258,13 @@ func (n *StarlightFsNode) Rmdir(ctx context.Context, name string) syscall.Errno 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("RMDIR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("RMDIR")
+	}
 
 	// remove a child
 	n.Ent.RemoveChild(name)
@@ -263,11 +277,13 @@ var _ = (fs.NodeOpener)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("OPEN")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("OPEN")
+	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
 		<-n.Ent.ready
@@ -424,11 +440,13 @@ var _ = (fs.NodeSetattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Setattr(ctx context.Context, fh fs.FileHandle, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("SETATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("SETATTR")
+	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
 		<-n.Ent.ready
@@ -483,13 +501,15 @@ func (n *StarlightFsNode) Symlink(ctx context.Context, target, name string, out 
 		return nil, syscall.EPERM
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"from":   name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-		"to":     target,
-	}).Trace("SYMLINK")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"from":   name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+			"to":     target,
+		}).Trace("SYMLINK")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
@@ -551,12 +571,14 @@ func (n *StarlightFsNode) Mkdir(ctx context.Context, name string, mode uint32, o
 		return nil, syscall.EPERM
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"from":   name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-	}).Trace("MKDIR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"from":   name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("MKDIR")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
@@ -631,14 +653,16 @@ func (n *StarlightFsNode) Create(ctx context.Context, name string, flags uint32,
 		return nil, nil, 0, syscall.EPERM
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":   n.Ent.Name,
-		"child":  name,
-		"source": n.Ent.Source,
-		"state":  n.Ent.State,
-		"mode":   fmt.Sprintf("%o", mode),
-		"flags":  fmt.Sprintf("%o", flags),
-	}).Trace("CREATE")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"child":  name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+			"mode":   fmt.Sprintf("%o", mode),
+			"flags":  fmt.Sprintf("%o", flags),
+		}).Trace("CREATE")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
@@ -707,14 +731,16 @@ func (n *StarlightFsNode) Rename(ctx context.Context, name string, newParent fs.
 		return syscall.EPERM
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"n":       n.Ent.Name,
-		"name":    name,
-		"newName": name,
-		"source":  n.Ent.Source,
-		"state":   n.Ent.State,
-		"flags":   fmt.Sprintf("%o", flags),
-	}).Trace("RENAME")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"n":       n.Ent.Name,
+			"name":    name,
+			"newName": name,
+			"source":  n.Ent.Source,
+			"state":   n.Ent.State,
+			"flags":   fmt.Sprintf("%o", flags),
+		}).Trace("RENAME")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
@@ -779,10 +805,12 @@ var _ = (fs.NodeGetxattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, syscall.Errno) {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name": n.Ent.Name,
-		"attr": attr,
-	}).Trace("GETXATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+			"attr": attr,
+		}).Trace("GETXATTR")
+	}
 
 	if n.Ent.AtomicGetFileState() == EnRwLayer {
 		sz, err := unix.Lgetxattr(n.Ent.GetRwLayerPath(), attr, dest)
@@ -801,9 +829,11 @@ var _ = (fs.NodeListxattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Listxattr(ctx context.Context, dest []byte) (uint32, syscall.Errno) {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name": n.Ent.Name,
-	}).Trace("LISTXATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+		}).Trace("LISTXATTR")
+	}
 
 	if n.Ent.AtomicGetFileState() == EnRwLayer {
 		sz, err := unix.Llistxattr(n.Ent.GetRwLayerPath(), dest)
@@ -824,11 +854,13 @@ var _ = (fs.NodeSetxattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Setxattr(ctx context.Context, attr string, data []byte, flags uint32) syscall.Errno {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name": n.Ent.Name,
-		"attr": attr,
-		"val":  string(data),
-	}).Trace("SETXATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+			"attr": attr,
+			"val":  string(data),
+		}).Trace("SETXATTR")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
@@ -845,10 +877,12 @@ var _ = (fs.NodeRemovexattrer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Removexattr(ctx context.Context, attr string) syscall.Errno {
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"name": n.Ent.Name,
-		"attr": attr,
-	}).Trace("REMOVEXATTR")
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+			"attr": attr,
+		}).Trace("REMOVEXATTR")
+	}
 
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()

@@ -3,7 +3,7 @@
 ######################################################################
 TARGETS=starlight-proxy starlight-grpc ctr-starlight
 
-.PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight
+.PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight install
 
 ######################################################################
 # Build
@@ -28,3 +28,9 @@ build-ctr-starlight:
 clean:
 	-rm -rf ./out/*
 
+
+######################################################################
+# Install
+######################################################################
+install:
+	install ./out/*-* /bin

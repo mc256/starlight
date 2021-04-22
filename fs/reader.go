@@ -431,10 +431,6 @@ func (ir *ImageReader) extractFiles() {
 
 	wg.Wait()
 
-	log.G(ir.ctx).WithFields(logrus.Fields{
-		"name": ir.name,
-	}).Info("decompressed entire image")
-
 	for _, lm := range ir.layerLookupMap {
 		if err := lm.AtomicSetCompleted(); err != nil {
 			log.G(ir.ctx).WithError(err).Error("set layer to completed")
@@ -442,9 +438,13 @@ func (ir *ImageReader) extractFiles() {
 			log.G(ir.ctx).WithFields(logrus.Fields{
 				"path": lm.absPath,
 				"d":    lm.digest,
-			}).Debug("set layer to completed")
+			}).Debug("layer is ready")
 		}
 	}
+
+	log.G(ir.ctx).WithFields(logrus.Fields{
+		"name": ir.name,
+	}).Info("entire image extracted")
 }
 
 func (ir *ImageReader) ExtractFiles() {

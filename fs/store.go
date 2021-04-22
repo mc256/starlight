@@ -167,7 +167,7 @@ func (s *LayerStore) saveLayer(digest util.TraceableBlobDigest, lay *LayerMeta, 
 		log.G(s.ctx).WithFields(logrus.Fields{
 			"digest": digest,
 			"path":   lay.absPath,
-		}).Debug("updated layer")
+		}).Debug("updated layer store")
 	}
 
 	if err = tx.Commit(); err != nil {
