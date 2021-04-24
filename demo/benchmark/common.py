@@ -86,21 +86,49 @@ def start_all_grpc(cfg):
     return stargz_p, starlight_p
 
 
-def set_latency_bandwidth(cfg, latency, bandwidth=100):
-    call_wait([
+
+def set_latency_bandwidth(cfg, latency, bandwidth = 100, debug=False):
+    p1 = start_process([
         "sudo", "tc", "qdisc", "add", "dev", cfg.NETWORK_DEVICE,
-        "handle", "1:", "root", "htb", "default", "11"
+        "root", "netem", "delay", "%dms" % (latency // 2), "rate", "%dMbit" % bandwidth
     ])
-    call_wait([
-        "sudo", "tc", "class", "add", "dev", cfg.NETWORK_DEVICE,
-        "parent", "1:", "classid", "1:11", "htb", "rate", "%dMbit" % bandwidth
+    p2 = start_process([
+        "ssh", "maverick@cloudy",
+        "sudo tc qdisc add dev enp3s0 root netem delay %dms rate 100Mbit" % (latency //2)
     ])
-
-    call_wait([
-        "sudo", "tc", "qdisc", "add", "dev", cfg.NETWORK_DEVICE,
-        "parent", "1:11", "handle", "10:", "netem", "delay", "%dms" % latency
+    p3 = start_process([
+        "ssh", "maverick@starlight",
+        "sudo tc qdisc add dev enp4s0 root netem delay %dms rate 100Mbit" % (latency //2)
     ])
+    if debug is True:
+        for ln in p1.stdout:
+            print(ln)
+        for ln in p2.stdout:
+            print(ln)
+        for ln in p3.stdout:
+            print(ln)
+    p1.wait()
+    p2.wait()
+    p3.wait()
 
 
-def reset_latency_bandwidth(cfg):
-    call_wait(["sudo", "tc", "qdisc", "del", "dev", cfg.NETWORK_DEVICE, "root"])
+def reset_latency_bandwidth(cfg, debug=False):
+    p1 = start_process(["sudo","tc","qdisc","del","dev",cfg.NETWORK_DEVICE,"root"])
+    p2 = start_process([
+        "ssh", "maverick@cloudy",
+        "sudo tc qdisc del dev enp3s0 root"
+    ])
+    p3 = start_process([
+        "ssh", "maverick@starlight",
+        "sudo tc qdisc del dev enp4s0 root"
+    ])
+    if debug is True:
+        for ln in p1.stdout:
+            print(ln)
+        for ln in p2.stdout:
+            print(ln)
+        for ln in p3.stdout:
+            print(ln)
+    p1.wait()
+    p2.wait()
+    p3.wait()

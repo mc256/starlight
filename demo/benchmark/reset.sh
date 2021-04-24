@@ -20,6 +20,17 @@ if [ -d "${STARLIGHT_SNAPSHOTTER_ROOT}sfs/" ] ; then
 fi
 rm -rf "${STARLIGHT_SNAPSHOTTER_ROOT}"*
 
+rm -rf /tmp/benchmark-folders
+
+mkdir -p /tmp/benchmark-folders/m1
+mkdir -p /tmp/benchmark-folders/m2
+mkdir -p /tmp/benchmark-folders/m3
+mkdir -p /tmp/benchmark-folders/m4
+mkdir -p /tmp/benchmark-folders/m5
+
+chown -R 999:999 /tmp/benchmark-folders/m1
+chown -R 999:999 /tmp/benchmark-folders/m2
+
 ps aux | grep ctr-starlight | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep ctr-remote | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep " starlight-grpc " | head -n -1 | awk '{print $2}' | sudo xargs kill -9

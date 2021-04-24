@@ -119,6 +119,8 @@ def test_estargz(cfg, image_name, history, r=0, debug=False):
         "-n", "xe%d" % r,
         "c", "create",
         "--snapshotter", "stargz",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m1,dst=/var/lib/mysql,options=bind:rw",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m2,dst=/var/run/mysqld,options=bind:rw",
         "--env-file", "./all.env",
         "%s:5000/%s-estargz2" % (cfg.REGISTRY_SERVER, image_name),
         "task%d" % r
@@ -201,10 +203,15 @@ def test_starlight(cfg, image_name, history, r=0, old_image_name="", debug=False
         "sudo", "ctr-starlight",
         "-n", "xs%d" % r,
         "create",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m1,dst=/var/lib/mysql,options=bind:rw",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m2,dst=/run/mysqld,options=bind:rw",
         "--env-file", "./all.env",
         new,
         new,
-        "task%d" % r
+        "task%d" % r,
+        "sh",
+        "-c",
+        "/entrypoint.sh mysqld; ls -alhn /var/lib/; echo ----; ls -alhn /var/lib/mysql"
     ], debug)
 
     ######################################################################
@@ -279,6 +286,8 @@ def test_vanilla(cfg, image_name, history, r=0, debug=False):
         "sudo", "ctr",
         "-n", "xv%d" % r,
         "c", "create",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m1,dst=/var/lib/mysql,options=bind:rw",
+        "--mount","type=bind,src=/tmp/benchmark-folders/m2,dst=/var/run/mysqld,options=bind:rw",
         "--env-file", "./all.env",
         "%s:5000/%s" % (cfg.REGISTRY_SERVER, image_name),
         "task%d" % r
