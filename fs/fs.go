@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	DebugTrace = false
+	DebugTrace = true
 )
 
 type StarlightFsNode struct {
@@ -900,27 +900,20 @@ func (n *StarlightFsNode) Removexattr(ctx context.Context, attr string) syscall.
 var _ = (fs.NodeStatfser)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
-	/*
-		s := syscall.Statfs_t{}
-		err := syscall.Statfs(n.Ent.AtomicGetRealPath(), &s)
-		if err != nil {
-			return fs.ToErrno(err)
-		}
-		out.FromStatfsT(&s)
-		out.NameLen = 1<<32 - 1
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+			"attr": out,
+		}).Trace("STATFS")
+	}
 
-	*/
-	// http://man7.org/linux/man-pages/man2/statfs.2.html
-	out.Blocks = 0 // dummy
-	out.Bfree = 0
-	out.Bavail = 0
-	out.Files = 0 // dummy
-	out.Ffree = 0
-	out.Bsize = 0 // dummy
+	s := syscall.Statfs_t{}
+	err := syscall.Statfs(n.Ent.AtomicGetRealPath(), &s)
+	if err != nil {
+		return fs.ToErrno(err)
+	}
+	out.FromStatfsT(&s)
 	out.NameLen = 1<<32 - 1
-	out.Frsize = 0 // dummy
-	out.Padding = 0
-	out.Spare = [6]uint32{}
 
 	return 0
 }
