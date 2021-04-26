@@ -211,6 +211,76 @@ func (n *StarlightFsNode) Readlink(ctx context.Context) ([]byte, syscall.Errno) 
 	return buf, 0
 }
 
+var _ = (fs.NodeLinker)((*StarlightFsNode)(nil))
+
+func (n *StarlightFsNode) Link(ctx context.Context, target fs.InodeEmbedder, name string, out *fuse.EntryOut) (node *fs.Inode, errno syscall.Errno) {
+	if strings.HasPrefix(name, ".wh.") {
+		return nil, syscall.EPERM
+	}
+
+	t := target.(*StarlightFsNode)
+
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"from":   name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+			"target": t.Ent.Name,
+		}).Trace("LINK")
+	}
+
+	n.Ent.StateMu.Lock()
+	defer n.Ent.StateMu.Unlock()
+
+	var child *FsEntry
+	var hasChild bool
+	if child, hasChild = n.Ent.LookUp(name); hasChild {
+		return nil, syscall.EEXIST
+	}
+
+	if err := n.promote(); err != 0 {
+		return nil, err
+	}
+
+	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
+		Entry{
+			TraceableEntry: &util.TraceableEntry{
+				TOCEntry: &estargz.TOCEntry{
+					Name: filepath.Join(n.Ent.Name, name),
+					Type: "hardlink",
+				},
+			},
+			parent: n.Ent,
+			State:  EnRwLayer,
+			ready:  nil,
+		},
+	})
+
+	if err := syscall.Link(t.Ent.GetRwLayerPath(), child.GetRwLayerPath()); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	// permission
+	if err := n.preserveOwner(ctx, child.GetRwLayerPath()); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	var stat syscall.Stat_t
+	if err := syscall.Lstat(child.GetRwLayerPath(), &stat); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	out.FromStat(&stat)
+
+	child.stable.Ino = stat.Ino
+	child.stable.Mode = stat.Mode
+
+	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
+	n.Ent.AddChild(name, child)
+	return ch, 0
+}
+
 var _ = (fs.NodeUnlinker)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Unlink(ctx context.Context, name string) syscall.Errno {
@@ -267,8 +337,30 @@ func (n *StarlightFsNode) Rmdir(ctx context.Context, name string) syscall.Errno 
 	}
 
 	// remove a child
-	n.Ent.RemoveChild(name)
-	// TODO: write a whiteout file to rwlayer
+	if child, hasChild := n.Ent.LookUp(name); hasChild {
+		if err := func() (errno syscall.Errno) {
+			child.StateMu.Lock()
+			defer child.StateMu.Unlock()
+
+			var err error
+			if child.State == EnRwLayer {
+				err = syscall.Rmdir(child.GetRwLayerPath())
+			} else if child.State == EnRoLayer {
+				//err = syscall.Unlink(child.GetRoLayerPath())
+
+			}
+			if err != nil {
+				return fs.ToErrno(err)
+			}
+
+			n.Ent.RemoveChild(name)
+			return 0
+		}(); err != 0 {
+			return err
+		}
+	} else {
+		return syscall.ENOENT
+	}
 
 	return 0
 }
@@ -398,7 +490,7 @@ func (n *StarlightFsNode) setRWAttr(in *fuse.SetAttrIn) syscall.Errno {
 		if gok {
 			sgid = int(gid)
 		}
-		if err := syscall.Chown(p, suid, sgid); err != nil {
+		if err := syscall.Lchown(p, suid, sgid); err != nil {
 			return fs.ToErrno(err)
 		}
 	}
@@ -758,9 +850,9 @@ func (n *StarlightFsNode) Rename(ctx context.Context, name string, newParent fs.
 		child.StateMu.Lock()
 		defer child.StateMu.Unlock()
 
-		if _, hasTChild := target.Ent.LookUp(newName); hasTChild {
-			return syscall.EPERM
-		}
+		//if _, hasTChild := target.Ent.LookUp(newName); hasTChild {
+		//	return syscall.EPERM
+		//}
 
 		if n.Ent.State == EnRoLayer {
 			if errno := n.promote(); errno != 0 {
@@ -895,7 +987,30 @@ func (n *StarlightFsNode) Removexattr(ctx context.Context, attr string) syscall.
 	return fs.ToErrno(err)
 }
 
-// Statfs
+var _ = (fs.NodeFsyncer)((*StarlightFsNode)(nil))
+
+func (n *StarlightFsNode) Fsync(ctx context.Context, f fs.FileHandle, flags uint32) syscall.Errno {
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+		}).Trace("FSYNC")
+	}
+
+	if n.Ent.AtomicGetFileState() == EnEmpty {
+		<-n.Ent.ready
+		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
+	}
+
+	p := n.Ent.AtomicGetRealPath()
+	fd, err := syscall.Open(p, int(flags), 0)
+	if err != nil {
+		return fs.ToErrno(err)
+	}
+	f = fs.NewLoopbackFile(fd)
+
+	return f.(fs.FileFsyncer).Fsync(ctx, flags)
+
+}
 
 var _ = (fs.NodeStatfser)((*StarlightFsNode)(nil))
 

@@ -589,7 +589,10 @@ func NewImageReader(ctx context.Context, layerStore *LayerStore, reader io.Reade
 				}
 
 				if temp.Size == 0 {
-					if lm := ir.layerLookupMap[ent.Source-1]; lm.AtomicIsComplete() {
+					if ent.Source <= 0 {
+						temp.State = EnRwLayer
+						// TODO: this wipe out file should be written to the RW layer, but not yet implemented
+					} else if lm := ir.layerLookupMap[ent.Source-1]; lm.AtomicIsComplete() {
 						temp.State = EnRoLayer
 					} else {
 						temp.State = EnEmpty

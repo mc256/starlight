@@ -42,7 +42,7 @@ func Action(c *cli.Context) error {
 	socket := c.String("address")
 
 	// Connect to containerd
-	t, ctx, err := ctr.NewContainerdClient(ns, socket)
+	t, ctx, err := ctr.NewContainerdClient(ns, socket, c.String("log-level"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("containerd client")
 		return nil

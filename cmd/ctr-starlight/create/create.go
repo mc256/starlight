@@ -52,7 +52,7 @@ func Action(c *cli.Context) error {
 	// Connect to containerd
 	ns := c.String("namespace")
 	socket := c.String("address")
-	t, ctx, err := ctr.NewContainerdClient(ns, socket)
+	t, ctx, err := ctr.NewContainerdClient(ns, socket, c.String("log-level"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("containerd client")
 		return nil
@@ -118,7 +118,11 @@ func Action(c *cli.Context) error {
 	opts = append(opts, oci.WithEnv(c.StringSlice("env")))
 
 	// Options mounts
-	opts = append(opts, withMounts(c))
+	ms, err := withMounts(c, ctx, mnt[0].Source)
+	if err != nil {
+		return err
+	}
+	opts = append(opts, ms)
 
 	////////////////////////////////////////////////////////////////
 	if len(args) > 0 {
@@ -134,12 +138,21 @@ func Action(c *cli.Context) error {
 	////////////////////////////////////////////////////////////////
 	if c.Bool("local-time") {
 		opts = append(opts, oci.WithHostLocaltime)
+		if err := touchFile(ctx, mnt[0].Source, "etc/localtime"); err != nil {
+			log.G(ctx).WithError(err).Error("touch localtime error")
+		}
 	}
 	if c.Bool("privileged") {
 		opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
 	}
 	if c.Bool("net-host") {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
+		if err := touchFile(ctx, mnt[0].Source, "etc/hosts"); err != nil {
+			log.G(ctx).WithError(err).Error("touch hosts error")
+		}
+		if err := touchFile(ctx, mnt[0].Source, "etc/resolv.conf"); err != nil {
+			log.G(ctx).WithError(err).Error("touch resolv.conf error")
+		}
 	}
 
 	////////////////////////////////////////////////////////////////

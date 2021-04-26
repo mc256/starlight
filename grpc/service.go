@@ -31,7 +31,7 @@ import (
 	"syscall"
 )
 
-func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtocol, remoteAddress, workDir string) {
+func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtocol, remoteAddress, workDir string, fsTrace bool) {
 	// Create a gRPC server
 	rpc := grpc.NewServer()
 
@@ -41,7 +41,7 @@ func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtoco
 	// https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter
 	remote := NewStarlightProxy(ctx, remoteProtocol, remoteAddress)
 
-	sn, err := NewSnapshotter(ctx, workDir, remote)
+	sn, err := NewSnapshotter(ctx, workDir, remote, fsTrace)
 	if err != nil {
 		log.G(ctx).WithError(err).Fatal("failed to create new snapshotter")
 		os.Exit(1)

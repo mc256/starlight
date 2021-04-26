@@ -44,6 +44,7 @@ func RunAction(c *cli.Context) error {
 		protocol,
 		c.String("server"),
 		c.String("fs"),
+		c.Bool("log-fs-trace"),
 	)
 
 	return nil

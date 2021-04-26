@@ -69,6 +69,13 @@ func NewApp() *cli.App {
 			Usage:       "address for containerd's GRPC server",
 			Required:    false,
 		},
+		&cli.StringFlag{
+			Name:        "log-level",
+			Usage:       "log level for this command line tool",
+			Value:       "info",
+			DefaultText: "info",
+			Required:    false,
+		},
 	}
 	app.Commands = append([]*cli.Command{
 		util.VersionCommand(),

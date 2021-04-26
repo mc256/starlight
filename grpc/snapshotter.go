@@ -60,11 +60,13 @@ type snapshotter struct {
 	imageReaders map[string]*starlightfs.ImageReader
 	//imageReadersMux sync.Mutex
 	fsMap map[string]*starlightfs.FsInstance
+
+	fsTrace bool
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
-func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy) (snapshots.Snapshotter, error) {
+func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy, fsTrace bool) (snapshots.Snapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -100,6 +102,7 @@ func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy) (s
 		imageReaders: make(map[string]*starlightfs.ImageReader, 0),
 		fsMap:        make(map[string]*starlightfs.FsInstance, 0),
 
+		fsTrace: fsTrace,
 		//imageReadersMux: sync.Mutex{},
 	}, nil
 }
@@ -275,11 +278,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 				// fuse server
 				fsOpts := fusefs.Options{}
-
-				if strings.ToLower(os.Getenv("FS_TRACE")) == "true" {
-					fsOpts.Debug = true
-				}
-				fsOpts.Debug = false // Turn it off to make it faster
+				fsOpts.Debug = o.fsTrace
 
 				fsServer, err := fsi.NewFuseServer(mp, &fsOpts, fsOpts.Debug)
 				if err != nil {

@@ -38,7 +38,7 @@ type ContainerdClient struct {
 	SnId   string
 }
 
-func NewContainerdClient(namespace, socket string) (c *ContainerdClient, ctx context.Context, err error) {
+func NewContainerdClient(namespace, socket, logLevel string) (c *ContainerdClient, ctx context.Context, err error) {
 	var client *containerd.Client
 	if client, err = containerd.New(socket); err != nil {
 		return nil, nil, err
@@ -49,7 +49,7 @@ func NewContainerdClient(namespace, socket string) (c *ContainerdClient, ctx con
 		Client:     client,
 	}
 
-	util.ConfigLogger()
+	util.ConfigLoggerWithLevel(logLevel)
 	c.ctx = namespaces.WithNamespace(context.Background(), namespace)
 
 	// Snapshotter service
