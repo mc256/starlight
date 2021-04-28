@@ -298,8 +298,15 @@ func (ir *ImageReader) decompress(wg *sync.WaitGroup, cur, size int64, buf *byte
 		// send landmark signal
 		if isTemplate == false {
 			landmark := entS.(*LandmarkEntry)
+			if landmark.checkpoint == "v3" {
+				continue
+			}
 			close(landmark.ready)
-			ir.printLog(landmark.image, landmark.checkpoint, "", "", "landmark signal sent")
+			//ir.printLog(landmark.image, landmark.checkpoint, "", "", "landmark signal sent")
+			log.G(ir.ctx).WithFields(logrus.Fields{
+				"img":        landmark.image,
+				"checkpoint": landmark.checkpoint,
+			}).Info("landmark signal sent")
 			continue
 		}
 
@@ -445,6 +452,12 @@ func (ir *ImageReader) extractFiles() {
 	log.G(ir.ctx).WithFields(logrus.Fields{
 		"name": ir.name,
 	}).Info("entire image extracted")
+
+	for k, v := range ir.checkpointWaitPool {
+		if strings.HasSuffix(k, "v3") {
+			close(v.ready)
+		}
+	}
 }
 
 func (ir *ImageReader) ExtractFiles() {
