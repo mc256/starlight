@@ -1,8 +1,11 @@
+import signal
 import subprocess, os
 import time
 import random
 import constants as config
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import date
 
 
@@ -152,13 +155,16 @@ class ContainerExperiment:
         self.version = version
         self.old_version = old_version
         self.has_mounting = False
+        self.rtt = [2, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+        self.rounds = 20
+        self.expected_max_start_time = 30
         self.mounting = []
 
         today = date.today().strftime("%m%d")
         if old_version == "":
-            self.experiment_name = "%s-%s--Deploy-%s" % (image_name, today, version)
+            self.experiment_name = "%s-%s--deploy-%s" % (image_name, today, version)
         else:
-            self.experiment_name = "%s-%s--Update-%s_%s" % (image_name, today, version, old_version)
+            self.experiment_name = "%s-%s--update-%s_%s-r%d" % (image_name, today, version, old_version, self.rounds)
 
     def set_experiment_name(self, name):
         self.experiment_name = name
@@ -195,6 +201,57 @@ class ContainerExperiment:
 
     def has_old_version(self):
         return self.old_version != ""
+
+    def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget, position=1):
+        estargz_np = np.array(performance_estargz)
+        starlight_np = np.array(performance_starlight)
+        vanilla_np = np.array(performance_vanilla)
+        wget_np = np.array(performance_wget)
+
+        df1 = pd.DataFrame(vanilla_np.T, columns=self.rtt[:position])
+        df2 = pd.DataFrame(estargz_np.T, columns=self.rtt[:position])
+        df3 = pd.DataFrame(starlight_np.T, columns=self.rtt[:position])
+        df4 = pd.DataFrame(wget_np.T, columns=self.rtt[:position])
+
+        df_avg = pd.DataFrame({
+            'vanilla': df1.mean(),
+            'estargz': df2.mean(),
+            'starlight': df3.mean(),
+            'wget': df4.mean(),
+        },
+            index=self.rtt
+        )
+
+        df1.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
+        df2.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
+        df3.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
+        df4.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
+
+        df1_q = df1.quantile([0.1, 0.9])
+        df2_q = df2.quantile([0.1, 0.9])
+        df3_q = df3.quantile([0.1, 0.9])
+        df4_q = df4.quantile([0.1, 0.9])
+
+        max_delay = self.expected_max_start_time
+
+        fig, (ax1) = plt.subplots(ncols=1, sharey=True, figsize=(4, 4), dpi=80)
+
+        fig.suptitle("%s" % self.experiment_name)
+        ax1.set_xlim([0, 350])
+        ax1.set_ylim([0, max_delay])
+        ax1.set_ylabel('startup time (s)')
+
+        ax1.fill_between(df1_q.columns, df1_q.loc[0.1], df1_q.loc[0.9], alpha=0.25)
+        ax1.fill_between(df2_q.columns, df2_q.loc[0.1], df2_q.loc[0.9], alpha=0.25)
+        ax1.fill_between(df3_q.columns, df3_q.loc[0.1], df3_q.loc[0.9], alpha=0.25)
+        ax1.fill_between(df4_q.columns, df4_q.loc[0.1], df4_q.loc[0.9], alpha=0.25)
+
+        df_avg.plot(kind='line', ax=ax1, grid=True)
+        ax1.legend(loc='upper left')
+        ax1.title.set_text("mean & quantile[0.1,0.9]")
+
+        fig.tight_layout()
+        fig.savefig("./plot/%s.png" % self.experiment_name, facecolor='w', transparent=False)
 
 
 class MountingPoint:
@@ -332,10 +389,21 @@ class Runner:
         print("%12s : " % "wget", end='')
         ######################################################################
         # Pull
+        query = "http://%s/from/_/to/%s" % (
+            self.service.config.PROXY_SERVER,
+            experiment.get_starlight_image(False)
+        )
+        if experiment.has_old_version():
+            query = "http://%s/from/%s/to/%s" % (
+                self.service.config.PROXY_SERVER,
+                experiment.get_starlight_image(True),
+                experiment.get_starlight_image(False)
+            )
+
         call_wait([
             "wget",
             "-O", "%s/test.bin" % self.service.config.TMP,
-            "-q", "%s/prepare/%s" % (self.service.config.PROXY_SERVER, experiment.get_starlight_image(False))
+            "-q", query
         ], debug)
 
         ######################################################################
@@ -390,15 +458,13 @@ class Runner:
             ),
             "task%d" % r
         ])
-        print(cmd)
         call_wait(cmd, debug)
         ######################################################################
         # Task Start
-        proc = start_process_shell(
-            "sudo ctr -n xe%d t start task%d 2>&1 %s" % (
-                r, r, self.service.config.TEE_LOG_STARGZ_RUNTIME
-            )
+        cmd_start = "sudo ctr -n xe%d t start task%d 2>&1 %s" % (
+            r, r, self.service.config.TEE_LOG_STARGZ_RUNTIME
         )
+        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
 
         last_line = ""
         real_done = False
@@ -438,10 +504,6 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
-
-            a, b = proc.communicate()
             print(a.decode("utf-8"), end="")
             print(b.decode("utf-8"), end="")
 
@@ -490,11 +552,10 @@ class Runner:
 
         ######################################################################
         # Task Start
-        proc = start_process_shell(
-            "sudo ctr -n xs%d t start task%d 2>&1 %s" % (
-                r, r, self.service.config.TEE_LOG_STARLIGHT_RUNTIME
-            )
+        cmd_start = "sudo ctr -n xs%d t start task%d 2>&1 %s" % (
+            r, r, self.service.config.TEE_LOG_STARLIGHT_RUNTIME
         )
+        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
         last_line = ""
         real_done = False
         for ln in proc.stdout:
@@ -533,10 +594,6 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
-
-            a, b = proc.communicate()
             print(a.decode("utf-8"), end="")
             print(b.decode("utf-8"), end="")
 
@@ -586,11 +643,10 @@ class Runner:
 
         ######################################################################
         # Task Start
-        proc = start_process_shell(
-            "sudo ctr -n xv%d t start task%d 2>&1 %s" % (
-                r, r, self.service.config.TEE_LOG_CONTAINERD_RUNTIME
-            )
+        cmd_start = "sudo ctr -n xv%d t start task%d 2>&1 %s" % (
+            r, r, self.service.config.TEE_LOG_CONTAINERD_RUNTIME
         )
+        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
         last_line = ""
         real_done = False
         for ln in proc.stdout:
@@ -629,10 +685,6 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
-
-            a, b = proc.communicate()
             print(a.decode("utf-8"), end="")
             print(b.decode("utf-8"), end="")
 

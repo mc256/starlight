@@ -13,6 +13,7 @@ class TestMySQL(c.ContainerExperiment):
             c.MountingPoint("/var/lib/mysql", False, "rw", "999:999"),
             c.MountingPoint("/run/mysqld", False, "rw", "999:999")
         ])
+        self.expected_max_start_time = 30
 
 
 class TestMariadb(c.ContainerExperiment):
@@ -27,6 +28,7 @@ class TestMariadb(c.ContainerExperiment):
             c.MountingPoint("/var/lib/mysql", False, "rw", "999:999"),
             c.MountingPoint("/run/mysqld", False, "rw", "999:999")
         ])
+        self.expected_max_start_time = 30
 
 
 class TestRedis(c.ContainerExperiment):
@@ -40,6 +42,7 @@ class TestRedis(c.ContainerExperiment):
         self.set_mounting_points([
             c.MountingPoint("/data"),
         ])
+        self.expected_max_start_time = 16
 
 
 class TestCassandra(c.ContainerExperiment):
@@ -50,3 +53,4 @@ class TestCassandra(c.ContainerExperiment):
             version,
             old_version
         )
+        self.expected_max_start_time = 20
