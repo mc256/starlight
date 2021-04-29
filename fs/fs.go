@@ -374,7 +374,7 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 			"name":   n.Ent.Name,
 			"source": n.Ent.Source,
 			"state":  n.Ent.State,
-		}).Trace("OPEN")
+		}).Trace("OPEN-P")
 	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
@@ -405,6 +405,14 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 	fd, err := syscall.Open(p, int(flags), 0)
 	if err != nil {
 		return nil, 0, fs.ToErrno(err)
+	}
+
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("OPEN")
 	}
 	return fs.NewLoopbackFile(fd), 0, 0
 }
@@ -1018,10 +1026,8 @@ func (n *StarlightFsNode) Statfs(ctx context.Context, out *fuse.StatfsOut) sysca
 	if DebugTrace {
 		log.G(ctx).WithFields(logrus.Fields{
 			"name": n.Ent.Name,
-			"attr": out,
-		}).Trace("STATFS")
+		}).Trace("STATFS-P")
 	}
-
 	s := syscall.Statfs_t{}
 	err := syscall.Statfs(n.Ent.AtomicGetRealPath(), &s)
 	if err != nil {
@@ -1029,6 +1035,11 @@ func (n *StarlightFsNode) Statfs(ctx context.Context, out *fuse.StatfsOut) sysca
 	}
 	out.FromStatfsT(&s)
 	out.NameLen = 1<<32 - 1
-
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+			"attr": out,
+		}).Trace("STATFS")
+	}
 	return 0
 }

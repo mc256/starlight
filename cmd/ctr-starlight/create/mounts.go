@@ -22,12 +22,14 @@ import (
 	gocontext "context"
 	"encoding/csv"
 	"fmt"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/net/context"
 	"os"
 	"path"
 	"strings"
@@ -89,6 +91,17 @@ func touchDir(ctx gocontext.Context, mounting, dirName string) error {
 	} else {
 		currentTime := time.Now().Local()
 		return os.Chtimes(fullName, currentTime, currentTime)
+	}
+}
+
+func WithImageStopSignal() containerd.NewContainerOpts {
+	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
+		if c.Labels == nil {
+			c.Labels = make(map[string]string)
+		}
+
+		c.Labels[containerd.StopSignalLabel] = "SIGTERM"
+		return nil
 	}
 }
 

@@ -38,6 +38,8 @@ ps aux | grep " stargz-grpc " | head -n -1 | awk '{print $2}' | sudo xargs kill 
 ps aux | grep shim-runc-v2 | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep entrypoint | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep mysqld | head -n -1 | awk '{print $2}' | sudo xargs kill -9
+ps aux | grep mariadb | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep redis-server | head -n -1 | awk '{print $2}' | sudo xargs kill -9
+ps aux | grep java/openjdk | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 
 /usr/local/bin/containerd &

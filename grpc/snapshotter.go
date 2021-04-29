@@ -31,10 +31,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.etcd.io/bbolt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 /*
@@ -290,9 +292,10 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 				}
 
 				// mounting point
+				mountingPoint := fsi.GetMountPoint()
 				mnt = []mount.Mount{{
 					Type:   "bind",
-					Source: fsi.GetMountPoint(),
+					Source: mountingPoint,
 					Options: []string{
 						"rw",
 						"rbind",
@@ -386,16 +389,31 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 	_key := key[:len(key)-7]
 	if fsi, hasFs := o.fsMap[path.Base(_key)]; hasFs {
+		// Problem! Looking for a better fix
+		// Possible of losing mounting points after task started
+		mounting := fsi.GetMountPoint()
+		go func() {
+			n := 0
+			for {
+				_, _ = ioutil.ReadDir(mounting)
+				time.Sleep(100 * time.Millisecond)
+				n++
+				if n > 50 {
+					break
+				}
+			}
+		}()
+
 		return []mount.Mount{{
 			Type:   "bind",
-			Source: fsi.GetMountPoint(),
+			Source: mounting,
 			Options: []string{
 				"rw",
 				"rbind",
 			},
 		}}, nil
 	} else {
-		return nil, util.ErrLayerNotFound
+		return nil, util.ErrMountingPointNotFound
 	}
 }
 

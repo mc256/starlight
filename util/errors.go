@@ -24,6 +24,7 @@ var (
 	ErrImageMediaType           = errors.New("unknown image type")
 	ErrImagePlatform            = errors.New("found manifest but platform does not match")
 	ErrLayerNotFound            = errors.New("cannot find layer")
+	ErrMountingPointNotFound    = errors.New("cannot find mounting point")
 	ErrNotConsolidated          = errors.New("delta image has not yet been consolidated")
 	ErrAlreadyConsolidated      = errors.New("delta image has been consolidated already")
 	ErrHashCollision            = errors.New("found two files have the same hash but different size")

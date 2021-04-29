@@ -36,6 +36,10 @@ import (
 	"strings"
 )
 
+const (
+	RunCommand = false
+)
+
 func Action(c *cli.Context) error {
 	// [flags] ImageCombination Image CONTAINER [COMMAND] [ARG...]
 	var imageCombo, ref, containerName string
@@ -210,6 +214,8 @@ func Action(c *cli.Context) error {
 	for _, dev := range c.StringSlice("device") {
 		opts = append(opts, oci.WithLinuxDevice(dev, "rwm"))
 	}
+
+	cOpts = append(cOpts, WithImageStopSignal())
 
 	////////////////////////////////////////////////////////////////
 	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(c.StringSlice("label"))))
