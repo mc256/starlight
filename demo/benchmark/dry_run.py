@@ -2,7 +2,9 @@ from common import Runner
 from testcases import *
 
 if __name__ == '__main__':
-    t = TestRedis("6.0", "5.0")
+    #t = TestRedis("6.0", "5.0")
+    t = TestMySQL("8.0.24", "8.0.23")
+    #t = TestCassandra("4.0", "3.11")
 
     t.set_experiment_name("dryrun")
     r = Runner()
@@ -15,10 +17,10 @@ if __name__ == '__main__':
     r.service.reset_container_service()
     r.service.start_grpc_estargz()
 
-    n = r.sync_pull_estargz(t, 0, False)
+    n = r.sync_pull_estargz(t, 0, True)
 
     r.service.set_latency_bandwidth(10)
-    r.test_estargz(t, history_temp, n, False)
+    r.test_estargz(t, history_temp, n, True)
     r.service.reset_latency_bandwidth()
 
     r.service.kill_estargz()
@@ -27,10 +29,10 @@ if __name__ == '__main__':
     r.service.reset_container_service()
     r.service.start_grpc_starlight()
 
-    n = r.sync_pull_starlight(t, 0, False)
+    n = r.sync_pull_starlight(t, 0, True)
 
     r.service.set_latency_bandwidth(10)
-    r.test_starlight(t, history_temp, n, False)
+    r.test_starlight(t, history_temp, n, True)
     r.service.reset_latency_bandwidth()
 
     r.service.kill_starlight()
@@ -38,10 +40,10 @@ if __name__ == '__main__':
     # vanilla
     r.service.reset_container_service()
 
-    n = r.sync_pull_vanilla(t, 0, False)
+    n = r.sync_pull_vanilla(t, 0, True)
 
     r.service.set_latency_bandwidth(10)
-    r.test_vanilla(t, history_temp, n, False)
+    r.test_vanilla(t, history_temp, n, True)
     r.service.reset_latency_bandwidth()
 
     # wget

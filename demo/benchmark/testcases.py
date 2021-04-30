@@ -2,7 +2,7 @@ import common as c
 
 
 class TestMySQL(c.ContainerExperiment):
-    def __init__(self, version, old_version):
+    def __init__(self, version, old_version=""):
         super().__init__(
             "mysql",
             "socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server - GPL",
@@ -17,7 +17,7 @@ class TestMySQL(c.ContainerExperiment):
 
 
 class TestMariadb(c.ContainerExperiment):
-    def __init__(self, version, old_version):
+    def __init__(self, version, old_version=""):
         super().__init__(
             "mariadb",
             "socket: '/var/run/mysqld/mysqld.sock'  port: 3306  mariadb.org binary distribution",
@@ -32,7 +32,7 @@ class TestMariadb(c.ContainerExperiment):
 
 
 class TestRedis(c.ContainerExperiment):
-    def __init__(self, version, old_version):
+    def __init__(self, version, old_version=""):
         super().__init__(
             "redis",
             "* Ready to accept connections",
@@ -46,11 +46,11 @@ class TestRedis(c.ContainerExperiment):
 
 
 class TestCassandra(c.ContainerExperiment):
-    def __init__(self, version, old_version):
+    def __init__(self, version, old_version=""):
         super().__init__(
             "cassandra",
             "- Startup complete",
             version,
             old_version
         )
-        self.expected_max_start_time = 20
+        self.expected_max_start_time = 120

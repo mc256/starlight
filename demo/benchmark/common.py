@@ -155,7 +155,8 @@ class ContainerExperiment:
         self.version = version
         self.old_version = old_version
         self.has_mounting = False
-        self.rtt = [2, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+        # self.rtt = [2, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+        self.rtt = [2, 50, 100, 150, 200, 250, 300]
         self.rounds = 20
         self.expected_max_start_time = 30
         self.mounting = []
@@ -202,7 +203,15 @@ class ContainerExperiment:
     def has_old_version(self):
         return self.old_version != ""
 
-    def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget, position=1):
+    def load_results(self):
+        df1 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
+        df2 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
+        df3 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
+        df4 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
+        return df1, df2, df3, df4
+
+    def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
+                     position=1):
         estargz_np = np.array(performance_estargz)
         starlight_np = np.array(performance_starlight)
         vanilla_np = np.array(performance_vanilla)
@@ -213,6 +222,14 @@ class ContainerExperiment:
         df3 = pd.DataFrame(starlight_np.T, columns=self.rtt[:position])
         df4 = pd.DataFrame(wget_np.T, columns=self.rtt[:position])
 
+        df1.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
+        df2.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
+        df3.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
+        df4.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
+
+        return df1, df2, df3, df4
+
+    def plot_results(self, df1, df2, df3, df4):
         df_avg = pd.DataFrame({
             'vanilla': df1.mean(),
             'estargz': df2.mean(),
@@ -222,11 +239,6 @@ class ContainerExperiment:
             index=self.rtt
         )
 
-        df1.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
-        df2.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
-        df3.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
-        df4.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
-
         df1_q = df1.quantile([0.1, 0.9])
         df2_q = df2.quantile([0.1, 0.9])
         df3_q = df3.quantile([0.1, 0.9])
@@ -234,24 +246,28 @@ class ContainerExperiment:
 
         max_delay = self.expected_max_start_time
 
-        fig, (ax1) = plt.subplots(ncols=1, sharey=True, figsize=(4, 4), dpi=80)
+        fig, (ax1) = plt.subplots(ncols=1, figsize=(4, 4), dpi=300)
 
         fig.suptitle("%s" % self.experiment_name)
-        ax1.set_xlim([0, 350])
+        ax1.set_xlim([0, 300])
         ax1.set_ylim([0, max_delay])
         ax1.set_ylabel('startup time (s)')
+        ax1.set_xlabel('RTT (ms)')
 
         ax1.fill_between(df1_q.columns, df1_q.loc[0.1], df1_q.loc[0.9], alpha=0.25)
         ax1.fill_between(df2_q.columns, df2_q.loc[0.1], df2_q.loc[0.9], alpha=0.25)
         ax1.fill_between(df3_q.columns, df3_q.loc[0.1], df3_q.loc[0.9], alpha=0.25)
         ax1.fill_between(df4_q.columns, df4_q.loc[0.1], df4_q.loc[0.9], alpha=0.25)
 
-        df_avg.plot(kind='line', ax=ax1, grid=True)
+        df_avg.plot(kind='line', ax=ax1, grid=True, marker="o")
         ax1.legend(loc='upper left')
         ax1.title.set_text("mean & quantile[0.1,0.9]")
 
         fig.tight_layout()
         fig.savefig("./plot/%s.png" % self.experiment_name, facecolor='w', transparent=False)
+
+    def __repr__(self):
+        return "ContainerExperiment<%s>" % self.experiment_name
 
 
 class MountingPoint:
@@ -262,28 +278,20 @@ class MountingPoint:
         self.guest_dst = guest_dst
         self.op_type = op_type
         self.owner = owner
-        self.r = random.randrange(999999999)
+        self.r = random.randrange(999999)
 
     def reset_tmp(self, debug=False):
         p = start_process([
-            "sudo", "rm", "-rf", "%s" % (self.WORKDIR)
+            "sudo", "rm", "-rf", "%s" % self.WORKDIR
         ])
         if debug is True:
             for ln in p.stdout:
                 print(ln)
         p.wait()
 
-    def prepare(self, debug=False):
+    def prepare(self, rr=0, debug=False):
         p = start_process([
-            "sudo", "rm", "-rf", "%s/m%d" % (self.WORKDIR, self.r)
-        ])
-        if debug is True:
-            for ln in p.stdout:
-                print(ln)
-        p.wait()
-
-        p = start_process([
-            "sudo", "mkdir", "-p", "%s/m%d" % (self.WORKDIR, self.r)
+            "sudo", "mkdir", "-p", "%s/m%d-%d" % (self.WORKDIR, self.r, rr)
         ])
         if debug is True:
             for ln in p.stdout:
@@ -292,15 +300,24 @@ class MountingPoint:
 
         if self.owner != "":
             p = start_process([
-                "sudo", "chown", "-R", self.owner, "%s/m%d" % (self.WORKDIR, self.r)
+                "sudo", "chown", "-R", self.owner, "%s/m%d-%d" % (self.WORKDIR, self.r, rr)
             ])
             if debug is True:
                 for ln in p.stdout:
                     print(ln)
             p.wait()
 
-    def get_mount_parameter(self):
-        return "type=bind,src=%s/m%d,dst=%s,options=rbind:%s" % (self.WORKDIR, self.r, self.guest_dst, self.op_type)
+    def destroy(self, rr=0, debug=False):
+        p = start_process([
+            "sudo", "rm", "-rf", "%s/m%d-%d" % (self.WORKDIR, self.r, rr)
+        ])
+        if debug is True:
+            for ln in p.stdout:
+                print(ln)
+        p.wait()
+
+    def get_mount_parameter(self, rr=0):
+        return "type=bind,src=%s/m%d-%d,dst=%s,options=rbind:%s" % (self.WORKDIR, self.r, rr, self.guest_dst, self.op_type)
 
 
 class Runner:
@@ -425,7 +442,7 @@ class Runner:
         print("%12s : " % "estargz", end='')
         ######################################################################
         # Pull
-        call_wait([
+        cmd_pull = [
             "sudo", "ctr-remote",
             "-n", "xe%d" % r,
             "image", "rpull",
@@ -433,7 +450,14 @@ class Runner:
                       self.service.config.REGISTRY_SERVER,
                       experiment.get_stargz_image()
                   )
-        ], debug)
+        ]
+        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
+        a, b = pr.communicate()
+        if debug:
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
 
         ######################################################################
         # Create
@@ -446,10 +470,10 @@ class Runner:
 
         if experiment.has_mounting is True:
             for m in experiment.mounting:
-                m.prepare()
-                cmd.extend(["--mount", m.get_mount_parameter()])
+                m.prepare(r, debug)
+                cmd.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV])
+        cmd.extend(["--env-file", self.service.config.ENV, "--net-host"])
 
         cmd.extend([
             "%s/%s" % (
@@ -504,8 +528,14 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+
+        if experiment.has_mounting is True:
+            for m in experiment.mounting:
+                m.destroy(r, debug)
 
         return r
 
@@ -526,8 +556,14 @@ class Runner:
             cmd_pull.append(experiment.get_starlight_image(old=True))
 
         cmd_pull.append(experiment.get_starlight_image(old=False))
+        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        a, b = pr.communicate()
 
-        call_wait(cmd_pull, debug)
+        if debug:
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
 
         ######################################################################
         # Create
@@ -539,10 +575,10 @@ class Runner:
 
         if experiment.has_mounting is True:
             for m in experiment.mounting:
-                m.prepare()
-                cmd.extend(["--mount", m.get_mount_parameter()])
+                m.prepare(r, debug)
+                cmd.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV])
+        cmd.extend(["--env-file", self.service.config.ENV, "--net-host", "--local-time"])
 
         cmd.append(experiment.get_starlight_image(old=False))  # Image Combo
         cmd.append(experiment.get_starlight_image(old=False))  # Specific Image
@@ -594,8 +630,14 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+
+        if experiment.has_mounting is True:
+            for m in experiment.mounting:
+                m.destroy(r, debug)
 
         return r
 
@@ -607,7 +649,7 @@ class Runner:
         print("%12s : " % "vanilla", end='')
         ######################################################################
         # Pull
-        call_wait([
+        cmd_pull = [
             "sudo", "ctr",
             "-n", "xv%d" % r,
             "image", "pull",
@@ -615,8 +657,15 @@ class Runner:
                       self.service.config.REGISTRY_SERVER,
                       experiment.get_vanilla_image()
                   )
-        ], debug)
+        ]
+        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
+        a, b = pr.communicate()
 
+        if debug:
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
         ######################################################################
         # Create
         cmd = [
@@ -627,10 +676,10 @@ class Runner:
 
         if experiment.has_mounting is True:
             for m in experiment.mounting:
-                m.prepare()
-                cmd.extend(["--mount", m.get_mount_parameter()])
+                m.prepare(r, debug)
+                cmd.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV])
+        cmd.extend(["--env-file", self.service.config.ENV, "--net-host"])
 
         cmd.extend([
             "%s/%s" % (
@@ -685,7 +734,13 @@ class Runner:
 
         if debug:
             a, b = stop.communicate()
-            print(a.decode("utf-8"), end="")
-            print(b.decode("utf-8"), end="")
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+
+        if experiment.has_mounting is True:
+            for m in experiment.mounting:
+                m.destroy(r, debug)
 
         return r
