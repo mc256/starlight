@@ -33,7 +33,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 )
 
 func touchFile(ctx gocontext.Context, mounting, fileName string) error {
@@ -41,6 +40,11 @@ func touchFile(ctx gocontext.Context, mounting, fileName string) error {
 	log.G(ctx).WithFields(logrus.Fields{
 		"path": fullName,
 	}).Debug("preparing guest binding file")
+	defer func() {
+		log.G(ctx).WithFields(logrus.Fields{
+			"path": fullName,
+		}).Debug("prepared guest binding file")
+	}()
 
 	create := false
 	if stat, err := os.Stat(fullName); os.IsNotExist(err) {
@@ -56,15 +60,14 @@ func touchFile(ctx gocontext.Context, mounting, fileName string) error {
 		if err := os.MkdirAll(path.Dir(fullName), 0755); err != nil {
 			return err
 		}
+
 		if file, err := os.Create(fullName); err != nil {
 			return err
 		} else {
 			return file.Close()
 		}
-	} else {
-		currentTime := time.Now().Local()
-		return os.Chtimes(fullName, currentTime, currentTime)
 	}
+	return nil
 }
 
 func touchDir(ctx gocontext.Context, mounting, dirName string) error {
@@ -72,6 +75,11 @@ func touchDir(ctx gocontext.Context, mounting, dirName string) error {
 	log.G(ctx).WithFields(logrus.Fields{
 		"path": fullName,
 	}).Debug("preparing guest binding directory")
+	defer func() {
+		log.G(ctx).WithFields(logrus.Fields{
+			"path": fullName,
+		}).Debug("prepared guest binding directory")
+	}()
 
 	create := false
 	if stat, err := os.Stat(fullName); os.IsNotExist(err) {
@@ -87,11 +95,8 @@ func touchDir(ctx gocontext.Context, mounting, dirName string) error {
 		if err := os.MkdirAll(fullName, 0755); err != nil {
 			return err
 		}
-		return nil
-	} else {
-		currentTime := time.Now().Local()
-		return os.Chtimes(fullName, currentTime, currentTime)
 	}
+	return nil
 }
 
 func WithImageStopSignal() containerd.NewContainerOpts {
