@@ -440,7 +440,7 @@ class Runner:
         ######################################################################
         end = time.time()
         dur = end - start
-        print("%3.6fs" % dur, end=" deploy" if use_old else " update")
+        print("%3.6fs" % dur, end=" deploy\n" if use_old else " update\n")
         history.append(dur)
         pass
 

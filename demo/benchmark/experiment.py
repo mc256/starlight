@@ -3,7 +3,7 @@ from test_cases import *
 
 if __name__ == '__main__':
     # t = TestRedis("6.0", "5.0")
-    t = TestCassandra("4.0", "3.11")
+    t = TestCassandra("3.11.10", "3.11.9")
     # t = TestMySQL("8.0.24", "8.0.23")
     # t = TestMariadb("10.5", "10.4")
 
