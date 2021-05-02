@@ -13,14 +13,14 @@ class TestMySQL(c.ContainerExperiment):
             c.MountingPoint("/var/lib/mysql", False, "rw", "999:999"),
             c.MountingPoint("/run/mysqld", False, "rw", "999:999")
         ])
-        self.expected_max_start_time = 30
+        self.expected_max_start_time = 35
 
 
 class TestMariadb(c.ContainerExperiment):
     def __init__(self, version, old_version=""):
         super().__init__(
             "mariadb",
-            "socket: '/var/run/mysqld/mysqld.sock'  port: 3306  mariadb.org binary distribution",
+            "port: 3306  mariadb.org binary distribution",
             version,
             old_version
         )

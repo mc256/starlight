@@ -86,7 +86,7 @@ class ProcessService:
                                                " 2>&1%s" % (
                                                    self.config.STARLIGHT_GRPC,
                                                    self.config.PROXY_SERVER,
-                                                   self.config.TEE_LOG_STARGZ
+                                                   self.config.TEE_LOG_STARLIGHT
                                                )
                                                )
         time.sleep(self.GRPC_PLUGIN_WAIT)
@@ -163,9 +163,9 @@ class ContainerExperiment:
 
         today = date.today().strftime("%m%d")
         if old_version == "":
-            self.experiment_name = "%s-%s--deploy-%s" % (image_name, today, version)
+            self.experiment_name = "%s-%s--deploy-%s-r%d" % (image_name, today, version, self.rounds)
         else:
-            self.experiment_name = "%s-%s--update-%s_%s-r%d" % (image_name, today, version, old_version, self.rounds)
+            self.experiment_name = "%s-%s--%s_%s-r%d" % (image_name, today, version, old_version, self.rounds)
 
     def set_experiment_name(self, name):
         self.experiment_name = name
@@ -203,15 +203,15 @@ class ContainerExperiment:
     def has_old_version(self):
         return self.old_version != ""
 
-    def load_results(self):
-        df1 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
-        df2 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
-        df3 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
-        df4 = pd.read_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
+    def load_results(self, suffix=""):
+        df1 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 1))
+        df2 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 2))
+        df3 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 3))
+        df4 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 4))
         return df1, df2, df3, df4
 
     def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
-                     position=1):
+                     position=1, suffix=""):
         estargz_np = np.array(performance_estargz)
         starlight_np = np.array(performance_starlight)
         vanilla_np = np.array(performance_vanilla)
@@ -222,14 +222,14 @@ class ContainerExperiment:
         df3 = pd.DataFrame(starlight_np.T, columns=self.rtt[:position])
         df4 = pd.DataFrame(wget_np.T, columns=self.rtt[:position])
 
-        df1.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 1))
-        df2.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 2))
-        df3.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 3))
-        df4.to_pickle("./pkl/%s-%d.pkl" % (self.experiment_name, 4))
+        df1.to_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 1))
+        df2.to_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 2))
+        df3.to_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 3))
+        df4.to_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 4))
 
         return df1, df2, df3, df4
 
-    def plot_results(self, df1, df2, df3, df4):
+    def plot_results(self, df1, df2, df3, df4, suffix=""):
         df_avg = pd.DataFrame({
             'vanilla': df1.mean(),
             'estargz': df2.mean(),
@@ -248,7 +248,7 @@ class ContainerExperiment:
 
         fig, (ax1) = plt.subplots(ncols=1, figsize=(4, 4), dpi=300)
 
-        fig.suptitle("%s" % self.experiment_name)
+        fig.suptitle("%s%s" % (self.experiment_name, suffix))
         ax1.set_xlim([0, 300])
         ax1.set_ylim([0, max_delay])
         ax1.set_ylabel('startup time (s)')
@@ -259,12 +259,14 @@ class ContainerExperiment:
         ax1.fill_between(df3_q.columns, df3_q.loc[0.1], df3_q.loc[0.9], alpha=0.25)
         ax1.fill_between(df4_q.columns, df4_q.loc[0.1], df4_q.loc[0.9], alpha=0.25)
 
-        df_avg.plot(kind='line', ax=ax1, grid=True, marker="o")
+        df_avg.plot(kind='line', ax=ax1, grid=True, marker=".")
         ax1.legend(loc='upper left')
         ax1.title.set_text("mean & quantile[0.1,0.9]")
 
         fig.tight_layout()
-        fig.savefig("./plot/%s.png" % self.experiment_name, facecolor='w', transparent=False)
+        fig.savefig("./plot/%s%s.png" % (self.experiment_name, suffix), facecolor='w', transparent=False)
+
+        plt.close(fig)
 
     def __repr__(self):
         return "ContainerExperiment<%s>" % self.experiment_name
@@ -317,7 +319,8 @@ class MountingPoint:
         p.wait()
 
     def get_mount_parameter(self, rr=0):
-        return "type=bind,src=%s/m%d-%d,dst=%s,options=rbind:%s" % (self.WORKDIR, self.r, rr, self.guest_dst, self.op_type)
+        return "type=bind,src=%s/m%d-%d,dst=%s,options=rbind:%s" % (
+            self.WORKDIR, self.r, rr, self.guest_dst, self.op_type)
 
 
 class Runner:
@@ -398,7 +401,7 @@ class Runner:
 
         return r
 
-    def test_wget(self, experiment: ContainerExperiment, history, r=0, debug=False):
+    def test_wget(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
         if r == 0:
             r = random.randrange(999999999)
 
@@ -406,27 +409,38 @@ class Runner:
         print("%12s : " % "wget", end='')
         ######################################################################
         # Pull
-        query = "http://%s/from/_/to/%s" % (
-            self.service.config.PROXY_SERVER,
-            experiment.get_starlight_image(False)
-        )
-        if experiment.has_old_version():
-            query = "http://%s/from/%s/to/%s" % (
+        query = ""
+        if use_old:
+            query = "http://%s/from/_/to/%s" % (
                 self.service.config.PROXY_SERVER,
-                experiment.get_starlight_image(True),
+                experiment.get_starlight_image(True)
+            )
+        else:
+            query = "http://%s/from/_/to/%s" % (
+                self.service.config.PROXY_SERVER,
                 experiment.get_starlight_image(False)
             )
+            if experiment.has_old_version():
+                query = "http://%s/from/%s/to/%s" % (
+                    self.service.config.PROXY_SERVER,
+                    experiment.get_starlight_image(True),
+                    experiment.get_starlight_image(False)
+                )
 
-        call_wait([
+        cmd = [
             "wget",
             "-O", "%s/test.bin" % self.service.config.TMP,
             "-q", query
-        ], debug)
+        ]
+
+        if debug:
+            print(cmd)
+        call_wait(cmd, debug)
 
         ######################################################################
         end = time.time()
         dur = end - start
-        print("%3.6fs" % dur)
+        print("%3.6fs" % dur, end=" deploy" if use_old else " update")
         history.append(dur)
         pass
 
@@ -434,9 +448,12 @@ class Runner:
     # Pull and Run
     ####################################################################################################
 
-    def test_estargz(self, experiment: ContainerExperiment, history, r=0, debug=False):
+    def test_estargz(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
         if r == 0:
             r = random.randrange(999999999)
+        task_suffix = ""
+        if use_old:
+            task_suffix = "s"
 
         start = time.time()
         print("%12s : " % "estargz", end='')
@@ -448,9 +465,11 @@ class Runner:
             "image", "rpull",
             "--plain-http", "%s/%s" % (
                       self.service.config.REGISTRY_SERVER,
-                      experiment.get_stargz_image()
+                      experiment.get_stargz_image(use_old)
                   )
         ]
+        if debug:
+            print(cmd_pull)
         pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
         a, b = pr.communicate()
         if debug:
@@ -459,6 +478,7 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Create
         cmd = [
@@ -478,16 +498,23 @@ class Runner:
         cmd.extend([
             "%s/%s" % (
                 self.service.config.REGISTRY_SERVER,
-                experiment.get_stargz_image()
+                experiment.get_stargz_image(use_old)
             ),
-            "task%d" % r
+            "task%d%s" % (r, task_suffix)
         ])
+
+        if debug:
+            print(cmd)
         call_wait(cmd, debug)
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Task Start
-        cmd_start = "sudo ctr -n xe%d t start task%d 2>&1 %s" % (
-            r, r, self.service.config.TEE_LOG_STARGZ_RUNTIME
+        cmd_start = "sudo ctr -n xe%d t start task%d%s 2>&1 %s" % (
+            r, r, task_suffix, self.service.config.TEE_LOG_STARGZ_RUNTIME
         )
+
+        if debug:
+            print(cmd_pull)
         proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
 
         last_line = ""
@@ -511,7 +538,7 @@ class Runner:
             return
 
         if real_done is True:
-            print("%3.6fs" % dur)
+            print("%3.6fs" % dur, end="\t")
             history.append(dur)
         else:
             print(last_line, end="")
@@ -521,7 +548,7 @@ class Runner:
         # Stop
         time.sleep(1)
         stop = start_process_shell(
-            "sudo ctr -n xe%d t kill task%d 2>&1" % (r, r)
+            "sudo ctr -n xe%d t kill task%d%s 2>&1" % (r, r, task_suffix)
         )
         stop.wait()
         proc.wait()
@@ -533,15 +560,38 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        if experiment.has_mounting is True:
+        if experiment.has_mounting is True and use_old is False:
             for m in experiment.mounting:
                 m.destroy(r, debug)
 
+        # Due to the lazy pulling, we might not have the entire image at this point, but we want to
+        # make sure all the layers are ready before proceeding to pulling the updated new image
+        if use_old:
+            print("deploy", end="")
+            complete = 0
+            for ln in self.service.p_stargz.stdout:
+                line = ln.decode('utf-8')
+                if debug:
+                    print(line, end="")
+                if line.find("resolving") != -1:
+                    complete += 1
+                if line.find("completed to fetch all layer data in background") != -1:
+                    complete -= 1
+                    if complete == 0:
+                        break
+            print("-synced.")
+        else:
+            print("update")
+
         return r
 
-    def test_starlight(self, experiment: ContainerExperiment, history, r=0, debug=False, checkpoint=0):
+    def test_starlight(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+                       checkpoint=0):
         if r == 0:
             r = random.randrange(999999999)
+        task_suffix = ""
+        if use_old:
+            task_suffix = "s"
 
         start = time.time()
         print("%12s : " % "starlight", end='')
@@ -552,10 +602,15 @@ class Runner:
             "-n", "xs%d" % r,
             "prepare"
         ]
-        if experiment.has_old_version():
+        if use_old:
             cmd_pull.append(experiment.get_starlight_image(old=True))
+        else:
+            if experiment.has_old_version():
+                cmd_pull.append(experiment.get_starlight_image(old=True))
+            cmd_pull.append(experiment.get_starlight_image(old=False))
 
-        cmd_pull.append(experiment.get_starlight_image(old=False))
+        if debug:
+            print(cmd_pull)
         pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         a, b = pr.communicate()
 
@@ -565,10 +620,12 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Create
         cmd = [
             "sudo", "ctr-starlight",
+            "--log-level", "debug",
             "-n", "xs%d" % r,
             "create",
         ]
@@ -578,19 +635,38 @@ class Runner:
                 m.prepare(r, debug)
                 cmd.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV, "--net-host", "--local-time"])
+        # cmd.extend(["-cp", "%d" % checkpoint])
+        cmd.extend(["--env-file", self.service.config.ENV])
+        cmd.extend(["--net-host"])
 
-        cmd.append(experiment.get_starlight_image(old=False))  # Image Combo
-        cmd.append(experiment.get_starlight_image(old=False))  # Specific Image
+        if use_old:
+            cmd.append(experiment.get_starlight_image(old=True))  # Image Combo
+            cmd.append(experiment.get_starlight_image(old=True))  # Specific Image
+        else:
+            cmd.append(experiment.get_starlight_image(old=False))  # Image Combo
+            cmd.append(experiment.get_starlight_image(old=False))  # Specific Image
 
-        cmd.append("task%d" % r)
-        call_wait(cmd, debug)
+        cmd.append("task%d%s" % (r, task_suffix))
 
+        if debug:
+            print(cmd)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        a, b = proc.communicate()
+        if debug:
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Task Start
-        cmd_start = "sudo ctr -n xs%d t start task%d 2>&1 %s" % (
-            r, r, self.service.config.TEE_LOG_STARLIGHT_RUNTIME
+        cmd_start = "sudo ctr -n xs%d t start task%d%s 2>&1 %s" % (
+            r, r, task_suffix, self.service.config.TEE_LOG_STARLIGHT_RUNTIME
         )
+
+        if debug:
+            print(cmd_start)
         proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
         last_line = ""
         real_done = False
@@ -613,7 +689,7 @@ class Runner:
             return
 
         if real_done is True:
-            print("%3.6fs" % dur)
+            print("%3.6fs" % dur, end="\t")
             history.append(dur)
         else:
             print(last_line, end="")
@@ -623,7 +699,7 @@ class Runner:
         # Stop
         time.sleep(1)
         stop = start_process_shell(
-            "sudo ctr -n xs%d t kill task%d 2>&1" % (r, r)
+            "sudo ctr -n xs%d t kill task%d%s 2>&1" % (r, r, task_suffix)
         )
         stop.wait()
         proc.wait()
@@ -635,15 +711,32 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        if experiment.has_mounting is True:
+        if experiment.has_mounting is True and use_old is False:
             for m in experiment.mounting:
                 m.destroy(r, debug)
 
+        # Due to the lazy pulling, we might not have the entire image at this point, but we want to
+        # make sure all the layers are ready before proceeding to pulling the updated new image
+        if use_old:
+            print("deploy", end="")
+            for ln in self.service.p_starlight.stdout:
+                line = ln.decode('utf-8')
+                if debug:
+                    print(line, end="")
+                if line.find("entire image extracted") != -1:
+                    break
+            print("-synced.")
+        else:
+            print("update")
+
         return r
 
-    def test_vanilla(self, experiment: ContainerExperiment, history, r=0, debug=False):
+    def test_vanilla(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
         if r == 0:
             r = random.randrange(999999999)
+        task_suffix = ""
+        if use_old:
+            task_suffix = "s"
 
         start = time.time()
         print("%12s : " % "vanilla", end='')
@@ -655,17 +748,21 @@ class Runner:
             "image", "pull",
             "--plain-http", "%s/%s" % (
                       self.service.config.REGISTRY_SERVER,
-                      experiment.get_vanilla_image()
+                      experiment.get_vanilla_image(use_old)
                   )
         ]
+
+        if debug:
+            print(cmd_pull)
         pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
         a, b = pr.communicate()
 
-        if debug:
+        if debug and False:  # it is just too much to print out
             if a is not None:
                 print(a.decode("utf-8"), end="")
             if b is not None:
                 print(b.decode("utf-8"), end="")
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Create
         cmd = [
@@ -684,17 +781,23 @@ class Runner:
         cmd.extend([
             "%s/%s" % (
                 self.service.config.REGISTRY_SERVER,
-                experiment.get_vanilla_image()
+                experiment.get_vanilla_image(use_old)
             ),
-            "task%d" % r
+            "task%d%s" % (r, task_suffix)
         ])
-        call_wait(cmd, debug)
 
+        if debug:
+            print(cmd)
+        call_wait(cmd, debug)
+        print("%3.6fs" % (time.time() - start), end="\t")
         ######################################################################
         # Task Start
-        cmd_start = "sudo ctr -n xv%d t start task%d 2>&1 %s" % (
-            r, r, self.service.config.TEE_LOG_CONTAINERD_RUNTIME
+        cmd_start = "sudo ctr -n xv%d t start task%d%s 2>&1 %s" % (
+            r, r, task_suffix, self.service.config.TEE_LOG_CONTAINERD_RUNTIME
         )
+
+        if debug:
+            print(cmd_start)
         proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
         last_line = ""
         real_done = False
@@ -717,7 +820,7 @@ class Runner:
             return
 
         if real_done is True:
-            print("%3.6fs" % dur)
+            print("%3.6fs" % dur, end="\t")
             history.append(dur)
         else:
             print(last_line, end="")
@@ -727,7 +830,7 @@ class Runner:
         # Stop
         time.sleep(1)
         stop = start_process_shell(
-            "sudo ctr -n xv%d t kill task%d 2>&1" % (r, r)
+            "sudo ctr -n xv%d t kill task%d%s 2>&1" % (r, r, task_suffix)
         )
         stop.wait()
         proc.wait()
@@ -739,8 +842,13 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        if experiment.has_mounting is True:
+        if experiment.has_mounting is True and use_old is False:
             for m in experiment.mounting:
                 m.destroy(r, debug)
+
+        if use_old:
+            print("deploy")
+        else:
+            print("update")
 
         return r
