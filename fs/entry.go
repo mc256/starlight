@@ -172,6 +172,12 @@ func (fe *FsEntry) GetStableAttr() *fuseFs.StableAttr {
 func (fe *FsEntry) GetAttrFromEntry(out *fuse.Attr) syscall.Errno {
 	out.Ino = fe.stable.Ino
 	out.Size = uint64(fe.Size)
+	if fe.IsDir() {
+		out.Size = 4096
+	} else if fe.Type == "symlink" {
+		out.Size = uint64(len(fe.LinkName))
+	}
+
 	out.Blksize = uint32(fe.ChunkSize)
 	if fe.ChunkSize == 0 {
 		out.Blksize = 4096

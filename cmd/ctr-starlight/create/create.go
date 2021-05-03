@@ -150,13 +150,20 @@ func Action(c *cli.Context) error {
 		opts = append(opts, oci.WithPrivileged, oci.WithAllDevicesAllowed, oci.WithHostDevices)
 	}
 	if c.Bool("net-host") {
-		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace), oci.WithHostHostsFile, oci.WithHostResolvconf)
+		opts = append(opts,
+			oci.WithHostNamespace(specs.NetworkNamespace),
+			oci.WithHostHostsFile,
+			oci.WithHostResolvconf,
+		)
 		if err := touchFile(ctx, mnt[0].Source, "etc/hosts"); err != nil {
 			log.G(ctx).WithError(err).Error("touch hosts error")
 		}
 		if err := touchFile(ctx, mnt[0].Source, "etc/resolv.conf"); err != nil {
 			log.G(ctx).WithError(err).Error("touch resolv.conf error")
 		}
+	}
+	if hostname := c.String("host-name"); hostname != "" {
+		opts = append(opts, oci.WithHostname(hostname))
 	}
 
 	////////////////////////////////////////////////////////////////

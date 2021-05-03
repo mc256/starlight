@@ -87,5 +87,9 @@ var (
 			Name:  "local-time",
 			Usage: "synchronize host local time",
 		},
+		&cli.StringFlag{
+			Name:  "host-name",
+			Usage: "host name for this container worker",
+		},
 	}
 )

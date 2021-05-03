@@ -53,4 +53,7 @@ class TestCassandra(c.ContainerExperiment):
             version,
             old_version
         )
-        self.expected_max_start_time = 120
+        self.set_mounting_points([
+            c.MountingPoint("/var/lib/cassandra", False, "rw")
+        ])
+        self.expected_max_start_time = 30

@@ -377,30 +377,57 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 		}).Trace("OPEN-P")
 	}
 
-	if n.Ent.AtomicGetFileState() == EnEmpty {
-		<-n.Ent.ready
-		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
-	}
-
-	isWrite := (flags&syscall.O_RDWR != 0) || (flags&syscall.O_WRONLY != 0)
-	if isWrite {
+	if flags&syscall.O_WRONLY != 0 && flags|syscall.O_WRONLY == syscall.O_WRONLY {
 		if fh, mode, err := func() (fs.FileHandle, uint32, syscall.Errno) {
 			n.Ent.StateMu.Lock()
 			defer n.Ent.StateMu.Unlock()
-			if n.Ent.State == EnRoLayer {
+			if n.Ent.State != EnRwLayer {
 				if errno := n.promote(); errno != 0 {
 					return nil, 0, errno
 				}
 				if errno := n.setRWAttrFromEntry(); errno != 0 {
 					return nil, 0, errno
 				}
-				n.Ent.State = EnRwLayer
 			}
+			n.Ent.State = EnRwLayer
 			return nil, 0, 0
 		}(); err != 0 {
 			return fh, mode, err
 		}
+		if DebugTrace {
+			log.G(ctx).WithFields(logrus.Fields{
+				"name":   n.Ent.Name,
+				"source": n.Ent.Source,
+				"state":  n.Ent.State,
+			}).Trace("OPEN-W")
+		}
+	} else {
+		if n.Ent.AtomicGetFileState() == EnEmpty {
+			<-n.Ent.ready
+			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
+		}
+
+		isWrite := (flags&syscall.O_RDWR != 0) || (flags&syscall.O_WRONLY != 0)
+		if isWrite {
+			if fh, mode, err := func() (fs.FileHandle, uint32, syscall.Errno) {
+				n.Ent.StateMu.Lock()
+				defer n.Ent.StateMu.Unlock()
+				if n.Ent.State == EnRoLayer {
+					if errno := n.promote(); errno != 0 {
+						return nil, 0, errno
+					}
+					if errno := n.setRWAttrFromEntry(); errno != 0 {
+						return nil, 0, errno
+					}
+					n.Ent.State = EnRwLayer
+				}
+				return nil, 0, 0
+			}(); err != 0 {
+				return fh, mode, err
+			}
+		}
 	}
+
 	p := n.Ent.AtomicGetRealPath()
 	fd, err := syscall.Open(p, int(flags), 0)
 	if err != nil {

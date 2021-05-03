@@ -61,8 +61,8 @@ done
 
 
 declare -a CassandraList=(
-  "cassandra:3.11"
-  "cassandra:4.0"
+  "cassandra:3.11.10"
+  "cassandra:3.11.9"
 )
 
 for VAL in "${CassandraList[@]}"; do

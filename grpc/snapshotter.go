@@ -392,6 +392,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		// Problem! Looking for a better fix
 		// Possible of losing mounting points after task started
 		mounting := fsi.GetMountPoint()
+		_, _ = ioutil.ReadDir(mounting)
 		go func() {
 			n := 0
 			for {

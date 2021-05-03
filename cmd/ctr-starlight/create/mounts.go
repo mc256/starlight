@@ -66,8 +66,15 @@ func touchFile(ctx gocontext.Context, mounting, fileName string) error {
 		} else {
 			return file.Close()
 		}
+	} else {
+		dst, err := os.OpenFile(fullName, os.O_WRONLY, 644)
+		if err != nil {
+			return err
+		}
+		defer dst.Close()
+		_, _ = dst.WriteString("")
+		return nil
 	}
-	return nil
 }
 
 func touchDir(ctx gocontext.Context, mounting, dirName string) error {

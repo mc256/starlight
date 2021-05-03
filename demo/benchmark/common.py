@@ -50,7 +50,7 @@ class ProcessService:
 
     def reset_container_service(self, is_debug=False):
         self.p_containerd = subprocess.Popen(
-            ['sudo ./reset.sh 2>&1%s' % self.config.TEE_LOG_CONTAINERD],
+            ['sudo %s 2>&1%s' % (self.config.RESET, self.config.TEE_LOG_CONTAINERD)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=True
