@@ -1070,3 +1070,70 @@ func (n *StarlightFsNode) Statfs(ctx context.Context, out *fuse.StatfsOut) sysca
 	}
 	return 0
 }
+
+var _ = (fs.NodeMknoder)((*StarlightFsNode)(nil))
+
+func (n *StarlightFsNode) Mknod(ctx context.Context, name string, mode, rdev uint32, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
+
+	if DebugTrace {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"from":   name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Trace("MKNOD")
+	}
+
+	n.Ent.StateMu.Lock()
+	defer n.Ent.StateMu.Unlock()
+
+	var child *FsEntry
+	var hasChild bool
+	if child, hasChild = n.Ent.LookUp(name); hasChild {
+		return nil, syscall.EEXIST
+	}
+
+	if err := n.promote(); err != 0 {
+		return nil, err
+	}
+
+	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
+		Entry{
+			TraceableEntry: &util.TraceableEntry{
+				TOCEntry: &estargz.TOCEntry{
+					Name: filepath.Join(n.Ent.Name, name),
+					Type: "dir",
+				},
+			},
+			parent: n.Ent,
+			State:  EnRwLayer,
+			ready:  nil,
+		},
+	})
+
+	// mkdir
+	if err := syscall.Mknod(child.GetRwLayerPath(), mode, int(rdev)); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	// permission
+	if err := n.preserveOwner(ctx, child.GetRwLayerPath()); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	// stat
+	var stat syscall.Stat_t
+	if err := syscall.Lstat(child.GetRwLayerPath(), &stat); err != nil {
+		return nil, fs.ToErrno(err)
+	}
+
+	out.FromStat(&stat)
+
+	child.stable.Ino = stat.Ino
+	child.stable.Mode = stat.Mode
+	child.parent = n.Ent
+
+	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
+	n.Ent.AddChild(name, child)
+	return ch, 0
+}
