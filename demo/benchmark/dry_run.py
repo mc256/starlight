@@ -1,12 +1,14 @@
+import subprocess
+from common import ContainerExperimentX as X
 from common import Runner
+from common import MountingPoint
+
 from test_cases import *
 
 if __name__ == '__main__':
-    # t = TestRedis("6.0", "5.0")
-    t = TestMySQL("8.0.24", "8.0.23")
-    # t = TestCassandra("4.0", "3.11")
-    # t = TestMySQL("8.0.24")
-
+    # t = TestMySQL("8.0.24", "8.0.23")
+    # t = X('nginx', 'web-server', '1B', '1.20.0', '1.19.10', [], "ready for start up")
+    t = X('httpd', 'web-server', '1B', '2.4.46', '2.4.43', [], "Command line: 'httpd -D FOREGROUND'")
     t.set_experiment_name("dry-run" + t.experiment_name)
     r = Runner()
     history_temp = []
@@ -14,12 +16,28 @@ if __name__ == '__main__':
     print("This is a dry run.")
 
     rtt = 30
-    debug = False
+    debug = True
 
     r.service.reset_latency_bandwidth(True)
     r.service.set_latency_bandwidth(rtt)
 
     print("RTT:%d" % rtt)
+
+    # -------------------- starlight --------------------
+    r.service.reset_container_service()
+    r.service.start_grpc_starlight()
+
+    n = 0
+    if t.has_old_version():
+        # #n = r.sync_pull_starlight(t, 0, True)
+        n = r.test_starlight(t, history=history_temp, use_old=True, r=n, debug=debug)
+        pass
+
+    # r.service.set_latency_bandwidth(rtt, True)
+    r.test_starlight(t, history=history_temp, use_old=False, r=n, debug=debug)
+    # r.service.reset_latency_bandwidth(True)
+
+    r.service.kill_starlight()
 
     # -------------------- vanilla --------------------
     r.service.reset_container_service()
@@ -49,23 +67,6 @@ if __name__ == '__main__':
     # r.service.reset_latency_bandwidth(True)
 
     r.service.kill_estargz()
-
-    # -------------------- starlight --------------------
-    r.service.reset_container_service()
-    r.service.start_grpc_starlight()
-
-    n = 0
-    if t.has_old_version():
-        # #n = r.sync_pull_starlight(t, 0, True)
-        n = r.test_starlight(t, history=history_temp, use_old=True, r=n, debug=debug)
-        pass
-
-    # r.service.set_latency_bandwidth(rtt, True)
-    r.test_starlight(t, history=history_temp, use_old=False, r=n, debug=debug)
-    # r.service.reset_latency_bandwidth(True)
-
-    r.service.kill_starlight()
-
 
     # ----------------------------------------------------
     # print out results

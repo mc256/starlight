@@ -160,6 +160,8 @@ class ContainerExperiment:
         self.rounds = 20
         self.expected_max_start_time = 30
         self.mounting = []
+        self.has_args = False
+        self.args = []
 
         today = date.today().strftime("%m%d")
         if old_version == "":
@@ -175,6 +177,12 @@ class ContainerExperiment:
             return
         self.mounting = mp
         self.has_mounting = True
+
+    def set_args(self, args=None):
+        if args is None:
+            return
+        self.has_args = True
+        self.args = args
 
     def get_starlight_image(self, old=False):
         if old:
@@ -270,6 +278,19 @@ class ContainerExperiment:
 
     def __repr__(self):
         return "ContainerExperiment<%s>" % self.experiment_name
+
+
+class ContainerExperimentX(ContainerExperiment):
+    def __init__(self, img_name, img_type, download, tag, tag_old, mounts, ready,  args=None, expectation=60):
+        super().__init__(
+            img_name,
+            ready,
+            tag,
+            tag_old
+        )
+        self.set_mounting_points(mounts)
+        self.expected_max_start_time = expectation
+        self.set_args(args)
 
 
 class MountingPoint:
@@ -503,6 +524,9 @@ class Runner:
             "task%d%s" % (r, task_suffix)
         ])
 
+        if experiment.has_args:
+            cmd.extend(experiment.args)
+
         if debug:
             print(cmd)
         call_wait(cmd, debug)
@@ -648,6 +672,9 @@ class Runner:
 
         cmd.append("task%d%s" % (r, task_suffix))
 
+        if experiment.has_args:
+            cmd.extend(experiment.args)
+
         if debug:
             print(cmd)
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -785,6 +812,9 @@ class Runner:
             ),
             "task%d%s" % (r, task_suffix)
         ])
+
+        if experiment.has_args:
+            cmd.extend(experiment.args)
 
         if debug:
             print(cmd)
