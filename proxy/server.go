@@ -162,8 +162,13 @@ func (a *StarlightProxyClient) getDefault(w http.ResponseWriter, req *http.Reque
 
 func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request) {
 	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
+	remoteAddr := req.RemoteAddr
+
+	if realIp := req.Header.Get("X-Real-IP"); realIp != "" {
+		remoteAddr = realIp
+	}
 	log.G(a.ctx).WithFields(logrus.Fields{
-		"remote": req.RemoteAddr,
+		"remote": remoteAddr,
 		"params": params,
 	}).Info("request received")
 	var err error
@@ -186,7 +191,7 @@ func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request
 		_, _ = fmt.Fprintf(w, "Opoos! Something went wrong: \n\n%s\n", err)
 	} else {
 		log.G(a.ctx).WithFields(logrus.Fields{
-			"remote": req.RemoteAddr,
+			"remote": remoteAddr,
 			"params": params,
 		}).Info("request sent")
 	}

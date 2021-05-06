@@ -7,9 +7,4 @@ services:
     expose:
       - 8888
     entrypoint: "jupyter notebook --allow-root"
-
-
-
-
-
 #   docker exec -it experiment /bin/zsh

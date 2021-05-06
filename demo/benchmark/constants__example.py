@@ -29,3 +29,4 @@ class Configuration:
 
     TMP = "/tmp"
     ENV = "../config/all.env"
+    RESET = "./reset.sh"

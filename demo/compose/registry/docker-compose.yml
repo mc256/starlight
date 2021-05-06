@@ -8,5 +8,5 @@ services:
     environment:
     - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
     volumes:
-    - "./data:/data:rw"
+    - "/mnt/data/registry_data:/data:rw"
     restart: always

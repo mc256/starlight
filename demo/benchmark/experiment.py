@@ -1,11 +1,45 @@
 from common import Runner
-from test_cases import *
+from common import ContainerExperimentX as X
+from common import MountingPoint as M
 
 if __name__ == '__main__':
     # t = TestRedis("6.0", "5.0")
-    t = TestCassandra("3.11.10", "3.11.9")
+    # t = TestCassandra("3.11.10", "3.11.9")
     # t = TestMySQL("8.0.24", "8.0.23")
     # t = TestMariadb("10.5", "10.4")
+
+    t = X(
+        'mariadb', 'database', '1B', '10.5.9', '10.5.8',
+        [M("/var/lib/mysql", False, "rw", "999:999"), M("/run/mysqld", False, "rw", "999:999")],
+        "port: 3306  mariadb.org binary distribution",
+        None, 30
+    )
+
+    """
+    t = X(
+        'redis', 'database', '1B', '6.2.2', '6.2.1',
+        [M("/data")],
+        "* Ready to accept connections",
+        None, 10
+    )
+    t = X(
+        'postgres', 'database', '1B', '13.2', '13.1',
+        [M("/var/lib/postgresql/data")],
+        "LOG:  database system is ready to accept connections",
+        None, 30
+    )
+    t = X(
+        'cassandra', 'emerging', '100M', '3.11.10', '3.11.9',
+        [M("/var/lib/cassandra")],
+        "- Startup complete",
+        None, 30
+    )
+    t = X(
+        'redis', 'database', '1B', '6.2.2', '6.2.1', [M("/data")],
+        "* Ready to accept connections",
+        None, 20
+    )
+    """
 
     r = Runner()
     discard = []

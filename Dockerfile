@@ -56,12 +56,12 @@ WORKDIR /go/src/app/starlight
 
 COPY . .
 COPY ./demo/config/containerd.config.toml /etc/containerd/config.toml
-COPY ./demo/config/entrypoint.sh /entrypoint.sh
+COPY ./demo/config/starlight-snapshotter-entrypoint.sh /entrypoint.sh
 
 RUN make build-starlight-grpc
 RUN make build-ctr-starlight
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/starlight-snapshotter-entrypoint.sh"]
 
 ######
 FROM starlight-worker AS experiment-base

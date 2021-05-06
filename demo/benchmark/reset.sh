@@ -41,6 +41,6 @@ ps aux | grep mysqld | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep mariadb | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep redis-server | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep java/openjdk | head -n -1 | awk '{print $2}' | sudo xargs kill -9
-ps aux | grep jmongod | head -n -1 | awk '{print $2}' | sudo xargs kill -9
+ps aux | grep mongod | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 
 /usr/local/bin/containerd &

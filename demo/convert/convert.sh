@@ -1,25 +1,25 @@
 #!/bin/bash
 
-REGISTRY="cloudy:5000"
+REGISTRY="registry.starlight.yuri.moe"
 echo $REGISTRY
 
 declare -a ImageList=(
   "ubuntu:focal-20210416"
   "ubuntu:focal-20210401"
-	"alpine:3.13.5"
+  "alpine:3.13.5"
   "alpine:3.13.4"
-	"busybox:1.32.1"
-	"busybox:1.33.0"
-	"busybox:1.32.1"
+  "busybox:1.32.1"
+  "busybox:1.33.0"
+  "busybox:1.32.1"
   "busybox:1.32.0"
-	"debian:oldstable"
-	"debian:stable"
-	"centos:7"
-	"centos:8"
-	"fedora:32"
-	"fedora:33"
-	"oraclelinux:7"
-	"oraclelinux:8"
+  "debian:oldstable"
+  "debian:stable"
+  "centos:7"
+  "centos:8"
+  "fedora:32"
+  "fedora:33"
+  "oraclelinux:7"
+  "oraclelinux:8"
 )
 
 for VAL in "${ImageList[@]}"; do
@@ -34,8 +34,8 @@ declare -a DatabaseList=(
   "mysql:8.0.20"
   "mysql:8.0.21"
   "mysql:8.0.22"
-	"mysql:8.0.23"
-	"mysql:8.0.24"
+  "mysql:8.0.23"
+  "mysql:8.0.24"
   "mariadb:10.5.9"
   "mariadb:10.5.8"
 )
@@ -77,7 +77,7 @@ for VAL in "${CassandraList[@]}"; do
       --env-file=../config/all.env \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
-      --mount type=bind,src=/tmp/t2,dst=/var/lib/cassandra,options=bind:rw \
+      --mount type=bind,src=/tmp/t1,dst=/var/lib/cassandra,options=bind:rw \
       --dns-nameservers=8.8.8.8 \
       --wait-on-signal \
     "$VAL" "http://$REGISTRY/$VAL-starlight"

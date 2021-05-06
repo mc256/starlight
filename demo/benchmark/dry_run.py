@@ -1,9 +1,6 @@
-import subprocess
 from common import ContainerExperimentX as X
 from common import Runner
-from common import MountingPoint
-
-from test_cases import *
+from common import MountingPoint as M
 
 if __name__ == '__main__':
     # t = TestMySQL("8.0.24", "8.0.23")

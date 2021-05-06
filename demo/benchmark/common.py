@@ -237,6 +237,31 @@ class ContainerExperiment:
 
         return df1, df2, df3, df4
 
+    def plot_single_result(self, step_starlight, step_vanilla, step_estargz, step_wget, suffix=""):
+        df_avg = pd.DataFrame({
+            "estargz": step_estargz,
+            "starlight": step_starlight,
+            "vanilla": step_vanilla,
+            "wget": step_wget,
+        })
+
+        fig, (ax1) = plt.subplots(ncols=1, figsize=(4, 4), dpi=300)
+
+        max_delay = self.expected_max_start_time
+
+        fig.suptitle("%s%s" % (self.experiment_name, suffix))
+        ax1.set_ylim([0, max_delay])
+        ax1.set_ylabel('startup time (s)')
+        ax1.set_xlabel('method')
+
+        df_avg.plot(kind='box', ax=ax1, grid=True)
+        ax1.title.set_text("fixed latency")
+
+        fig.tight_layout()
+        fig.savefig("./plot/%s%s.png" % (self.experiment_name, suffix), facecolor='w', transparent=False)
+
+        plt.close(fig)
+
     def plot_results(self, df1, df2, df3, df4, suffix=""):
         df_avg = pd.DataFrame({
             'vanilla': df1.mean(),
@@ -281,7 +306,40 @@ class ContainerExperiment:
 
 
 class ContainerExperimentX(ContainerExperiment):
-    def __init__(self, img_name, img_type, download, tag, tag_old, mounts, ready,  args=None, expectation=60):
+    def __init__(self, img_name, img_type, download, tag, tag_old, mounts, ready, args=None, expectation=60):
+        """
+        Create and experiment configuration
+        Parameters
+        ----------
+        img_name : str
+            Number of rows/columns of the subplot grid.
+
+        img_type: str
+            Category of the Image, based on HelloBench [FAST'16] or your paper. Not used
+
+        download : str
+            How many downloads from. Not used
+
+        tag : str
+            Version of the new container image. It should have no optimized suffix. Out program will add that
+            (i.e. -starlight or -estargz) for you.
+
+        tag_old : str
+            Same as tag but an older version.
+
+        mounts: List[MountingPoint]
+            mounting points, the experiment will prepare external mounting point and remove those folder once finished.
+
+        ready: str
+            the line of text where container tells us it is ready.
+
+        args: List[str] or None
+            the parameters that can be executed.
+
+        expectation: int
+            expect when it will finish for the upper limit of the y-axis in plotting
+
+        """
         super().__init__(
             img_name,
             ready,
