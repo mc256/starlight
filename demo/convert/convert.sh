@@ -26,7 +26,9 @@ for VAL in "${ImageList[@]}"; do
   echo "============================================================"
   echo $VAL
   echo "============================================================"
-  ctr-remote image optimize --plain-http --entrypoint='[ "/bin/sh", "-c" ]' --args='[ "echo hello" ]' \
+  ctr-remote image optimize --plain-http \
+  --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/hello-entrypoint.sh,dst=/entrypoint.sh,options=rbind:ro \
+  --entrypoint='[ "/entrypoint.sh" ]' \
   	"$VAL" "http://$REGISTRY/$VAL-starlight"
 done
 

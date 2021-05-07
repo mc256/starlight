@@ -104,10 +104,10 @@ if __name__ == '__main__':
             pool_estargz, pool_starlight, pool_vanilla, pool_wget, 1, "-deploy-fixed"
         )
 
-        pool_starlight.append(step_starlight_update)
-        pool_vanilla.append(step_vanilla_update)
-        pool_estargz.append(step_estargz_update)
-        pool_wget.append(step_wget_update)
+        pool_starlight_update.append(step_starlight_update)
+        pool_vanilla_update.append(step_vanilla_update)
+        pool_estargz_update.append(step_estargz_update)
+        pool_wget_update.append(step_wget_update)
 
         _, _, _, _ = t.save_results(
             pool_estargz_update, pool_starlight_update, pool_vanilla_update, pool_wget_update, 1, "-update-fixed"

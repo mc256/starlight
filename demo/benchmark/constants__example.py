@@ -1,4 +1,6 @@
 class Configuration:
+    USE_HTTPS = False
+
     REGISTRY_SERVER = "cloudy:5000"
     PROXY_SERVER = "starlight:8090"
     #REGISTRY_SERVER = "container-worker.momoko:5000"

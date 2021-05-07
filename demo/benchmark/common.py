@@ -80,11 +80,11 @@ class ProcessService:
 
     def start_grpc_starlight(self):
         self.p_starlight = start_process_shell("sudo %s run "
-                                               "--log-level=debug "
-                                               "--plain-http "
+                                               "--log-level=debug %s"
                                                "--server=%s "
                                                " 2>&1%s" % (
                                                    self.config.STARLIGHT_GRPC,
+                                                   "" if self.config.USE_HTTPS else "--plain-http ",
                                                    self.config.PROXY_SERVER,
                                                    self.config.TEE_LOG_STARLIGHT
                                                )
@@ -211,12 +211,12 @@ class ContainerExperiment:
     def has_old_version(self):
         return self.old_version != ""
 
-    def load_results(self, suffix=""):
-        df1 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 1))
-        df2 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 2))
-        df3 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 3))
-        df4 = pd.read_pickle("./pkl/%s%s-%d.pkl" % (self.experiment_name, suffix, 4))
-        return df1, df2, df3, df4
+    def load_results(self, suffix="", data_path="./pkl"):
+        df1 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 1))
+        df2 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 2))
+        df3 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 3))
+        df4 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 4))
+        return df1, df2, df3, df4  # vanilla, estargz, starlight, wget
 
     def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
                      position=1, suffix=""):
@@ -412,8 +412,9 @@ class Runner:
             r = random.randrange(999999)
 
         spe_p = start_process_shell([
-            "sudo ctr-remote -n xe%d image rpull --plain-http %s/%s  2>&1" % (
+            "sudo ctr-remote -n xe%d image rpull %s %s/%s  2>&1" % (
                 r,
+                "" if self.service.config.USE_HTTPS else "--plain-http ",
                 self.service.config.REGISTRY_SERVER,
                 experiment.get_stargz_image(old=True)
             )
@@ -462,8 +463,9 @@ class Runner:
             r = random.randrange(999999)
 
         pull = start_process_shell([
-            "sudo ctr -n xv%d image pull --plain-http %s/%s 2>&1" % (
+            "sudo ctr -n xv%d image pull %s %s/%s 2>&1" % (
                 r,
+                "" if self.service.config.USE_HTTPS else "--plain-http ",
                 self.service.config.REGISTRY_SERVER,
                 experiment.get_vanilla_image(old=True)
             )
@@ -542,11 +544,16 @@ class Runner:
             "sudo", "ctr-remote",
             "-n", "xe%d" % r,
             "image", "rpull",
-            "--plain-http", "%s/%s" % (
-                      self.service.config.REGISTRY_SERVER,
-                      experiment.get_stargz_image(use_old)
-                  )
         ]
+
+        if not self.service.config.USE_HTTPS:
+            cmd_pull.extend(["--plain-http"])
+
+        cmd_pull.extend(["%s/%s" % (
+            self.service.config.REGISTRY_SERVER,
+            experiment.get_stargz_image(use_old)
+        )])
+
         if debug:
             print(cmd_pull)
         pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
@@ -830,12 +837,15 @@ class Runner:
         cmd_pull = [
             "sudo", "ctr",
             "-n", "xv%d" % r,
-            "image", "pull",
-            "--plain-http", "%s/%s" % (
-                      self.service.config.REGISTRY_SERVER,
-                      experiment.get_vanilla_image(use_old)
-                  )
-        ]
+            "image", "pull"]
+
+        if not self.service.config.USE_HTTPS:
+            cmd_pull.extend(["--plain-http"])
+
+        cmd_pull.extend(["%s/%s" % (
+            self.service.config.REGISTRY_SERVER,
+            experiment.get_vanilla_image(use_old)
+        )])
 
         if debug:
             print(cmd_pull)

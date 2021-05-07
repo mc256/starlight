@@ -5,7 +5,13 @@ from common import MountingPoint as M
 if __name__ == '__main__':
     # t = TestMySQL("8.0.24", "8.0.23")
     # t = X('nginx', 'web-server', '1B', '1.20.0', '1.19.10', [], "ready for start up")
-    t = X('httpd', 'web-server', '1B', '2.4.46', '2.4.43', [], "Command line: 'httpd -D FOREGROUND'")
+    # t = X('httpd', 'web-server', '1B', '2.4.46', '2.4.43', [], "Command line: 'httpd -D FOREGROUND'")
+    t = X(
+        'redis', 'database', '1B', '6.2.2', '6.2.1',
+        [M("/data")],
+        "* Ready to accept connections",
+        None, 10
+    )
     t.set_experiment_name("dry-run" + t.experiment_name)
     r = Runner()
     history_temp = []
