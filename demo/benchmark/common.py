@@ -163,14 +163,21 @@ class ContainerExperiment:
         self.has_args = False
         self.args = []
 
-        today = date.today().strftime("%m%d")
-        if old_version == "":
-            self.experiment_name = "%s-%s--deploy-%s-r%d" % (image_name, today, version, self.rounds)
-        else:
-            self.experiment_name = "%s-%s--%s_%s-r%d" % (image_name, today, version, old_version, self.rounds)
+        self.experiment_name = ""
+        self.update_experiment_name()
+
+        self.action_history = []
 
     def set_experiment_name(self, name):
         self.experiment_name = name
+
+    def update_experiment_name(self):
+        today = date.today().strftime("%m%d")
+        if self.old_version == "":
+            self.experiment_name = "%s-%s--deploy-%s-r%d" % (self.image_name, today, self.version, self.rounds)
+        else:
+            self.experiment_name = "%s-%s--%s_%s-r%d" % (
+                self.image_name, today, self.version, self.old_version, self.rounds)
 
     def set_mounting_points(self, mp=None):
         if mp is None:
@@ -217,6 +224,13 @@ class ContainerExperiment:
         df3 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 3))
         df4 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 4))
         return df1, df2, df3, df4  # vanilla, estargz, starlight, wget
+
+    def add_event(self, method="", event="", rtt=0, round=0, ts=time.time(), delta=0.0):
+        self.action_history.append([method, event, rtt, round, ts, delta])
+
+    def save_event(self, suffix=""):
+        ddf = pd.DataFrame(self.action_history, columns=['method', 'event', 'rrt', 'round', 'ts', 'delta'])
+        ddf.to_pickle("./pkl/%s%s-bundle.pkl" % (self.experiment_name, suffix))
 
     def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
                      position=1, suffix=""):
@@ -354,12 +368,13 @@ class ContainerExperimentX(ContainerExperiment):
 class MountingPoint:
     WORKDIR = "/tmp/starlight-exp"
 
-    def __init__(self, guest_dst, is_file=False, op_type="rw", owner=""):
+    def __init__(self, guest_dst, is_file=False, op_type="rw", owner="", overwrite=""):
         self.is_file = is_file
         self.guest_dst = guest_dst
         self.op_type = op_type
         self.owner = owner
         self.r = random.randrange(999999)
+        self.overwrite = overwrite
 
     def reset_tmp(self, debug=False):
         p = start_process([
@@ -398,12 +413,15 @@ class MountingPoint:
         p.wait()
 
     def get_mount_parameter(self, rr=0):
+        if self.overwrite != "":
+            return self.overwrite
         return "type=bind,src=%s/m%d-%d,dst=%s,options=rbind:%s" % (
             self.WORKDIR, self.r, rr, self.guest_dst, self.op_type)
 
 
 class Runner:
     def __init__(self):
+        self.ycsb_p = None
         self.service = ProcessService()
         pass
 
@@ -526,18 +544,50 @@ class Runner:
         pass
 
     ####################################################################################################
+    # FS Benchmark
+    ####################################################################################################
+    def ycsb(self, exp: ContainerExperiment, r, suffix):
+        self.ycsb_p = subprocess.Popen(
+            ['%s run redis -s -P workloads/tsworkloada -p "redis.host=127.0.0.1" -p "redis.port=6379" '
+             '-p measurementtype=timeseries -p timeseries.granularity=100 > %s/%s-%d-%s.txt' % (
+                 self.service.config.YCSB, self.service.config.YCSB_LOG,
+                 exp.experiment_name, r, suffix
+             )],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True
+        )
+        time.sleep(15)
+        pass
+
+    def ycsb_terminate(self, debug):
+        a, b = self.ycsb_p.communicate()
+        if debug:
+            print("-------------------------------- YCSB begin")
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+            print("-------------------------------- YCSB end", end="")
+
+    ####################################################################################################
     # Pull and Run
     ####################################################################################################
 
-    def test_estargz(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
+    def test_estargz(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+                     ycsb: bool = False):
         if r == 0:
             r = random.randrange(999999999)
         task_suffix = ""
         if use_old:
             task_suffix = "s"
 
+        if ycsb is True:
+            print(".", end="")
+            self.ycsb(experiment, r, "%s-estargz" % task_suffix)
+
         start = time.time()
-        print("%12s : " % "estargz", end='')
+        print("%12s : %f \t" % ("estargz", start), end='')
         ######################################################################
         # Pull
         cmd_pull = [
@@ -633,6 +683,8 @@ class Runner:
             print(last_line, end="")
             history.append(np.nan)
 
+        if ycsb is True:
+            self.ycsb_terminate(debug)
         ######################################################################
         # Stop
         time.sleep(1)
@@ -656,6 +708,7 @@ class Runner:
         # Due to the lazy pulling, we might not have the entire image at this point, but we want to
         # make sure all the layers are ready before proceeding to pulling the updated new image
         if use_old:
+            self.service.reset_latency_bandwidth()
             print("deploy", end="")
             complete = 0
             for ln in self.service.p_stargz.stdout:
@@ -675,15 +728,19 @@ class Runner:
         return r
 
     def test_starlight(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
-                       checkpoint=0):
+                       ycsb: bool = False):
         if r == 0:
             r = random.randrange(999999999)
         task_suffix = ""
         if use_old:
             task_suffix = "s"
 
+        if ycsb is True:
+            print(".", end="")
+            self.ycsb(experiment, r, "%s-starlight" % task_suffix)
+
         start = time.time()
-        print("%12s : " % "starlight", end='')
+        print("%12s : %f \t" % ("starlight", start), end='')
         ######################################################################
         # Pull
         cmd_pull = [
@@ -787,6 +844,8 @@ class Runner:
             print(last_line, end="")
             history.append(np.nan)
 
+        if ycsb is True:
+            self.ycsb_terminate(debug)
         ######################################################################
         # Stop
         time.sleep(1)
@@ -810,6 +869,7 @@ class Runner:
         # Due to the lazy pulling, we might not have the entire image at this point, but we want to
         # make sure all the layers are ready before proceeding to pulling the updated new image
         if use_old:
+            self.service.reset_latency_bandwidth()
             print("deploy", end="")
             for ln in self.service.p_starlight.stdout:
                 line = ln.decode('utf-8')
@@ -823,15 +883,20 @@ class Runner:
 
         return r
 
-    def test_vanilla(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
+    def test_vanilla(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+                     ycsb: bool = False):
         if r == 0:
             r = random.randrange(999999999)
         task_suffix = ""
         if use_old:
             task_suffix = "s"
 
+        if ycsb is True:
+            print(".", end="")
+            self.ycsb(experiment, r, "%s-vanilla" % task_suffix)
+
         start = time.time()
-        print("%12s : " % "vanilla", end='')
+        print("%12s : %f \t" % ("vanilla", start), end='')
         ######################################################################
         # Pull
         cmd_pull = [
@@ -924,6 +989,8 @@ class Runner:
             print(last_line, end="")
             history.append(np.nan)
 
+        if ycsb is True:
+            self.ycsb_terminate(debug)
         ######################################################################
         # Stop
         time.sleep(1)

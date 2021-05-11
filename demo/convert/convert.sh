@@ -53,7 +53,7 @@ for VAL in "${DatabaseList[@]}"; do
   chown -R 999:999 /tmp/t2
 
   ctr-remote image optimize --plain-http \
-    --env-file=../config/all.env \
+    --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
     --mount type=bind,src=/tmp/t1,dst=/var/lib/mysql,options=bind:rw \
   	--mount type=bind,src=/tmp/t2,dst=/run/mysqld,options=bind:rw \
 	  --wait-on-signal \
@@ -76,7 +76,7 @@ for VAL in "${CassandraList[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
       --mount type=bind,src=/tmp/t1,dst=/var/lib/cassandra,options=bind:rw \
@@ -101,7 +101,7 @@ for VAL in "${RedisList[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/data,options=bind:rw \
       --wait-on-signal \
     "$VAL" "http://$REGISTRY/$VAL-starlight"
@@ -123,7 +123,7 @@ for VAL in "${PGLIST[@]}"; do
   mkdir /tmp/m1
 
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=rbind:ro \
       --mount type=bind,src=/tmp/m1,dst=/var/lib/postgresql/data,options=rbind:rw \
@@ -147,7 +147,7 @@ for VAL in "${MongoList[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/data/db,options=rbind:rw \
       --wait-on-signal \
     "$VAL" "http://$REGISTRY/$VAL-starlight"
@@ -166,7 +166,7 @@ for VAL in "${PythonList[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/data/db,options=rbind:rw \
       --wait-on-signal \
       --entrypoint='[ "python", "-c" ]' --args="[\"print('hello')\"]" \
@@ -186,7 +186,7 @@ for VAL in "${RabbitMQList[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --wait-on-signal \
     "$VAL" "http://$REGISTRY/$VAL-starlight"
 
@@ -233,7 +233,7 @@ for VAL in "${WPLIST[@]}"; do
 
 
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/var/www/html,options=rbind:rw \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
@@ -265,7 +265,7 @@ for VAL in "${NEXTCLOUD[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/var/www/html,options=rbind:rw \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
@@ -291,7 +291,7 @@ for VAL in "${GHOST[@]}"; do
   mkdir /tmp/t1
   chown -R 3001:2368 /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/var/lib/ghost/content,options=rbind:rw \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
@@ -320,7 +320,7 @@ for VAL in "${PHPMYADMIN[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --mount type=bind,src=/tmp/t1,dst=/var/www/html,options=rbind:rw \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
@@ -346,7 +346,7 @@ for VAL in "${HTTPDLIST[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
@@ -371,7 +371,7 @@ for VAL in "${NGINXLIST[@]}"; do
 
   mkdir /tmp/t1
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
@@ -395,7 +395,7 @@ for VAL in "${FLINKLIST[@]}"; do
 
 
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
@@ -422,7 +422,7 @@ for VAL in "${MOSQUITTOLIST[@]}"; do
   mkdir /tmp/t3
 
   ctr-remote image optimize --plain-http \
-      --env-file=../config/all.env \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
       --wait-on-signal \
       --add-hosts=127.0.0.1:localhost \
       --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
@@ -435,4 +435,24 @@ for VAL in "${MOSQUITTOLIST[@]}"; do
   rm -rf /tmp/t2
   rm -rf /tmp/t3
 
+done
+
+
+declare -a registry=(
+  "registry:2.7.1"
+  "registry:2.7.0"
+)
+for VAL in "${registry[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
+      --mount type=bind,src=/tmp/t1,dst=/data,options=bind:rw \
+      --wait-on-signal \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+	rm -rf /tmp/t1
 done
