@@ -230,7 +230,7 @@ class ContainerExperiment:
 
     def save_event(self, suffix=""):
         ddf = pd.DataFrame(self.action_history, columns=['method', 'event', 'rrt', 'round', 'ts', 'delta'])
-        ddf.to_pickle("./pkl/%s%s-bundle.pkl" % (self.experiment_name, suffix))
+        ddf.to_csv("./pkl/%s%s-bundle.csv" % (self.experiment_name, suffix))
 
     def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
                      position=1, suffix=""):
@@ -500,12 +500,27 @@ class Runner:
 
         return r
 
-    def test_wget(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False):
+    def test_wget(self,
+                  experiment: ContainerExperiment,
+                  dry_run: bool = False,
+                  rtt: int = 0,
+                  seq: int = 0,
+                  r=0,
+                  use_old: bool = False,
+                  debug=False):
         if r == 0:
             r = random.randrange(999999999)
 
+        task_suffix = "-update"
+        if use_old:
+            task_suffix = "-scratch"
+
+        # Timestamp -------------------------------------------------------------------------
         start = time.time()
-        print("%12s : " % "wget", end='')
+        print("%12s : %f \t" % ("wget", start), end='')
+        if not dry_run:
+            experiment.add_event("wget%s" % task_suffix, "start", rtt, seq, start, 0)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Pull
         query = ""
@@ -537,21 +552,23 @@ class Runner:
         call_wait(cmd, debug)
 
         ######################################################################
-        end = time.time()
-        dur = end - start
-        print("%3.6fs" % dur, end=" deploy\n" if use_old else " update\n")
-        history.append(dur)
+        # Timestamp -------------------------------------------------------------------------
+        ts_done = time.time()
+        print("%3.6fs" % (ts_done - start))
+        if not dry_run:
+            experiment.add_event("wget%s" % task_suffix, "done", rtt, seq, ts_done, ts_done - start)
+        # -----------------------------------------------------------------------------------
         pass
 
     ####################################################################################################
     # FS Benchmark
     ####################################################################################################
-    def ycsb(self, exp: ContainerExperiment, r, suffix):
+    def ycsb(self, exp: ContainerExperiment, round, suffix):
         self.ycsb_p = subprocess.Popen(
             ['%s run redis -s -P workloads/tsworkloada -p "redis.host=127.0.0.1" -p "redis.port=6379" '
              '-p measurementtype=timeseries -p timeseries.granularity=100 > %s/%s-%d-%s.txt' % (
                  self.service.config.YCSB, self.service.config.YCSB_LOG,
-                 exp.experiment_name, r, suffix
+                 exp.experiment_name, round, suffix
              )],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -574,20 +591,32 @@ class Runner:
     # Pull and Run
     ####################################################################################################
 
-    def test_estargz(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+    def test_estargz(self,
+                     experiment: ContainerExperiment,
+                     dry_run: bool = False,
+                     rtt: int = 0,
+                     seq: int = 0,
+                     use_old: bool = False,
+                     r=0,
+                     debug: bool = False,
                      ycsb: bool = False):
         if r == 0:
-            r = random.randrange(999999999)
-        task_suffix = ""
+            r = random.randrange(999999)
+
+        task_suffix = "-update"
         if use_old:
-            task_suffix = "s"
+            task_suffix = "-scratch"
 
         if ycsb is True:
             print(".", end="")
-            self.ycsb(experiment, r, "%s-estargz" % task_suffix)
+            self.ycsb(experiment, seq, "estargz%s" % task_suffix)
 
+        # Timestamp -------------------------------------------------------------------------
         start = time.time()
         print("%12s : %f \t" % ("estargz", start), end='')
+        if not dry_run:
+            experiment.add_event("estargz%s" % task_suffix, "start", rtt, seq, start, 0)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Pull
         cmd_pull = [
@@ -614,7 +643,12 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        print("%3.6fs" % (time.time() - start), end="\t")
+        # Timestamp -------------------------------------------------------------------------
+        ts_pull = time.time()
+        print("%3.6fs" % (ts_pull - start), end="\t")
+        if not dry_run:
+            experiment.add_event("estargz%s" % task_suffix, "pull", rtt, seq, ts_pull, ts_pull - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
         cmd = [
@@ -645,7 +679,13 @@ class Runner:
         if debug:
             print(cmd)
         call_wait(cmd, debug)
-        print("%3.6fs" % (time.time() - start), end="\t")
+
+        # Timestamp -------------------------------------------------------------------------
+        ts_create = time.time()
+        print("%3.6fs" % (ts_create - start), end="\t")
+        if not dry_run:
+            experiment.add_event("estargz%s" % task_suffix, "create", rtt, seq, ts_create, ts_create - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Task Start
         cmd_start = "sudo ctr -n xe%d t start task%d%s 2>&1 %s" % (
@@ -668,20 +708,25 @@ class Runner:
                 break
 
         ######################################################################
-        end = time.time()
+        # Timestamp -------------------------------------------------------------------------
+        ts_done = time.time()
         try:
-            dur = end - start
+            t_duration = ts_done - start
         except:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("estargz%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
             return
 
         if real_done is True:
-            print("%3.6fs" % dur, end="\t")
-            history.append(dur)
+            print("%3.6fs" % t_duration, end="\t")
+            if not dry_run:
+                experiment.add_event("estargz%s" % task_suffix, "done", rtt, seq, ts_done, t_duration)
         else:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("estargz%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
+        # -----------------------------------------------------------------------------------
 
         if ycsb is True:
             self.ycsb_terminate(debug)
@@ -722,25 +767,38 @@ class Runner:
                     if complete == 0:
                         break
             print("-synced.")
+            self.service.set_latency_bandwidth(rtt)
         else:
             print("update")
 
         return r
 
-    def test_starlight(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+    def test_starlight(self,
+                       experiment: ContainerExperiment,
+                       dry_run: bool = False,
+                       rtt: int = 0,
+                       seq: int = 0,
+                       use_old: bool = False,
+                       r=0,
+                       debug: bool = False,
                        ycsb: bool = False):
         if r == 0:
-            r = random.randrange(999999999)
-        task_suffix = ""
+            r = random.randrange(999999)
+
+        task_suffix = "-update"
         if use_old:
-            task_suffix = "s"
+            task_suffix = "-scratch"
 
         if ycsb is True:
             print(".", end="")
-            self.ycsb(experiment, r, "%s-starlight" % task_suffix)
+            self.ycsb(experiment, seq, "starlight%s" % task_suffix)
 
+        # Timestamp -------------------------------------------------------------------------
         start = time.time()
         print("%12s : %f \t" % ("starlight", start), end='')
+        if not dry_run:
+            experiment.add_event("starlight%s" % task_suffix, "start", rtt, seq, start, 0)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Pull
         cmd_pull = [
@@ -766,7 +824,12 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        print("%3.6fs" % (time.time() - start), end="\t")
+        # Timestamp -------------------------------------------------------------------------
+        ts_pull = time.time()
+        print("%3.6fs" % (ts_pull - start), end="\t")
+        if not dry_run:
+            experiment.add_event("starlight%s" % task_suffix, "pull", rtt, seq, ts_pull, ts_pull - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
         cmd = [
@@ -807,7 +870,12 @@ class Runner:
             if b is not None:
                 print(b.decode("utf-8"), end="")
 
-        print("%3.6fs" % (time.time() - start), end="\t")
+        # Timestamp -------------------------------------------------------------------------
+        ts_create = time.time()
+        print("%3.6fs" % (ts_create - start), end="\t")
+        if not dry_run:
+            experiment.add_event("starlight%s" % task_suffix, "create", rtt, seq, ts_create, ts_create - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Task Start
         cmd_start = "sudo ctr -n xs%d t start task%d%s 2>&1 %s" % (
@@ -829,20 +897,26 @@ class Runner:
                 break
 
         ######################################################################
-        end = time.time()
+
+        # Timestamp -------------------------------------------------------------------------
+        ts_done = time.time()
         try:
-            dur = end - start
+            t_duration = ts_done - start
         except:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("starlight%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
             return
 
         if real_done is True:
-            print("%3.6fs" % dur, end="\t")
-            history.append(dur)
+            print("%3.6fs" % t_duration, end="\t")
+            if not dry_run:
+                experiment.add_event("starlight%s" % task_suffix, "done", rtt, seq, ts_done, t_duration)
         else:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("starlight%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
+        # -----------------------------------------------------------------------------------
 
         if ycsb is True:
             self.ycsb_terminate(debug)
@@ -878,25 +952,38 @@ class Runner:
                 if line.find("entire image extracted") != -1:
                     break
             print("-synced.")
+            self.service.set_latency_bandwidth(rtt)
         else:
             print("update")
 
         return r
 
-    def test_vanilla(self, experiment: ContainerExperiment, history: [], use_old: bool, r=0, debug=False,
+    def test_vanilla(self,
+                     experiment: ContainerExperiment,
+                     dry_run: bool = False,
+                     rtt: int = 0,
+                     seq: int = 0,
+                     use_old: bool = False,
+                     r=0,
+                     debug: bool = False,
                      ycsb: bool = False):
         if r == 0:
-            r = random.randrange(999999999)
-        task_suffix = ""
+            r = random.randrange(999999)
+
+        task_suffix = "-update"
         if use_old:
-            task_suffix = "s"
+            task_suffix = "-scratch"
 
         if ycsb is True:
             print(".", end="")
-            self.ycsb(experiment, r, "%s-vanilla" % task_suffix)
+            self.ycsb(experiment, seq, "vanilla%s" % task_suffix)
 
+        # Timestamp -------------------------------------------------------------------------
         start = time.time()
         print("%12s : %f \t" % ("vanilla", start), end='')
+        if not dry_run:
+            experiment.add_event("vanilla%s" % task_suffix, "start", rtt, seq, start, 0)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Pull
         cmd_pull = [
@@ -922,7 +1009,13 @@ class Runner:
                 print(a.decode("utf-8"), end="")
             if b is not None:
                 print(b.decode("utf-8"), end="")
-        print("%3.6fs" % (time.time() - start), end="\t")
+
+        # Timestamp -------------------------------------------------------------------------
+        ts_pull = time.time()
+        print("%3.6fs" % (ts_pull - start), end="\t")
+        if not dry_run:
+            experiment.add_event("vanilla%s" % task_suffix, "pull", rtt, seq, ts_pull, ts_pull - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
         cmd = [
@@ -952,7 +1045,13 @@ class Runner:
         if debug:
             print(cmd)
         call_wait(cmd, debug)
-        print("%3.6fs" % (time.time() - start), end="\t")
+
+        # Timestamp -------------------------------------------------------------------------
+        ts_create = time.time()
+        print("%3.6fs" % (ts_create - start), end="\t")
+        if not dry_run:
+            experiment.add_event("vanilla%s" % task_suffix, "create", rtt, seq, ts_create, ts_create - start)
+        # -----------------------------------------------------------------------------------
         ######################################################################
         # Task Start
         cmd_start = "sudo ctr -n xv%d t start task%d%s 2>&1 %s" % (
@@ -974,20 +1073,25 @@ class Runner:
                 break
 
         ######################################################################
-        end = time.time()
+        # Timestamp -------------------------------------------------------------------------
+        ts_done = time.time()
         try:
-            dur = end - start
+            t_duration = ts_done - start
         except:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("vanilla%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
             return
 
         if real_done is True:
-            print("%3.6fs" % dur, end="\t")
-            history.append(dur)
+            print("%3.6fs" % t_duration, end="\t")
+            if not dry_run:
+                experiment.add_event("vanilla%s" % task_suffix, "done", rtt, seq, ts_done, t_duration)
         else:
             print(last_line, end="")
-            history.append(np.nan)
+            if not dry_run:
+                experiment.add_event("vanilla%s" % task_suffix, "done", rtt, seq, np.nan, np.nan)
+        # -----------------------------------------------------------------------------------
 
         if ycsb is True:
             self.ycsb_terminate(debug)
