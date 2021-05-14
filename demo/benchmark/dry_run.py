@@ -5,26 +5,26 @@ from common import MountingPoint as M
 if __name__ == '__main__':
 
     event_suffix = "-dryrun"
-    debug = True
+    debug = False
 
     for t in [
-        X(
-            'mysql', 'database', '1B', '8.0.24', '8.0.23', [
-                M("/var/lib/mysql", False, "rw", "999:999"),
-                M("/run/mysqld", False, "rw", "999:999")
-            ], "port: 3306  MySQL Community Server - GPL",
-            None, 40
-        ),
+    X('eclipse-mosquitto', 'emerging', '100M', '2.0.10-openssl', '2.0.9-openssl', [
+        M("/mosquitto/data"),
+        M("/mosquitto/log"),
+    ], "running"),
+
     ]:
 
         r = Runner()
         discard = []
 
         r.service.reset_latency_bandwidth()
-        print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
 
         t.rounds = 1
+        t.rtt = [250]
         t.update_experiment_name()
+
+        print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
 
         for i in range(len(t.rtt)):
             print("RTT:%d" % t.rtt[i])
@@ -62,6 +62,7 @@ if __name__ == '__main__':
 
             # starlight
             for k in range(t.rounds):
+
                 r.service.reset_container_service()
                 r.service.start_grpc_starlight()
 

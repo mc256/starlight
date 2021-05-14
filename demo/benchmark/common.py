@@ -47,10 +47,19 @@ class ProcessService:
         self.p_stargz = None
         self.p_starlight = None
         self.p_containerd = None
+        self.p_reset = None
 
     def reset_container_service(self, is_debug=False):
-        self.p_containerd = subprocess.Popen(
+        self.p_reset = subprocess.Popen(
             ['sudo %s 2>&1%s' % (self.config.RESET, self.config.TEE_LOG_CONTAINERD)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True
+        )
+        _ = self.p_reset.communicate()
+
+        self.p_containerd = subprocess.Popen(
+            ['sudo %s 2>&1%s' % (self.config.CONTAINERD, self.config.TEE_LOG_CONTAINERD)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=True
@@ -77,6 +86,7 @@ class ProcessService:
 
     def kill_estargz(self):
         kill_process(self.p_stargz)
+        self.p_stargz = None
 
     def start_grpc_starlight(self):
         self.p_starlight = start_process_shell("sudo %s run "
@@ -94,6 +104,7 @@ class ProcessService:
 
     def kill_starlight(self):
         kill_process(self.p_starlight)
+        self.p_starlight = None
 
     def start_all_grpc(self):
         return self.start_grpc_estargz(), self.start_grpc_starlight()
@@ -590,9 +601,89 @@ class Runner:
             print("-------------------------------- YCSB end", end="")
 
     ####################################################################################################
+    # Memory Testing
+    ####################################################################################################
+    def get_memory_usage(self, pid, debug):
+        if debug:
+            print("pid: %d" % pid)
+        mem_p = subprocess.Popen("pstree -p -s %d | grep -o '[0-9]\\{3,\\}' | "
+                                 "xargs -I '{}' grep VmPeak /proc/{}/status | "
+                                 "grep -o '[0-9]\\{3,\\}' | "
+                                 "awk 'n < $0 {n=$0}END{print n}'" % pid, shell=True, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+        a, b = mem_p.communicate()
+
+        a = a.decode("utf-8")
+        b = b.decode("utf-8")
+
+        if debug:
+            print(a, end="")
+            print(b, end="")
+
+        if b == "":
+            usage = [int(i) for i in a.split() if i.isdigit()]
+            return usage[0] if len(usage) == 1 else 0
+
+    def save_memory_usage(self,
+                          experiment: ContainerExperiment,
+                          method: str = "",
+                          event: str = "",
+                          rtt: int = 0,
+                          round: int = 0,
+                          other: subprocess.Popen = None,
+                          debug: bool = False
+                          ):
+        try:
+            if self.service.p_containerd is not None:
+                mem = self.get_memory_usage(self.service.p_containerd.pid, debug=debug)
+                experiment.add_event(method, "mem-containerd-%s" % event, rtt, round, delta=mem)
+            else:
+                if debug:
+                    print("get memory containerd not exists")
+        except:
+            if debug:
+                print("get memory error")
+            pass
+
+        try:
+            if self.service.p_starlight is not None:
+                mem = self.get_memory_usage(self.service.p_starlight.pid, debug=debug)
+                experiment.add_event(method, "mem-starlight-%s" % event, rtt, round, delta=mem)
+            else:
+                if debug:
+                    print("get memory starlight not exists")
+        except:
+            if debug:
+                print("get memory error")
+            pass
+
+        try:
+            if self.service.p_stargz is not None:
+                mem = self.get_memory_usage(self.service.p_stargz.pid, debug=debug)
+                experiment.add_event(method, "mem-stargz-%s" % event, rtt, round, delta=mem)
+            else:
+                if debug:
+                    print("get memory estargz not exists")
+        except:
+            if debug:
+                print("get memory error")
+            pass
+
+        try:
+            if other is not None:
+                mem = self.get_memory_usage(self.service.p_stargz.pid, debug=debug)
+                experiment.add_event(method, "mem-%s" % event, rtt, round, delta=mem)
+            else:
+                if debug:
+                    print("get memory other process not exists")
+        except:
+            if debug:
+                print("get memory error")
+            pass
+
+    ####################################################################################################
     # Pull and Run
     ####################################################################################################
-
     def test_estargz(self,
                      experiment: ContainerExperiment,
                      dry_run: bool = False,
@@ -732,6 +823,7 @@ class Runner:
 
         if ycsb is True:
             self.ycsb_terminate(debug)
+
         ######################################################################
         # Stop
         time.sleep(1)
@@ -773,6 +865,7 @@ class Runner:
         else:
             print("update")
 
+        self.save_memory_usage(experiment, "estargz%s" % task_suffix, "", rtt, seq, debug=debug)
         return r
 
     def test_starlight(self,
@@ -958,6 +1051,7 @@ class Runner:
         else:
             print("update")
 
+        self.save_memory_usage(experiment, "starlight%s" % task_suffix, "", rtt, seq, pr, debug=debug)
         return r
 
     def test_vanilla(self,
@@ -1122,4 +1216,5 @@ class Runner:
         else:
             print("update")
 
+        self.save_memory_usage(experiment, "vanilla%s" % task_suffix, "", rtt, seq, pr, debug=debug)
         return r

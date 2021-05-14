@@ -23,6 +23,7 @@ X(
 ),
 X('rabbitmq', 'application', '1B', '3.8.14', '3.8.13', [], "Server startup complete", None, 30),
 X('registry', 'application', '1B', '2.7.1', '2.7.0', [M("/data")], "listening on [::]:5000", None, 10),
+X('httqpd', 'web-server', '1B', '2.4.46', '2.4.43', [], "Command line: 'httpd -D FOREGROUND'"),
 X('ubuntu', 'distro', '1B', 'focal-20210416', 'focal-20210401', [
     M("", overwrite="type=bind,"
                     "src=/home/ubuntu/Development/starlight/demo/config/hello-entrypoint.sh,"
@@ -36,14 +37,28 @@ if __name__ == '__main__':
     event_suffix = "-v3"
 
     for t in [
+
+        X('nginx', 'web-server', '1B', '1.20.0', '1.19.10', [], "ready for start up"),
         X(
-            'mysql', 'database', '1B', '8.0.24', '8.0.23', [
+            'redis', 'database', '1B', '6.2.2', '6.2.1',
+            [M("/data")],
+            "* Ready to accept connections",
+            ["/usr/local/bin/redis-server","--protected-mode","no"], 10
+        ),
+        X('eclipse-mosquitto', 'emerging', '100M', '2.0.10-openssl', '2.0.9-openssl', [
+            M("/mosquitto/data"),
+            M("/mosquitto/log"),
+        ], "running"),
+        X('flink', 'emerging', '50M', '1.12.3-scala_2.12-java8', '1.12.3-scala_2.11-java8', [],
+          "Starting RPC endpoint for org.apache.flink.runtime.dispatcher.StandaloneDispatcher",
+          ["/docker-entrypoint.sh", "jobmanager"]),
+        X(
+            'mysql', 'database', '1B', '8.0.25', '8.0.24', [
                 M("/var/lib/mysql", False, "rw", "999:999"),
                 M("/run/mysqld", False, "rw", "999:999")
             ], "port: 3306  MySQL Community Server - GPL",
             None, 40
         ),
-        X('registry', 'application', '1B', '2.7.1', '2.7.0', [M("/data")], "listening on [::]:5000", None, 10),
     ]:
 
         r = Runner()
@@ -140,8 +155,9 @@ if __name__ == '__main__':
                     ycsb=False
                 )
                 t.save_event(event_suffix)
+
             # wget
-            for k in range(t.rounds):
+            for k in range(t.rounds + 1):
                 r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=True)
                 r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=False)
                 t.save_event(event_suffix)

@@ -5,10 +5,6 @@
 SERVER="proxy.starlight.yuri.moe"
 
 declare -a ImageList=(
-  "ubuntu:18.04"
-  "ubuntu:20.04"
-  "alpine:3.12.7"
-  "alpine:3.13.5"
   "busybox:1.32.1"
   "busybox:1.33.0"
   "debian:oldstable"
@@ -24,8 +20,6 @@ declare -a ImageList=(
   "mysql:8.0.22"
   "mysql:8.0.23"
   "mysql:8.0.24"
-  "mariadb:10.4"
-  "mariadb:10.5"
   "cassandra:3.11.10"
   "cassandra:3.11.9"
   "redis:5.0"
@@ -69,22 +63,8 @@ declare -a ImageList=(
   "mongo:4.0.24"
   "mongo:4.0.23"
 
-  "python:3.9.4"
-  "python:3.9.3"
   "rabbitmq:3.8.14"
   "rabbitmq:3.8.13"
-
-  "wordpress:php7.4-fpm"
-  "wordpress:php7.3-fpm"
-
-
-  "nextcloud:21.0.1-apache"
-  "nextcloud:20.0.9-apache"
-
-  "ghost:4.3.3-alpine"
-  "ghost:3.42.5-alpine"
-  "phpmyadmin:5.1.0-fpm-alpine"
-  "phpmyadmin:5.0.4-fpm-alpine"
 
   "httpd:2.4.46"
   "httpd:2.4.43"
@@ -100,8 +80,23 @@ declare -a ImageList=(
 
   "registry:2.7.1"
   "registry:2.7.0"
+
+
+
+
+  "python:3.9.4"
+  "python:3.9.3"
+  "wordpress:php7.4-fpm"
+  "wordpress:php7.3-fpm"
+  "nextcloud:21.0.1-apache"
+  "nextcloud:20.0.9-apache"
+  "ghost:4.3.3-alpine"
+  "ghost:3.42.5-alpine"
+  "phpmyadmin:5.1.0-fpm-alpine"
+  "phpmyadmin:5.0.4-fpm-alpine"
 )
 
 for VAL in "${ImageList[@]}"; do
+  echo "https://$SERVER/prepare/$VAL-starlight"
   curl "https://$SERVER/prepare/$VAL-starlight"
 done

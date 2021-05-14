@@ -57,11 +57,6 @@ BillionBench = [
 ]
 
 BillionBench_hold2 = [
-    X('alpine', 'distro', '1B', '3.13.5', '3.13.4', [], "hello", ["/bin/sh", "-c", "echo hello"]),
-    X('busybox', 'distro', '1B', '1.32.1', '1.32.0', [], "hello", ["/bin/sh", "-c", "echo hello"]),
-    X('ubuntu', 'distro', '1B', 'focal-20210416', 'focal-20210401', [], "hello", ["/bin/sh", "-c", "echo hello"]),
-
-
     X(
         'mongo', 'database', '1B', '4.0.24', '4.0.23', [M("/data/db")],
         "waiting for connections on port 27017"

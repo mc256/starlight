@@ -31,4 +31,8 @@ class Configuration:
 
     TMP = "/tmp"
     ENV = "../config/all.env"
-    RESET = "./reset.sh"
+    RESET = "./reset-momoko.sh"
+    CONTAINERD = "/usr/local/bin/containerd"
+
+    YCSB = "source /home/ubuntu/venv2.7/bin/activate && cd /home/ubuntu/Development/YCSB && ./bin/ycsb"
+    YCSB_LOG = "./"
