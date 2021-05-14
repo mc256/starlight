@@ -7,7 +7,7 @@ X(
     'redis', 'database', '1B', '6.2.2', '6.2.1',
     [M("/data")],
     "* Ready to accept connections",
-    None, 10
+    ["/usr/local/bin/redis-server","--protected-mode","no"], 10
 ),
 X(
     'cassandra', 'emerging', '100M', '3.11.10', '3.11.9',
@@ -32,8 +32,18 @@ X('ubuntu', 'distro', '1B', 'focal-20210416', 'focal-20210401', [
 ], "hello", ["/entrypoint.sh"], 10)
 """
 if __name__ == '__main__':
-    for t in [
 
+    event_suffix = "-v3"
+
+    for t in [
+        X(
+            'mysql', 'database', '1B', '8.0.24', '8.0.23', [
+                M("/var/lib/mysql", False, "rw", "999:999"),
+                M("/run/mysqld", False, "rw", "999:999")
+            ], "port: 3306  MySQL Community Server - GPL",
+            None, 40
+        ),
+        X('registry', 'application', '1B', '2.7.1', '2.7.0', [M("/data")], "listening on [::]:5000", None, 10),
     ]:
 
         r = Runner()
@@ -42,30 +52,11 @@ if __name__ == '__main__':
         r.service.reset_latency_bandwidth()
         print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
 
-        pool_starlight = []
-        pool_vanilla = []
-        pool_estargz = []
-        pool_wget = []
-
-        pool_starlight_update = []
-        pool_vanilla_update = []
-        pool_estargz_update = []
-        pool_wget_update = []
-
         for i in range(len(t.rtt)):
             print("RTT:%d" % t.rtt[i])
 
-            step_starlight = []
-            step_vanilla = []
-            step_estargz = []
-            step_wget = []
-
-            step_starlight_update = []
-            step_vanilla_update = []
-            step_estargz_update = []
-            step_wget_update = []
-
             r.service.set_latency_bandwidth(t.rtt[i])  # ADD DELAY
+
             # estargz
             for k in range(t.rounds + 1):
                 r.service.reset_container_service()
@@ -73,12 +64,27 @@ if __name__ == '__main__':
 
                 n = 0
                 if t.has_old_version():
-                    n = r.test_estargz(t, history=discard if k == 0 else step_estargz, use_old=True, r=n, debug=False)
+                    n = r.test_estargz(
+                        t,
+                        k == 0, rtt=t.rtt[i], seq=k,
+                        use_old=True,
+                        r=n,
+                        debug=False,
+                        ycsb=False
+                    )
+                    pass
 
-                r.service.set_latency_bandwidth(t.rtt[i])  # ADD DELAY
-                r.test_estargz(t, history=discard if k == 0 else step_estargz_update, use_old=False, r=n, debug=False)
+                r.test_estargz(
+                    t,
+                    k == 0, rtt=t.rtt[i], seq=k,
+                    use_old=False,
+                    r=n,
+                    debug=False,
+                    ycsb=False
+                )
 
                 r.service.kill_estargz()
+                t.save_event(event_suffix)
 
             # starlight
             for k in range(t.rounds + 1):
@@ -87,14 +93,27 @@ if __name__ == '__main__':
 
                 n = 0
                 if t.has_old_version():
-                    n = r.test_starlight(t, history=discard if k == 0 else step_starlight, use_old=True, r=n,
-                                         debug=False)
+                    n = r.test_starlight(
+                        t,
+                        k == 0, rtt=t.rtt[i], seq=k,
+                        use_old=True,
+                        r=n,
+                        debug=False,
+                        ycsb=False
+                    )
+                    pass
 
-                r.service.set_latency_bandwidth(t.rtt[i])  # ADD DELAY
-                r.test_starlight(t, history=discard if k == 0 else step_starlight_update, use_old=False, r=n,
-                                 debug=False)
+                r.test_starlight(
+                    t,
+                    k == 0, rtt=t.rtt[i], seq=k,
+                    use_old=False,
+                    r=n,
+                    debug=False,
+                    ycsb=False
+                )
 
                 r.service.kill_starlight()
+                t.save_event(event_suffix)
 
             # vanilla
             for k in range(t.rounds + 1):
@@ -102,38 +121,32 @@ if __name__ == '__main__':
 
                 n = 0
                 if t.has_old_version():
-                    n = r.test_vanilla(t, history=discard if k == 0 else step_vanilla, use_old=True, r=n, debug=False)
-                r.test_vanilla(t, history=discard if k == 0 else step_vanilla_update, use_old=False, r=n, debug=False)
+                    n = r.test_vanilla(
+                        t,
+                        k == 0, rtt=t.rtt[i], seq=k,
+                        use_old=True,
+                        r=n,
+                        debug=False,
+                        ycsb=False
+                    )
+                    pass
 
+                r.test_vanilla(
+                    t,
+                    k == 0, rtt=t.rtt[i], seq=k,
+                    use_old=False,
+                    r=n,
+                    debug=False,
+                    ycsb=False
+                )
+                t.save_event(event_suffix)
             # wget
             for k in range(t.rounds):
-                r.test_wget(t, history=discard if k == 0 else step_wget, use_old=True)
-                r.service.set_latency_bandwidth(t.rtt[i])  # ADD DELAY
-                r.test_wget(t, history=discard if k == 0 else step_wget_update, use_old=False)
+                r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=True)
+                r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=False)
+                t.save_event(event_suffix)
 
             r.service.reset_latency_bandwidth()
-            # save results
-            pool_starlight.append(step_starlight)
-            pool_vanilla.append(step_vanilla)
-            pool_estargz.append(step_estargz)
-            pool_wget.append(step_wget)
-
-            pool_starlight_update.append(step_starlight_update)
-            pool_vanilla_update.append(step_vanilla_update)
-            pool_estargz_update.append(step_estargz_update)
-            pool_wget_update.append(step_wget_update)
-
-            df1, df2, df3, df4 = t.save_results(
-                pool_estargz, pool_starlight, pool_vanilla, pool_wget,
-                i + 1, "-deploy"
-            )
-            t.plot_results(df1, df2, df3, df4, "-deploy")
-
-            df1, df2, df3, df4 = t.save_results(
-                pool_estargz_update, pool_starlight_update, pool_vanilla_update, pool_wget_update,
-                i + 1, "-update"
-            )
-            t.plot_results(df1, df2, df3, df4, "-update")
 
         r.service.reset_container_service()
         r.service.reset_latency_bandwidth()

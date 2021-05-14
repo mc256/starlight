@@ -229,8 +229,8 @@ class ContainerExperiment:
         self.action_history.append([method, event, rtt, round, ts, delta])
 
     def save_event(self, suffix=""):
-        ddf = pd.DataFrame(self.action_history, columns=['method', 'event', 'rrt', 'round', 'ts', 'delta'])
-        ddf.to_csv("./pkl/%s%s-bundle.csv" % (self.experiment_name, suffix))
+        ddf = pd.DataFrame(self.action_history, columns=['method', 'event', 'rtt', 'round', 'ts', 'delta'])
+        ddf.to_csv("./csv/%s%s-bundle.csv" % (self.experiment_name, suffix))
 
     def save_results(self, performance_estargz, performance_starlight, performance_vanilla, performance_wget,
                      position=1, suffix=""):
@@ -423,6 +423,7 @@ class Runner:
     def __init__(self):
         self.ycsb_p = None
         self.service = ProcessService()
+        self.ycsb_base = ""
         pass
 
     def sync_pull_estargz(self, experiment: ContainerExperiment, r=0, debug=False):
@@ -566,8 +567,9 @@ class Runner:
     def ycsb(self, exp: ContainerExperiment, round, suffix):
         self.ycsb_p = subprocess.Popen(
             ['%s run redis -s -P workloads/tsworkloada -p "redis.host=127.0.0.1" -p "redis.port=6379" '
-             '-p measurementtype=timeseries -p timeseries.granularity=100 > %s/%s-%d-%s.txt' % (
-                 self.service.config.YCSB, self.service.config.YCSB_LOG,
+             '-p measurementtype=timeseries -p timeseries.granularity=10000  -p status.interval=100 '
+             '> %s/%s%s-%d-%s.txt' % (
+                 self.service.config.YCSB, self.service.config.YCSB_LOG, self.ycsb_base,
                  exp.experiment_name, round, suffix
              )],
             stdout=subprocess.PIPE,

@@ -1,4 +1,5 @@
 from common import Runner
+import os
 from common import ContainerExperimentX as X
 from common import MountingPoint as M
 
@@ -29,6 +30,14 @@ if __name__ == '__main__':
 
         print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
 
+        r.ycsb_base = "150ms-tsworkloada-m5a.2x-1thread"
+        event_suffix = "-ycsb-%s" % r.ycsb_base
+        r.ycsb_base = r.ycsb_base + "/"
+        try:
+            os.mkdir("%s/%s" % (r.service.config.YCSB_LOG, r.ycsb_base))
+        except:
+            pass
+
         # estargz
         for k in range(t.rounds + 1):
             r.service.reset_container_service()
@@ -56,7 +65,7 @@ if __name__ == '__main__':
             )
 
             r.service.kill_estargz()
-            t.save_event("-ycsb-150ms")
+            t.save_event(event_suffix)
 
         # starlight
         for k in range(t.rounds + 1):
@@ -85,7 +94,7 @@ if __name__ == '__main__':
             )
 
             r.service.kill_starlight()
-            t.save_event("-ycsb-150ms")
+            t.save_event(event_suffix)
 
         # vanilla
         for k in range(t.rounds + 1):
@@ -111,13 +120,15 @@ if __name__ == '__main__':
                 debug=False,
                 ycsb=False if k == 0 else True
             )
-            t.save_event("-ycsb-150ms")
+            t.save_event(event_suffix)
 
+        """
         # wget
         for k in range(t.rounds + 1):
             n = r.test_wget(t, k == 0, rtt=rtt, seq=k, r=0, use_old=True)
             r.test_wget(t, k == 0, rtt=rtt, seq=k, r=n, use_old=False)
+        """
 
         # save results
-        t.save_event("-ycsb-150ms")
+        t.save_event(event_suffix)
         r.service.reset_container_service()
