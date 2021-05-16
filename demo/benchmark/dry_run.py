@@ -5,14 +5,18 @@ from common import MountingPoint as M
 if __name__ == '__main__':
 
     event_suffix = "-dryrun"
-    debug = False
+    debug = True
 
     for t in [
-    X('eclipse-mosquitto', 'emerging', '100M', '2.0.10-openssl', '2.0.9-openssl', [
-        M("/mosquitto/data"),
-        M("/mosquitto/log"),
-    ], "running"),
 
+        X('wordpress', 'application', '1B', 'php7.4-fpm', 'php7.3-fpm', [M("/var/www/html")],
+          "ready to handle connections"),
+        X('nextcloud', 'application', '1B', '21.0.1-apache', '20.0.9-apache', [M("/var/www/html")],
+          "Command line: 'apache2 -D FOREGROUND'"),
+        X('ghost', 'application', '1B', '4.3.3-alpine', '3.42.5-alpine',
+          [M("/var/lib/ghost/content", False, "rw", "3001:2368")], "Ghost booted"),
+        X('phpmyadmin', 'application', '10M', '5.1.0-fpm-alpine', '5.0.4-fpm-alpine', [],
+          "NOTICE: ready to handle connections")
     ]:
 
         r = Runner()
@@ -21,7 +25,7 @@ if __name__ == '__main__':
         r.service.reset_latency_bandwidth()
 
         t.rounds = 1
-        t.rtt = [250]
+        t.rtt = [2]
         t.update_experiment_name()
 
         print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)

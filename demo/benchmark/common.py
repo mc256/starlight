@@ -435,6 +435,7 @@ class Runner:
         self.ycsb_p = None
         self.service = ProcessService()
         self.ycsb_base = ""
+        self.timeout = 120
         pass
 
     def sync_pull_estargz(self, experiment: ContainerExperiment, r=0, debug=False):
@@ -728,13 +729,20 @@ class Runner:
 
         if debug:
             print(cmd_pull)
-        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
-        a, b = pr.communicate()
-        if debug:
-            if a is not None:
-                print(a.decode("utf-8"), end="")
-            if b is not None:
-                print(b.decode("utf-8"), end="")
+
+        proc_pull = subprocess.Popen(cmd_pull, preexec_fn=os.setpgrp,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_pull.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("estargz%s" % task_suffix, "pull-timeout", rtt, seq)
+            print('pull-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_pull = time.time()
@@ -744,7 +752,7 @@ class Runner:
         # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
-        cmd = [
+        cmd_create = [
             "sudo", "ctr-remote",
             "-n", "xe%d" % r,
             "c", "create",
@@ -754,11 +762,11 @@ class Runner:
         if experiment.has_mounting is True:
             for m in experiment.mounting:
                 m.prepare(r, debug)
-                cmd.extend(["--mount", m.get_mount_parameter(r)])
+                cmd_create.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV, "--net-host"])
+        cmd_create.extend(["--env-file", self.service.config.ENV, "--net-host"])
 
-        cmd.extend([
+        cmd_create.extend([
             "%s/%s" % (
                 self.service.config.REGISTRY_SERVER,
                 experiment.get_stargz_image(use_old)
@@ -767,11 +775,24 @@ class Runner:
         ])
 
         if experiment.has_args:
-            cmd.extend(experiment.args)
+            cmd_create.extend(experiment.args)
 
         if debug:
-            print(cmd)
-        call_wait(cmd, debug)
+            print(cmd_create)
+
+        proc_create = subprocess.Popen(cmd_create, preexec_fn=os.setpgrp,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_create.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("estargz%s" % task_suffix, "create-timeout", rtt, seq)
+            print('create-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_create = time.time()
@@ -786,12 +807,15 @@ class Runner:
         )
 
         if debug:
-            print(cmd_pull)
-        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
+            print(cmd_start)
+
+        proc_start = subprocess.Popen(cmd_start,
+                                      stdout=subprocess.PIPE,
+                                      shell=True)
 
         last_line = ""
         real_done = False
-        for ln in proc.stdout:
+        for ln in proc_start.stdout:
             line = ln.decode('utf-8')
             last_line = line
             if debug:
@@ -827,14 +851,24 @@ class Runner:
         ######################################################################
         # Stop
         time.sleep(1)
-        stop = start_process_shell(
-            "sudo ctr -n xe%d t kill task%d%s 2>&1" % (r, r, task_suffix)
-        )
-        stop.wait()
-        proc.wait()
+        proc_stop = subprocess.Popen("sudo ctr -n xe%d t kill task%d%s 2>&1" % (r, r, task_suffix),
+                                     preexec_fn=os.setpgrp,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     shell=True)
+        try:
+            proc_stop.wait(timeout=10)
+        except:
+            print("[stop-timeout]", end="")
+            pass
+
+        try:
+            proc_start.wait(timeout=10)
+        except:
+            print("[proc-timeout]", end="")
+            pass
 
         if debug:
-            a, b = stop.communicate()
+            a, b = proc_stop.communicate()
             if a is not None:
                 print(a.decode("utf-8"), end="")
             if b is not None:
@@ -910,14 +944,20 @@ class Runner:
 
         if debug:
             print(cmd_pull)
-        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        a, b = pr.communicate()
 
-        if debug:
-            if a is not None:
-                print(a.decode("utf-8"), end="")
-            if b is not None:
-                print(b.decode("utf-8"), end="")
+        proc_pull = subprocess.Popen(cmd_pull, preexec_fn=os.setpgrp,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_pull.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("starlight%s" % task_suffix, "pull-timeout", rtt, seq)
+            print('pull-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_pull = time.time()
@@ -927,7 +967,7 @@ class Runner:
         # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
-        cmd = [
+        cmd_create = [
             "sudo", "ctr-starlight",
             "--log-level", "debug",
             "-n", "xs%d" % r,
@@ -937,33 +977,40 @@ class Runner:
         if experiment.has_mounting is True:
             for m in experiment.mounting:
                 m.prepare(r, debug)
-                cmd.extend(["--mount", m.get_mount_parameter(r)])
+                cmd_create.extend(["--mount", m.get_mount_parameter(r)])
 
         # cmd.extend(["-cp", "%d" % checkpoint])
-        cmd.extend(["--env-file", self.service.config.ENV])
-        cmd.extend(["--net-host"])
+        cmd_create.extend(["--env-file", self.service.config.ENV])
+        cmd_create.extend(["--net-host"])
 
         if use_old:
-            cmd.append(experiment.get_starlight_image(old=True))  # Image Combo
-            cmd.append(experiment.get_starlight_image(old=True))  # Specific Image
+            cmd_create.append(experiment.get_starlight_image(old=True))  # Image Combo
+            cmd_create.append(experiment.get_starlight_image(old=True))  # Specific Image
         else:
-            cmd.append(experiment.get_starlight_image(old=False))  # Image Combo
-            cmd.append(experiment.get_starlight_image(old=False))  # Specific Image
+            cmd_create.append(experiment.get_starlight_image(old=False))  # Image Combo
+            cmd_create.append(experiment.get_starlight_image(old=False))  # Specific Image
 
-        cmd.append("task%d%s" % (r, task_suffix))
+        cmd_create.append("task%d%s" % (r, task_suffix))
 
         if experiment.has_args:
-            cmd.extend(experiment.args)
+            cmd_create.extend(experiment.args)
 
         if debug:
-            print(cmd)
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        a, b = proc.communicate()
-        if debug:
-            if a is not None:
-                print(a.decode("utf-8"), end="")
-            if b is not None:
-                print(b.decode("utf-8"), end="")
+            print(cmd_create)
+
+        proc_create = subprocess.Popen(cmd_create, preexec_fn=os.setpgrp,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_create.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("estargz%s" % task_suffix, "create-timeout", rtt, seq)
+            print('create-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_create = time.time()
@@ -979,10 +1026,14 @@ class Runner:
 
         if debug:
             print(cmd_start)
-        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
+
+        proc_start = subprocess.Popen(cmd_start,
+                                      stdout=subprocess.PIPE,
+                                      shell=True)
+
         last_line = ""
         real_done = False
-        for ln in proc.stdout:
+        for ln in proc_start.stdout:
             line = ln.decode('utf-8')
             last_line = line
             if debug:
@@ -992,7 +1043,6 @@ class Runner:
                 break
 
         ######################################################################
-
         # Timestamp -------------------------------------------------------------------------
         ts_done = time.time()
         try:
@@ -1018,14 +1068,24 @@ class Runner:
         ######################################################################
         # Stop
         time.sleep(1)
-        stop = start_process_shell(
-            "sudo ctr -n xs%d t kill task%d%s 2>&1" % (r, r, task_suffix)
-        )
-        stop.wait()
-        proc.wait()
+        proc_stop = subprocess.Popen("sudo ctr -n xs%d t kill task%d%s 2>&1" % (r, r, task_suffix),
+                                     preexec_fn=os.setpgrp,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     shell=True)
+        try:
+            proc_stop.wait(timeout=10)
+        except:
+            print("[stop-timeout]", end="")
+            pass
+
+        try:
+            proc_start.wait(timeout=10)
+        except:
+            print("[proc-timeout]", end="")
+            pass
 
         if debug:
-            a, b = stop.communicate()
+            a, b = proc_stop.communicate()
             if a is not None:
                 print(a.decode("utf-8"), end="")
             if b is not None:
@@ -1051,7 +1111,7 @@ class Runner:
         else:
             print("update")
 
-        self.save_memory_usage(experiment, "starlight%s" % task_suffix, "", rtt, seq, pr, debug=debug)
+        self.save_memory_usage(experiment, "starlight%s" % task_suffix, "", rtt, seq, debug=debug)
         return r
 
     def test_vanilla(self,
@@ -1097,14 +1157,20 @@ class Runner:
 
         if debug:
             print(cmd_pull)
-        pr = subprocess.Popen(cmd_pull, stdout=subprocess.PIPE)
-        a, b = pr.communicate()
 
-        if debug and False:  # it is just too much to print out
-            if a is not None:
-                print(a.decode("utf-8"), end="")
-            if b is not None:
-                print(b.decode("utf-8"), end="")
+        proc_pull = subprocess.Popen(cmd_pull, preexec_fn=os.setpgrp,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_pull.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("vanilla%s" % task_suffix, "pull-timeout", rtt, seq)
+            print('pull-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_pull = time.time()
@@ -1114,7 +1180,7 @@ class Runner:
         # -----------------------------------------------------------------------------------
         ######################################################################
         # Create
-        cmd = [
+        cmd_create = [
             "sudo", "ctr",
             "-n", "xv%d" % r,
             "c", "create"
@@ -1123,11 +1189,11 @@ class Runner:
         if experiment.has_mounting is True:
             for m in experiment.mounting:
                 m.prepare(r, debug)
-                cmd.extend(["--mount", m.get_mount_parameter(r)])
+                cmd_create.extend(["--mount", m.get_mount_parameter(r)])
 
-        cmd.extend(["--env-file", self.service.config.ENV, "--net-host"])
+        cmd_create.extend(["--env-file", self.service.config.ENV, "--net-host"])
 
-        cmd.extend([
+        cmd_create.extend([
             "%s/%s" % (
                 self.service.config.REGISTRY_SERVER,
                 experiment.get_vanilla_image(use_old)
@@ -1136,11 +1202,24 @@ class Runner:
         ])
 
         if experiment.has_args:
-            cmd.extend(experiment.args)
+            cmd_create.extend(experiment.args)
 
         if debug:
-            print(cmd)
-        call_wait(cmd, debug)
+            print(cmd_create)
+
+        proc_create = subprocess.Popen(cmd_create, preexec_fn=os.setpgrp,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            a, b = proc_create.communicate(timeout=self.timeout)
+            if debug:
+                if a is not None:
+                    print(a.decode("utf-8"), end="")
+                if b is not None:
+                    print(b.decode("utf-8"), end="")
+        except subprocess.TimeoutExpired:
+            experiment.add_event("estargz%s" % task_suffix, "create-timeout", rtt, seq)
+            print('create-timeout')
+            return
 
         # Timestamp -------------------------------------------------------------------------
         ts_create = time.time()
@@ -1156,10 +1235,13 @@ class Runner:
 
         if debug:
             print(cmd_start)
-        proc = subprocess.Popen(cmd_start, shell=True, stdout=subprocess.PIPE)
+
+        proc_start = subprocess.Popen(cmd_start,
+                                      stdout=subprocess.PIPE,
+                                      shell=True)
         last_line = ""
         real_done = False
-        for ln in proc.stdout:
+        for ln in proc_start.stdout:
             line = ln.decode('utf-8')
             last_line = line
             if debug:
@@ -1194,14 +1276,23 @@ class Runner:
         ######################################################################
         # Stop
         time.sleep(1)
-        stop = start_process_shell(
+        proc_stop = start_process_shell(
             "sudo ctr -n xv%d t kill task%d%s 2>&1" % (r, r, task_suffix)
         )
-        stop.wait()
-        proc.wait()
+        try:
+            proc_stop.wait(timeout=10)
+        except:
+            print("[stop-timeout]", end="")
+            pass
+
+        try:
+            proc_start.wait(timeout=10)
+        except:
+            print("[proc-timeout]", end="")
+            pass
 
         if debug:
-            a, b = stop.communicate()
+            a, b = proc_stop.communicate()
             if a is not None:
                 print(a.decode("utf-8"), end="")
             if b is not None:
@@ -1216,5 +1307,5 @@ class Runner:
         else:
             print("update")
 
-        self.save_memory_usage(experiment, "vanilla%s" % task_suffix, "", rtt, seq, pr, debug=debug)
+        self.save_memory_usage(experiment, "vanilla%s" % task_suffix, "", rtt, seq, debug=debug)
         return r
