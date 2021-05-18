@@ -67,7 +67,7 @@ func touchFile(ctx gocontext.Context, mounting, fileName string) error {
 			return file.Close()
 		}
 	} else {
-		dst, err := os.OpenFile(fullName, os.O_WRONLY, 644)
+		dst, err := os.OpenFile(fullName, os.O_WRONLY|os.O_CREATE, 644)
 		if err != nil {
 			return err
 		}

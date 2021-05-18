@@ -239,7 +239,7 @@ func (n *StarlightFsNode) Link(ctx context.Context, target fs.InodeEmbedder, nam
 		return nil, syscall.EEXIST
 	}
 
-	if err := n.promote(); err != 0 {
+	if err := n.promote(false); err != 0 {
 		return nil, err
 	}
 
@@ -377,12 +377,33 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 		}).Trace("OPEN-P")
 	}
 
-	if flags&syscall.O_WRONLY != 0 && flags|syscall.O_WRONLY == syscall.O_WRONLY {
+	if flags&syscall.O_WRONLY == 1 {
+		// WRITE ONLY
 		if fh, mode, err := func() (fs.FileHandle, uint32, syscall.Errno) {
 			n.Ent.StateMu.Lock()
 			defer n.Ent.StateMu.Unlock()
-			if n.Ent.State != EnRwLayer {
-				if errno := n.promote(); errno != 0 {
+			if n.Ent.State == EnEmpty {
+				if errno := n.promote(true); errno != 0 {
+					return nil, 0, errno
+				}
+				p := n.Ent.GetRwLayerPath()
+				_, err := syscall.Creat(p, 0)
+				if err != nil {
+					return nil, 0, fs.ToErrno(err)
+				}
+				if errno := n.setRWAttrFromEntry(); errno != 0 {
+					return nil, 0, errno
+				}
+
+				/*
+					log.G(ctx).WithFields(logrus.Fields{
+						"name":   n.Ent.Name,
+						"source": n.Ent.Source,
+						"state":  n.Ent.State,
+					}).Warn("OPEN-TOUCH")
+				*/
+			} else if n.Ent.State == EnRoLayer {
+				if errno := n.promote(false); errno != 0 {
 					return nil, 0, errno
 				}
 				if errno := n.setRWAttrFromEntry(); errno != 0 {
@@ -402,8 +423,26 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 			}).Trace("OPEN-W")
 		}
 	} else {
+		// READ and READ-WRITE
 		if n.Ent.AtomicGetFileState() == EnEmpty {
+			/*
+				log.G(ctx).WithFields(logrus.Fields{
+					"name":   n.Ent.Name,
+					"source": n.Ent.Source,
+					"state":  n.Ent.State,
+					"FLAG1":  flags & syscall.O_WRONLY,
+					"FLAG2":  flags,
+				}).Error("OPEN-BLOCK")
+
+			*/
 			<-n.Ent.ready
+			/*
+				log.G(ctx).WithFields(logrus.Fields{
+					"name":   n.Ent.Name,
+					"source": n.Ent.Source,
+					"state":  n.Ent.State,
+				}).Error("OPEN-UNBLOCK")
+			*/
 			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 		}
 
@@ -413,7 +452,7 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 				n.Ent.StateMu.Lock()
 				defer n.Ent.StateMu.Unlock()
 				if n.Ent.State == EnRoLayer {
-					if errno := n.promote(); errno != 0 {
+					if errno := n.promote(false); errno != 0 {
 						return nil, 0, errno
 					}
 					if errno := n.setRWAttrFromEntry(); errno != 0 {
@@ -444,8 +483,8 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 	return fs.NewLoopbackFile(fd), 0, 0
 }
 
-func (n *StarlightFsNode) promote() syscall.Errno {
-	if n.Ent.State == EnRwLayer {
+func (n *StarlightFsNode) promote(ignoreSelf bool) syscall.Errno {
+	if n.Ent.State == EnRwLayer && !ignoreSelf {
 		return 0
 	}
 
@@ -480,8 +519,10 @@ func (n *StarlightFsNode) promote() syscall.Errno {
 	}
 
 	// Promote it self
-	if err := n.Ent.Promote(); err != 0 {
-		return err
+	if !ignoreSelf {
+		if err := n.Ent.Promote(); err != 0 {
+			return err
+		}
 	}
 
 	return 0
@@ -576,6 +617,11 @@ func (n *StarlightFsNode) Setattr(ctx context.Context, fh fs.FileHandle, in *fus
 	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
+		log.G(ctx).WithFields(logrus.Fields{
+			"name":   n.Ent.Name,
+			"source": n.Ent.Source,
+			"state":  n.Ent.State,
+		}).Error("SETATTR")
 		<-n.Ent.ready
 		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 	}
@@ -585,7 +631,7 @@ func (n *StarlightFsNode) Setattr(ctx context.Context, fh fs.FileHandle, in *fus
 		defer n.Ent.StateMu.Unlock()
 		// Promote
 		if n.Ent.State == EnRoLayer {
-			if errno := n.promote(); errno != 0 {
+			if errno := n.promote(false); errno != 0 {
 				return errno
 			}
 			n.Ent.State = EnRwLayer
@@ -647,7 +693,7 @@ func (n *StarlightFsNode) Symlink(ctx context.Context, target, name string, out 
 		return nil, syscall.EEXIST
 	}
 
-	if err := n.promote(); err != 0 {
+	if err := n.promote(false); err != 0 {
 		return nil, err
 	}
 
@@ -716,7 +762,7 @@ func (n *StarlightFsNode) Mkdir(ctx context.Context, name string, mode uint32, o
 		return nil, syscall.EEXIST
 	}
 
-	if err := n.promote(); err != 0 {
+	if err := n.promote(false); err != 0 {
 		return nil, err
 	}
 
@@ -800,7 +846,7 @@ func (n *StarlightFsNode) Create(ctx context.Context, name string, flags uint32,
 		_ = n.Unlink(ctx, name)
 	}
 
-	if err := n.promote(); err != 0 {
+	if err := n.promote(false); err != 0 {
 		return nil, nil, 0, err
 	}
 
@@ -890,7 +936,7 @@ func (n *StarlightFsNode) Rename(ctx context.Context, name string, newParent fs.
 		//}
 
 		if n.Ent.State == EnRoLayer {
-			if errno := n.promote(); errno != 0 {
+			if errno := n.promote(false); errno != 0 {
 				return syscall.EPERM
 			}
 			if errno := n.setRWAttrFromEntry(); errno != 0 {
@@ -900,7 +946,7 @@ func (n *StarlightFsNode) Rename(ctx context.Context, name string, newParent fs.
 		}
 
 		if target.Ent.State == EnRoLayer {
-			if errno := target.promote(); errno != 0 {
+			if errno := target.promote(false); errno != 0 {
 				return syscall.EPERM
 			}
 			if errno := target.setRWAttrFromEntry(); errno != 0 {
@@ -992,7 +1038,7 @@ func (n *StarlightFsNode) Setxattr(ctx context.Context, attr string, data []byte
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	if errno := n.promote(); errno != 0 {
+	if errno := n.promote(false); errno != 0 {
 		return errno
 	}
 
@@ -1014,7 +1060,7 @@ func (n *StarlightFsNode) Removexattr(ctx context.Context, attr string) syscall.
 	n.Ent.StateMu.Lock()
 	defer n.Ent.StateMu.Unlock()
 
-	if errno := n.promote(); errno != 0 {
+	if errno := n.promote(false); errno != 0 {
 		return errno
 	}
 
@@ -1032,6 +1078,10 @@ func (n *StarlightFsNode) Fsync(ctx context.Context, f fs.FileHandle, flags uint
 	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
+
+		log.G(ctx).WithFields(logrus.Fields{
+			"name": n.Ent.Name,
+		}).Error("FSYNC")
 		<-n.Ent.ready
 		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 	}
@@ -1093,7 +1143,7 @@ func (n *StarlightFsNode) Mknod(ctx context.Context, name string, mode, rdev uin
 		return nil, syscall.EEXIST
 	}
 
-	if err := n.promote(); err != 0 {
+	if err := n.promote(false); err != 0 {
 		return nil, err
 	}
 

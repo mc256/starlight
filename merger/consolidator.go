@@ -51,6 +51,16 @@ type OutputEntry struct {
 	sourceDelta map[int]bool
 }
 
+var (
+	superSuperHot = map[string]bool{
+		"etc/localtime":   true,
+		"etc/passwd":      true,
+		"etc/hosts":       true,
+		"etc/group":       true,
+		"etc/resolv.conf": true,
+	}
+)
+
 type ByPriority []*ConsolidatorEntry
 
 func (b ByPriority) Len() int {
@@ -276,8 +286,16 @@ func (c *Consolidator) AddDelta(delta *Delta) error {
 			if ce, exist := c.uniqueMap[item.Digest]; exist {
 				count := len(ce.entries)
 				ce.entries = append(ce.entries, item)
-				ce.landmarkScore = (ce.landmarkScore*float32(count) + float32(priority)) / float32(count+1)
+				if superSuperHot[item.Name] {
+					ce.landmarkScore = -1
+				}
+				if ce.landmarkScore != -1 {
+					ce.landmarkScore = (ce.landmarkScore*float32(count) + float32(priority)) / float32(count+1)
+				}
 			} else {
+				if superSuperHot[item.Name] {
+					priority = -1
+				}
 				c.uniqueMap[item.Digest] = &ConsolidatorEntry{
 					entries:       []*util.TraceableEntry{item},
 					landmarkScore: float32(priority),

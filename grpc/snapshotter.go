@@ -250,6 +250,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 	var mnt []mount.Mount
 	if prepareWorker {
+		// Step 1 - container create
 		parentBase := path.Base(_parent)
 		if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
 			acceleratedImage := strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
@@ -309,6 +310,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 		}
 
 	} else {
+		// Step 1 - image pull
 		var targetImage, sourceImage string
 		parentBase := path.Base(_parent)
 		keyBase := path.Base(_key)
