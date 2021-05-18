@@ -394,14 +394,11 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 				if errno := n.setRWAttrFromEntry(); errno != 0 {
 					return nil, 0, errno
 				}
-
-				/*
-					log.G(ctx).WithFields(logrus.Fields{
-						"name":   n.Ent.Name,
-						"source": n.Ent.Source,
-						"state":  n.Ent.State,
-					}).Warn("OPEN-TOUCH")
-				*/
+				log.G(ctx).WithFields(logrus.Fields{
+					"name":   n.Ent.Name,
+					"source": n.Ent.Source,
+					"state":  n.Ent.State,
+				}).Warn("OPEN-TOUCH")
 			} else if n.Ent.State == EnRoLayer {
 				if errno := n.promote(false); errno != 0 {
 					return nil, 0, errno
@@ -425,24 +422,20 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 	} else {
 		// READ and READ-WRITE
 		if n.Ent.AtomicGetFileState() == EnEmpty {
-			/*
-				log.G(ctx).WithFields(logrus.Fields{
-					"name":   n.Ent.Name,
-					"source": n.Ent.Source,
-					"state":  n.Ent.State,
-					"FLAG1":  flags & syscall.O_WRONLY,
-					"FLAG2":  flags,
-				}).Error("OPEN-BLOCK")
+			log.G(ctx).WithFields(logrus.Fields{
+				"name":   n.Ent.Name,
+				"source": n.Ent.Source,
+				"state":  n.Ent.State,
+				"FLAG1":  flags & syscall.O_WRONLY,
+				"FLAG2":  flags,
+			}).Error("OPEN-BLOCK")
 
-			*/
 			<-n.Ent.ready
-			/*
-				log.G(ctx).WithFields(logrus.Fields{
-					"name":   n.Ent.Name,
-					"source": n.Ent.Source,
-					"state":  n.Ent.State,
-				}).Error("OPEN-UNBLOCK")
-			*/
+			log.G(ctx).WithFields(logrus.Fields{
+				"name":   n.Ent.Name,
+				"source": n.Ent.Source,
+				"state":  n.Ent.State,
+			}).Error("OPEN-UNBLOCK")
 			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 		}
 

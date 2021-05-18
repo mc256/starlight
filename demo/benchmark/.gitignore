@@ -1,5 +1,6 @@
 *
 !*.py
 !*.ipynb
+!../config/scripts
 constants.py
 *momoko*

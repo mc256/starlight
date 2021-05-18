@@ -50,13 +50,6 @@ BillionBench = [
         M("/mosquitto/data"),
         M("/mosquitto/log"),
     ], "running"),
-
-    X('python', 'language', '1B', '3.9.4', '3.9.3', [], "hello", [
-        "python", "-c", "print(\"hello\")"
-    ]),
-]
-
-BillionBench_hold2 = [
     X(
         'mongo', 'database', '1B', '4.0.24', '4.0.23', [M("/data/db")],
         "waiting for connections on port 27017"
@@ -64,15 +57,15 @@ BillionBench_hold2 = [
 ]
 
 BillionBench_hold = [
-
-    X('node', 'language', '1B', '16-alpine3.12', '16-alpine3.11', [], ""),
-    X('openjdk', 'language', '1B', '16.0.1-jdk', '11.0.11-9-jdk', [], ""),
-    X('golang', 'language', '1B', '1.16.3', '1.16.2', [], ""),
+    X('python', 'language', '1B', '3.9.4', '3.9.3', [], "Hello"),
+    X('node', 'language', '1B', '16-alpine3.12', '16-alpine3.11', [], "Hello"),
+    X('openjdk', 'language', '1B', '16.0.1-jdk', '11.0.11-9-jdk', [], "Hello"),
+    X('golang', 'language', '1B', '1.16.3', '1.16.2', [], "Hello"),
 
     X('haproxy', 'application', '500M', '2.3.10', '2.3.9', [], ""),
     X('traefik', 'application', '1B', 'v2.4.7', 'v2.4.6', [], ""),
 
-    X('memcached', 'web-server', '1B', '1.6.9', '1.6.8', [], ""),
+    X('memcached', 'web-server', '1B', '1.6.9', '1.6.8', [], "server listening", ["memcached", "-m", "256", "-vv"]),
 ]
 
 #PgAdmin = pgdb pgAdmin

@@ -266,7 +266,26 @@ func (ir *ImageReader) touchFile(wg *sync.WaitGroup) {
 	}
 }
 
+var (
+	superSuperHot = map[string]bool{
+		"etc/localtime":   true,
+		"etc/passwd":      true,
+		"etc/hosts":       true,
+		"etc/group":       true,
+		"etc/resolv.conf": true,
+	}
+)
+
 func (ir *ImageReader) printLog(fn, dir, base, ref, comment string) {
+	if superSuperHot[fn] {
+		log.G(ir.ctx).WithFields(logrus.Fields{
+			"filename": fn,
+			"dir":      dir,
+			"base":     base,
+			"ref":      ref,
+		}).Error(comment)
+	}
+
 	log.G(ir.ctx).WithFields(logrus.Fields{
 		"filename": fn,
 		"dir":      dir,
@@ -311,7 +330,7 @@ func (ir *ImageReader) decompress(wg *sync.WaitGroup, cur, size int64, buf *byte
 		}
 
 		// skip size zero
-		ir.printLog(ent.Name, "", "", oldName, "pre-extract")
+		ir.printLog(ent.Name, "", fmt.Sprintf("%d", cur), oldName, "pre-extract")
 		if ent.Size == 0 {
 			continue
 		}

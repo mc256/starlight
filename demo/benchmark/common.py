@@ -6,6 +6,7 @@ import constants as config
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import re
 from datetime import date
 
 
@@ -607,13 +608,27 @@ class Runner:
     def get_memory_usage(self, pid, debug):
         if debug:
             print("pid: %d" % pid)
-        mem_p = subprocess.Popen("pstree -p -s %d | grep -o '[0-9]\\{3,\\}' | "
-                                 "xargs -I '{}' grep VmPeak /proc/{}/status | "
-                                 "grep -o '[0-9]\\{3,\\}' | "
-                                 "awk 'n < $0 {n=$0}END{print n}'" % pid, shell=True, stdout=subprocess.PIPE,
+
+        mem_p = subprocess.Popen("pstree -p -s %d" % pid, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
         a, b = mem_p.communicate()
+        a = a.decode("utf-8")
+        b = b.decode("utf-8")
 
+        pid_list = ""
+        for pid in re.split('\(|\)', a):
+            if pid.isdigit():
+                if int(pid) > 100:
+                    pid_list += pid.strip() + "\\n"
+
+        pid_list = 'echo "' + pid_list + '"'
+        if debug:
+            print(pid_list)
+
+        mem_p = subprocess.Popen("%s | xargs -I '{}' grep VmHWM /proc/{}/status" % pid_list,
+                                 shell=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        a, b = mem_p.communicate()
         a = a.decode("utf-8")
         b = b.decode("utf-8")
 
@@ -621,9 +636,12 @@ class Runner:
             print(a, end="")
             print(b, end="")
 
-        if b == "":
-            usage = [int(i) for i in a.split() if i.isdigit()]
-            return usage[0] if len(usage) == 1 else 0
+        mem_usage_list = []
+        for mem_usage in a.split(' '):
+            if mem_usage.isdigit():
+                mem_usage_list.append(int(mem_usage))
+        return max(mem_usage_list)
+
 
     def save_memory_usage(self,
                           experiment: ContainerExperiment,
@@ -857,6 +875,7 @@ class Runner:
                                      shell=True)
         try:
             proc_stop.wait(timeout=10)
+            time.sleep(3)
         except:
             print("[stop-timeout]", end="")
             pass
@@ -1074,6 +1093,7 @@ class Runner:
                                      shell=True)
         try:
             proc_stop.wait(timeout=10)
+            time.sleep(3)
         except:
             print("[stop-timeout]", end="")
             pass
@@ -1281,6 +1301,7 @@ class Runner:
         )
         try:
             proc_stop.wait(timeout=10)
+            time.sleep(3)
         except:
             print("[stop-timeout]", end="")
             pass

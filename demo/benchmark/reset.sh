@@ -42,3 +42,5 @@ ps aux | grep mariadb | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep redis-server | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep java/openjdk | head -n -1 | awk '{print $2}' | sudo xargs kill -9
 ps aux | grep mongod | head -n -1 | awk '{print $2}' | sudo xargs kill -9
+ps aux | grep node | head -n -1 | awk '{print $2}' | sudo xargs kill -9
+ps aux | grep memcached | head -n -1 | awk '{print $2}' | sudo xargs kill -9

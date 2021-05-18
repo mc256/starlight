@@ -58,6 +58,7 @@ var (
 		"etc/hosts":       true,
 		"etc/group":       true,
 		"etc/resolv.conf": true,
+		"etc/host.conf":   true,
 	}
 )
 
@@ -287,18 +288,22 @@ func (c *Consolidator) AddDelta(delta *Delta) error {
 				count := len(ce.entries)
 				ce.entries = append(ce.entries, item)
 				if superSuperHot[item.Name] {
-					ce.landmarkScore = -1
+					ce.landmarkScore = -1.0
 				}
-				if ce.landmarkScore != -1 {
+				if ce.landmarkScore != -1.0 {
 					ce.landmarkScore = (ce.landmarkScore*float32(count) + float32(priority)) / float32(count+1)
 				}
 			} else {
 				if superSuperHot[item.Name] {
-					priority = -1
-				}
-				c.uniqueMap[item.Digest] = &ConsolidatorEntry{
-					entries:       []*util.TraceableEntry{item},
-					landmarkScore: float32(priority),
+					c.uniqueMap[item.Digest] = &ConsolidatorEntry{
+						entries:       []*util.TraceableEntry{item},
+						landmarkScore: -1.0,
+					}
+				} else {
+					c.uniqueMap[item.Digest] = &ConsolidatorEntry{
+						entries:       []*util.TraceableEntry{item},
+						landmarkScore: float32(priority),
+					}
 				}
 			}
 		}

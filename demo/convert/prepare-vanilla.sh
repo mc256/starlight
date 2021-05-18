@@ -67,6 +67,13 @@ declare -a ImageList=(
 
   "python:3.9.4"
   "python:3.9.3"
+  "node:16-alpine3.12"
+  "node:16-alpine3.11"
+  "openjdk:16.0.1-jdk"
+  "openjdk:11.0.11-9-jdk"
+  "golang:1.16.3"
+  "golang:1.16.2"
+
   "rabbitmq:3.8.14"
   "rabbitmq:3.8.13"
 

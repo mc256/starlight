@@ -27,7 +27,7 @@ for VAL in "${ImageList[@]}"; do
   echo $VAL
   echo "============================================================"
   ctr-remote image optimize --plain-http \
-  --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/hello-entrypoint.sh,dst=/entrypoint.sh,options=rbind:ro \
+  --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-hello.sh,dst=/entrypoint.sh,options=rbind:ro \
   --entrypoint='[ "/entrypoint.sh" ]' \
   	"$VAL" "http://$REGISTRY/$VAL-starlight"
 done
@@ -241,6 +241,7 @@ for VAL in "${WPLIST[@]}"; do
       --dns-nameservers=8.8.8.8 \
     "$VAL" "http://$REGISTRY/$VAL-starlight"
 
+  curl "https://$PROXY/prepare/$VAL-starlight"
 done
 
 ctr task kill mdb
@@ -455,4 +456,87 @@ for VAL in "${registry[@]}"; do
     "$VAL" "http://$REGISTRY/$VAL-starlight"
 
 	rm -rf /tmp/t1
+done
+
+declare -a PYLIST=(
+  "python:3.9.4"
+  "python:3.9.3"
+)
+for VAL in "${PYLIST[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-py.sh,dst=/entrypoint.sh,options=rbind:ro \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/scripts,dst=/app,options=rbind:rw \
+      --entrypoint='[ "/entrypoint.sh" ]' \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+	rm -rf /tmp/t1
+  curl "https://$PROXY/prepare/$VAL-starlight"
+done
+
+
+declare -a NODELIST=(
+  "node:16-alpine3.12"
+  "node:16-alpine3.11"
+)
+for VAL in "${NODELIST[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-js.sh,dst=/entrypoint.sh,options=rbind:ro \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/scripts,dst=/app,options=rbind:rw \
+      --entrypoint='[ "/entrypoint.sh" ]' \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+	rm -rf /tmp/t1
+  curl "https://$PROXY/prepare/$VAL-starlight"
+done
+
+
+
+declare -a JAVALIST=(
+  "openjdk:16.0.1-jdk"
+  "openjdk:11.0.11-9-jdk"
+)
+for VAL in "${JAVALIST[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-java.sh,dst=/entrypoint.sh,options=rbind:ro \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/scripts,dst=/app,options=rbind:rw \
+      --entrypoint='[ "/entrypoint.sh" ]' \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+	rm -rf /tmp/t1
+  curl "https://$PROXY/prepare/$VAL-starlight"
+done
+
+declare -a GOLANGLIST=(
+  "golang:1.16.3"
+  "golang:1.16.2"
+)
+for VAL in "${GOLANGLIST[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-go.sh,dst=/entrypoint.sh,options=rbind:ro \
+      --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/scripts,dst=/app,options=rbind:rw \
+      --entrypoint='[ "/entrypoint.sh" ]' \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+	rm -rf /tmp/t1
+  curl "https://$PROXY/prepare/$VAL-starlight"
 done
