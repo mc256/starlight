@@ -18,7 +18,13 @@ from common import MountingPoint as M
 
         X('ghost', 'application', '1B', '4.3.3-alpine', '3.42.5-alpine',
       [M("/var/lib/ghost/content", False, "rw", "3001:2368")], "Ghost boot"),
-        
+        X(
+            'mysql', 'database', '1B', '8.0.24', '8.0.23', [
+                M("/var/lib/mysql", False, "rw", "999:999"),
+                M("/run/mysqld", False, "rw", "999:999")
+            ], "port: 3306  MySQL Community Server - GPL",
+            None, 40
+        ),
 """
 if __name__ == '__main__':
 
@@ -26,13 +32,18 @@ if __name__ == '__main__':
     debug = True
 
     for t in [
-                X(
-            'mysql', 'database', '1B', '8.0.24', '8.0.23', [
-                M("/var/lib/mysql", False, "rw", "999:999"),
-                M("/run/mysqld", False, "rw", "999:999")
-            ], "port: 3306  MySQL Community Server - GPL",
-            None, 40
-        ),
+        X('openjdk', 'language', '1B', '16.0.1-jdk', '11.0.11-9-jdk', [
+            M("", overwrite="type=bind,"
+                            "src=/home/ubuntu/Development/starlight/demo/config/entrypoint-java.sh,"
+                            "dst=/entrypoint.sh,"
+                            "options=rbind:ro"
+              ),
+            M("", overwrite="type=bind,"
+                            "src=/home/ubuntu/Development/starlight/demo/config/scripts,"
+                            "dst=/app,"
+                            "options=rbind:rw"
+              )
+        ], "Hello", ["/entrypoint.sh"]),
     ]:
 
         r = Runner()

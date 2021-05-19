@@ -142,10 +142,22 @@ from common import MountingPoint as M
 
 if __name__ == '__main__':
 
-    event_suffix = "-v5"
+    event_suffix = "-v6"
 
     for t in [
-         X(
+        X('golang', 'language', '1B', '1.16.3', '1.16.2', [
+            M("", overwrite="type=bind,"
+                            "src=/home/ubuntu/Development/starlight/demo/config/entrypoint-go.sh,"
+                            "dst=/entrypoint.sh,"
+                            "options=rbind:ro"
+              ),
+            M("", overwrite="type=bind,"
+                            "src=/home/ubuntu/Development/starlight/demo/config/scripts,"
+                            "dst=/app,"
+                            "options=rbind:rw"
+              )
+        ], "Hello", ["/entrypoint.sh"]),
+        X(
             'mysql', 'database', '1B', '8.0.24', '8.0.23', [
                 M("/var/lib/mysql", False, "rw", "999:999"),
                 M("/run/mysqld", False, "rw", "999:999")
