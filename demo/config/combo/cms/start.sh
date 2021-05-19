@@ -29,6 +29,6 @@ sudo ctr-starlight -n n1 --log-level debug create --tty --net-host --local-time 
 sudo ctr -n n1 t start task-c-1
 
 
-sudo ctr -n n1 t kill task-a-1 && \
-sudo ctr -n n1 t kill task-b-1 && \
-sudo ctr -n n1 t kill task-c-1
+#sudo ctr -n n1 t kill task-a-1 && \
+#sudo ctr -n n1 t kill task-b-1 && \
+#sudo ctr -n n1 t kill task-c-1

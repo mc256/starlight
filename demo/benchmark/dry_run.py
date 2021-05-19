@@ -1,6 +1,7 @@
 from common import Runner
 from common import ContainerExperimentX as X
 from common import MountingPoint as M
+from benchmark_pop_bench import PopBench
 
 """
             M("", overwrite="type=bind,"
@@ -31,21 +32,8 @@ if __name__ == '__main__':
     event_suffix = "-dryrun"
     debug = True
 
-    for t in [
-        X('openjdk', 'language', '1B', '16.0.1-jdk', '11.0.11-9-jdk', [
-            M("", overwrite="type=bind,"
-                            "src=/home/ubuntu/Development/starlight/demo/config/entrypoint-java.sh,"
-                            "dst=/entrypoint.sh,"
-                            "options=rbind:ro"
-              ),
-            M("", overwrite="type=bind,"
-                            "src=/home/ubuntu/Development/starlight/demo/config/scripts,"
-                            "dst=/app,"
-                            "options=rbind:rw"
-              )
-        ], "Hello", ["/entrypoint.sh"]),
-    ]:
-
+    for key in ['mysql']:
+        t = PopBench[key]
         r = Runner()
         discard = []
 

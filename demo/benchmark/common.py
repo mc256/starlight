@@ -609,7 +609,7 @@ class Runner:
         if debug:
             print("pid: %d" % pid)
 
-        mem_p = subprocess.Popen("pstree -p -s %d" % pid, shell=True, stdout=subprocess.PIPE,
+        mem_p = subprocess.Popen("pstree -p %d" % pid, shell=True, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
         a, b = mem_p.communicate()
         a = a.decode("utf-8")
