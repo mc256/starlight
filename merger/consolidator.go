@@ -66,7 +66,9 @@ var (
 		"etc/ld.so.cache": true,
 
 		// 1s
-		"lib/x86_64-linux-gnu/ld-2.28.so": true,
+		"entrypoint.sh":                     true,
+		"lib/x86_64-linux-gnu/ld-2.28.so":   true,
+		"lib/x86_64-linux-gnu/libc-2.28.so": true,
 	}
 )
 

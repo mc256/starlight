@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -433,21 +434,19 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 					"FLAG2":  flags,
 				}).Error("OPEN-BLOCK")
 			*/
-			//beginTs := time.Now()
+			beginTs := time.Now()
 
 			<-n.Ent.ready
 
-			/*
-				endTs := time.Now()
-				elapsed := endTs.Sub(beginTs)
-				if elapsed.Seconds() > 0.5 {
-					log.G(ctx).WithFields(logrus.Fields{
-						"name":   n.Ent.Name,
-						"source": n.Ent.Source,
-						"state":  n.Ent.State,
-					}).Error("OPEN-UNBLOCK")
-				}
-			*/
+			endTs := time.Now()
+			elapsed := endTs.Sub(beginTs)
+			if elapsed.Seconds() > 1 {
+				log.G(ctx).WithFields(logrus.Fields{
+					"name":   n.Ent.Name,
+					"source": n.Ent.Source,
+					"state":  n.Ent.State,
+				}).Error("OPEN-UNBLOCK")
+			}
 
 			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 		}
