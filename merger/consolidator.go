@@ -53,15 +53,20 @@ type OutputEntry struct {
 
 var (
 	superSuperHot = map[string]bool{
+		// 10s
 		"etc/localtime":   true,
 		"etc/passwd":      true,
 		"etc/hosts":       true,
 		"etc/group":       true,
 		"etc/resolv.conf": true,
 
+		// 3s
 		"bin/dash":        true,
 		"bin/readlink":    true,
 		"etc/ld.so.cache": true,
+
+		// 1s
+		"lib/x86_64-linux-gnu/ld-2.28.so": true,
 	}
 )
 
