@@ -103,6 +103,9 @@ declare -a ImageList=(
 
   "registry:2.7.1"
   "registry:2.7.0"
+
+  "memcached:1.6.9"
+  "memcached:1.6.8"
 )
 
 for VAL in "${ImageList[@]}"; do

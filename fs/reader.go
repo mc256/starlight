@@ -277,21 +277,22 @@ var (
 )
 
 func (ir *ImageReader) printLog(fn, dir, base, ref, comment string) {
-	if superSuperHot[fn] {
+	/*
+		if superSuperHot[fn] {
+			log.G(ir.ctx).WithFields(logrus.Fields{
+				"filename": fn,
+				"dir":      dir,
+				"base":     base,
+				"ref":      ref,
+			}).Error(comment)
+		}
 		log.G(ir.ctx).WithFields(logrus.Fields{
 			"filename": fn,
 			"dir":      dir,
 			"base":     base,
 			"ref":      ref,
-		}).Error(comment)
-	}
-
-	log.G(ir.ctx).WithFields(logrus.Fields{
-		"filename": fn,
-		"dir":      dir,
-		"base":     base,
-		"ref":      ref,
-	}).Trace(comment)
+		}).Trace(comment)
+	*/
 }
 
 func (ir *ImageReader) decompress(wg *sync.WaitGroup, cur, size int64, buf *bytes.Buffer) {

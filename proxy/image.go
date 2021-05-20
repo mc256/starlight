@@ -102,7 +102,7 @@ func fetchLayer(wg *sync.WaitGroup, ib *ImageBuilder, registry, imageName, diges
 
 	// parse image name
 
-	ctx, cf := context.WithTimeout(ib.ctx, 10*time.Second)
+	ctx, cf := context.WithTimeout(ib.ctx, 3600*time.Second)
 	defer cf()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

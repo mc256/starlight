@@ -32,7 +32,7 @@ if __name__ == '__main__':
     event_suffix = "-dryrun"
     debug = True
 
-    for key in ['mysql']:
+    for key in ['nextcloud']:
         t = PopBench[key]
         r = Runner()
         discard = []
@@ -80,7 +80,7 @@ if __name__ == '__main__':
                 r.service.kill_starlight()
                 t.save_event(event_suffix)
 
-            """
+
             # estargz
             for k in range(t.rounds):
                 r.service.reset_container_service()
@@ -143,7 +143,7 @@ if __name__ == '__main__':
                 r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=False)
                 t.save_event(event_suffix)
             
-            """
+
 
             r.service.reset_latency_bandwidth()
 

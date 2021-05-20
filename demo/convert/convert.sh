@@ -3,6 +3,11 @@
 REGISTRY="registry.starlight.yuri.moe"
 echo $REGISTRY
 
+
+PROXY_URL="https://proxy.starlight.yuri.moe"
+echo $PROXY_URL
+
+
 declare -a ImageList=(
   "ubuntu:focal-20210416"
   "ubuntu:focal-20210401"
@@ -539,4 +544,26 @@ for VAL in "${GOLANGLIST[@]}"; do
 
 	rm -rf /tmp/t1
   curl "https://$PROXY/prepare/$VAL-starlight"
+done
+
+
+declare -a memcachedlist=(
+  "memcached:1.6.9"
+  "memcached:1.6.8"
+)
+
+for VAL in "${memcachedlist[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+  ctr-remote image optimize --plain-http \
+    --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
+    --mount type=bind,src=/home/ubuntu/Development/starlight/demo/config/entrypoint-memcached.sh,dst=/entrypoint.sh,options=rbind:ro \
+	  --wait-on-signal \
+	  --entrypoint='[ "/entrypoint.sh" ]' \
+	"$VAL" "http://$REGISTRY/$VAL-starlight"
+
+  curl "$PROXY_URL/prepare/$VAL-starlight"
+
 done

@@ -869,7 +869,7 @@ class Runner:
         ######################################################################
         # Stop
         time.sleep(1)
-        proc_stop = subprocess.Popen("sudo ctr -n xe%d t kill task%d%s 2>&1" % (r, r, task_suffix),
+        proc_stop = subprocess.Popen("sudo ctr -n xe%d t kill -s 9 task%d%s 2>&1" % (r, r, task_suffix),
                                      preexec_fn=os.setpgrp,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      shell=True)
@@ -1087,7 +1087,7 @@ class Runner:
         ######################################################################
         # Stop
         time.sleep(1)
-        proc_stop = subprocess.Popen("sudo ctr -n xs%d t kill task%d%s 2>&1" % (r, r, task_suffix),
+        proc_stop = subprocess.Popen("sudo ctr -n xs%d t kill -s 9 task%d%s 2>&1" % (r, r, task_suffix),
                                      preexec_fn=os.setpgrp,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      shell=True)
@@ -1297,7 +1297,7 @@ class Runner:
         # Stop
         time.sleep(1)
         proc_stop = start_process_shell(
-            "sudo ctr -n xv%d t kill task%d%s 2>&1" % (r, r, task_suffix)
+            "sudo ctr -n xv%d t kill -s 9 task%d%s 2>&1" % (r, r, task_suffix)
         )
         try:
             proc_stop.wait(timeout=10)

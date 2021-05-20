@@ -7,14 +7,14 @@ if __name__ == '__main__':
 
     event_suffix = "-v6"
 
-    for key in ['mysql']:
+    for key in ['nextcloud']:
         t = PopBench[key]
         r = Runner()
         discard = []
 
         r.service.reset_latency_bandwidth()
         # t.rtt = [2]
-        t.rounds = 5
+        t.rounds = 3
         t.update_experiment_name()
 
         print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
