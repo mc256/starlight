@@ -256,6 +256,35 @@ rm -rf /tmp/tm
 rm -rf /tmp/tn
 
 
+declare -a WPLIST=(
+  "wordpress:php7.4"
+  "wordpress:php7.3"
+)
+
+for VAL in "${WPLIST[@]}"; do
+  echo "============================================================"
+  echo "$VAL --- Please press Ctrl+C when finished"
+  echo "============================================================"
+
+
+  mkdir /tmp/t1
+  ctr-remote image optimize --plain-http \
+      --env-file=/home/ubuntu/Development/starlight/demo/config/all.env \
+      --mount type=bind,src=/tmp/t1,dst=/var/www/html,options=rbind:rw \
+      --wait-on-signal \
+      --add-hosts=127.0.0.1:localhost \
+      --mount type=bind,src=/etc/hosts,dst=/etc/hosts,options=bind:ro \
+      --dns-nameservers=8.8.8.8 \
+    "$VAL" "http://$REGISTRY/$VAL-starlight"
+
+  curl "https://$PROXY/prepare/$VAL-starlight"
+  rm -rf /tmp/t1
+
+done
+
+
+
+
 # =========================== NextCloud ===========================
 
 declare -a NEXTCLOUD=(

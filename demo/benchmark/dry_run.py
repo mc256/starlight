@@ -32,7 +32,7 @@ if __name__ == '__main__':
     event_suffix = "-dryrun"
     debug = True
 
-    for key in ['nextcloud']:
+    for key in ['nextcloud-fpm']:
         t = PopBench[key]
         r = Runner()
         discard = []

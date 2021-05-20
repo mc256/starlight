@@ -5,16 +5,16 @@ from benchmark_pop_bench import PopBench
 
 if __name__ == '__main__':
 
-    event_suffix = "-v6"
+    event_suffix = "-v7"
 
-    for key in ['nextcloud']:
+    for key in ['nextcloud-fpm', 'wordpress']:
         t = PopBench[key]
         r = Runner()
         discard = []
 
         r.service.reset_latency_bandwidth()
         # t.rtt = [2]
-        t.rounds = 3
+        t.rounds = 5
         t.update_experiment_name()
 
         print("Hello! This is Starlight Stage. We are running experiment:\n\t- %s" % t)
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
                 r.service.kill_starlight()
                 t.save_event(event_suffix)
-
+            """
             # vanilla
             for k in range(t.rounds + 1):
                 r.service.reset_container_service()
@@ -115,7 +115,7 @@ if __name__ == '__main__':
                 r.test_wget(t, k == 0, rtt=t.rtt[i], seq=k, use_old=False)
                 t.save_event(event_suffix)
 
-            """
+            
             """
             r.service.reset_latency_bandwidth()
 

@@ -109,11 +109,16 @@ PopBench = {
     # Application --------------------------------------------------------------------------------------
     'rabbitmq':X('rabbitmq', 'application', '1B', '3.8.14', '3.8.13', [], "Server startup complete", None, 30),
     'registry':X('registry', 'application', '1B', '2.7.1', '2.7.0', [M("/data")], "listening on [::]:5000", None, 10),
-    'wordpress':X('wordpress', 'application', '1B', 'php7.4-fpm', 'php7.3-fpm', [
+    'wordpress-fpm':X('wordpress', 'application', '1B', 'php7.4-fpm', 'php7.3-fpm', [
         M("/var/www/html")
     ], "ready to handle connections"),
+    'wordpress':X('wordpress', 'application', '1B', 'php7.4', 'php7.3', [
+        M("/var/www/html")
+    ], "Command line: 'apache2 -D FOREGROUND'"),
     'nextcloud':X('nextcloud', 'application', '1B', '21.0.1-apache', '20.0.9-apache', [],
       "Command line: 'apache2 -D FOREGROUND'"),
+    'nextcloud-fpm':X('nextcloud', 'application', '1B', '21.0.1-fpm', '20.0.9-fpm', [],
+      "ready to handle connections"),
     'ghost':X('ghost', 'application', '1B', '4.3.3-alpine', '3.42.5-alpine', [
         M("/var/lib/ghost/content", False, "rw", "3001:2368")
     ], "Ghost boot"),

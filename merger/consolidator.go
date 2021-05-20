@@ -58,7 +58,10 @@ var (
 		"etc/hosts":       true,
 		"etc/group":       true,
 		"etc/resolv.conf": true,
-		"etc/host.conf":   true,
+
+		"bin/dash":        true,
+		"bin/readlink":    true,
+		"etc/ld.so.cache": true,
 	}
 )
 

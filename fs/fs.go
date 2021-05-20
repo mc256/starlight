@@ -433,13 +433,18 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 					"FLAG2":  flags,
 				}).Error("OPEN-BLOCK")
 			*/
+			//beginTs := time.Now()
 			<-n.Ent.ready
+			//endTs := time.Now()
 			/*
-				log.G(ctx).WithFields(logrus.Fields{
-					"name":   n.Ent.Name,
-					"source": n.Ent.Source,
-					"state":  n.Ent.State,
-				}).Error("OPEN-UNBLOCK")
+				elapsed := endTs.Sub(beginTs)
+				if elapsed.Seconds() > 2 {
+					log.G(ctx).WithFields(logrus.Fields{
+						"name":   n.Ent.Name,
+						"source": n.Ent.Source,
+						"state":  n.Ent.State,
+					}).Error("OPEN-UNBLOCK")
+				}
 			*/
 			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 		}
