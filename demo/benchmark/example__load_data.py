@@ -1,6 +1,6 @@
 from common import Runner
-from common import MountingPoint as M
-from common import ContainerExperimentX as X
+from mounting_point import MountingPoint as M
+from container_experiment import ContainerExperimentX as X
 
 if __name__ == '__main__':
     t = X(

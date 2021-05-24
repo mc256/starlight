@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     event_suffix = "-v7-so"
 
-    for key in ['nextcloud']:
+    for key in ['python']:
         t = PopBench[key]
         r = Runner()
         discard = []
