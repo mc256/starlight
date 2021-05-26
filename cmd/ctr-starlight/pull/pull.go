@@ -16,7 +16,7 @@
    file created by maverick in 2021
 */
 
-package prepare
+package pull
 
 import (
 	"errors"
@@ -65,7 +65,7 @@ func Action(c *cli.Context) error {
 
 func Command() *cli.Command {
 	cmd := cli.Command{
-		Name:  "prepare",
+		Name:  "pull",
 		Usage: "Launch background fetcher to load the delta image",
 		Action: func(c *cli.Context) error {
 			return Action(c)

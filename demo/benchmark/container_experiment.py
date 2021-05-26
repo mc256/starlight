@@ -1,5 +1,7 @@
 import time
+from typing import Callable
 from datetime import date
+import subprocess
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,6 +28,11 @@ class ContainerExperiment:
         self.args = []
 
         self.experiment_name = ""
+
+        self.workload_enabled = False
+        self.workload_fn: Callable[[int, str, bool], None] or None = None
+        self.workload_p = None
+
         self.update_experiment_name()
 
         self.action_history = []
@@ -40,6 +47,9 @@ class ContainerExperiment:
         else:
             self.experiment_name = "%s-%s--%s_%s-r%d" % (
                 self.image_name, today, self.version, self.old_version, self.rounds)
+
+        if self.workload_enabled is True and self.workload_fn is not None:
+            self.experiment_name = self.experiment_name + '-wl'
 
     def set_mounting_points(self, mp=None):
         if mp is None:
@@ -80,6 +90,13 @@ class ContainerExperiment:
     def has_old_version(self):
         return self.old_version != ""
 
+    def has_workload(self):
+        return self.workload_enabled
+
+    def enable_workload(self):
+        self.workload_enabled = True
+        self.update_experiment_name()
+
     def load_results(self, suffix="", data_path="./pkl"):
         df1 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 1))
         df2 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 2))
@@ -87,8 +104,8 @@ class ContainerExperiment:
         df4 = pd.read_pickle("%s/%s%s-%d.pkl" % (data_path, self.experiment_name, suffix, 4))
         return df1, df2, df3, df4  # vanilla, estargz, starlight, wget
 
-    def add_event(self, method="", event="", rtt=0, round=0, ts=time.time(), delta=0.0):
-        self.action_history.append([method, event, rtt, round, ts, delta])
+    def add_event(self, method="", event="", rtt=0, seq=0, ts=time.time(), delta=0.0):
+        self.action_history.append([method, event, rtt, seq, ts, delta])
 
     def save_event(self, suffix=""):
         ddf = pd.DataFrame(self.action_history, columns=['method', 'event', 'rtt', 'round', 'ts', 'delta'])
@@ -180,9 +197,23 @@ class ContainerExperiment:
     def __repr__(self):
         return "ContainerExperiment<%s>" % self.experiment_name
 
+    ####################################################################################################
+    # FS Benchmark
+    ####################################################################################################
+    def workload_wait(self, debug):
+        a, b = self.workload_p.communicate()
+        if debug:
+            print("-------------------------------- Workload begin")
+            if a is not None:
+                print(a.decode("utf-8"), end="")
+            if b is not None:
+                print(b.decode("utf-8"), end="")
+            print("-------------------------------- Workload end", end="")
+
 
 class ContainerExperimentX(ContainerExperiment):
-    def __init__(self, img_name, img_type, download, tag, tag_old, mounts, ready, args=None, expectation=60):
+    def __init__(self, img_name, img_type, download, tag, tag_old, mounts, ready, args=None, expectation=60,
+                 workload_fn: Callable[[int, str, bool], subprocess.Popen] = None):
         """
         Create and experiment configuration
         Parameters
@@ -215,6 +246,9 @@ class ContainerExperimentX(ContainerExperiment):
         expectation: int
             expect when it will finish for the upper limit of the y-axis in plotting
 
+        workload_fn: Callable[[int, str, bool], subprocess.Popen] or None
+            start a workload with the program. [sequence number, method, debug].
+
         """
         super().__init__(
             img_name,
@@ -225,3 +259,4 @@ class ContainerExperimentX(ContainerExperiment):
         self.set_mounting_points(mounts)
         self.expected_max_start_time = expectation
         self.set_args(args)
+        self.workload_fn = workload_fn

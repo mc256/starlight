@@ -21,7 +21,7 @@ package main
 import (
 	"fmt"
 	cmdCreate "github.com/mc256/starlight/cmd/ctr-starlight/create"
-	cmdPrepare "github.com/mc256/starlight/cmd/ctr-starlight/prepare"
+	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -79,7 +79,7 @@ func NewApp() *cli.App {
 	}
 	app.Commands = append([]*cli.Command{
 		util.VersionCommand(),
-		cmdPrepare.Command(),
+		cmdPull.Command(),
 		cmdCreate.Command(),
 	})
 
