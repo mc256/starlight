@@ -28,6 +28,11 @@ def redis_ycsb_benchmark(seq: int, method: str, debug: bool = False):
 
     return remote
 
+def apache_benchmark(seq: int, method: str, debug: bool=False):
+    # ab -n 100 -c 10 -g ./ab-log.log  localhost:8080
+
+    pass
+
 
 PopBench = {
     # Linux Distribution --------------------------------------------------------------------------
