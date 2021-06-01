@@ -20,7 +20,7 @@ def redis_ycsb_benchmark(seq: int, method: str, debug: bool = False):
         '-p "redis.port=6379" '
         '-p measurementtype=timeseries '
         '-p timeseries.granularity=100 > /home/ubuntu/sandbox/redis-v8/%d_%s.log  2>/dev/null ' % (
-        seq, method)
+            seq, method)
     ], preexec_fn=os.setpgrp, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     # takes approximately 20 seconds to start YCSB. We want YCSB to wait for the redis worker
@@ -28,7 +28,8 @@ def redis_ycsb_benchmark(seq: int, method: str, debug: bool = False):
 
     return remote
 
-def apache_benchmark(seq: int, method: str, debug: bool=False):
+
+def apache_benchmark(seq: int, method: str, debug: bool = False):
     # ab -n 100 -c 10 -g ./ab-log.log  localhost:8080
 
     pass
@@ -156,10 +157,10 @@ PopBench = {
     'wordpress-fpm': X('wordpress', 'application', '1B', 'php7.4-fpm', 'php7.3-fpm', [
         M("/var/www/html")
     ], "ready to handle connections"),
-    'wordpress': X('wordpress', 'application', '1B', 'php7.4', 'php7.3', [
+    'wordpress-apache': X('wordpress', 'application', '1B', 'php7.4', 'php7.3', [
         M("/var/www/html")
     ], "Command line: 'apache2 -D FOREGROUND'"),
-    'nextcloud': X('nextcloud', 'application', '1B', '21.0.1-apache', '20.0.9-apache', [],
+    'nextcloud-apache': X('nextcloud', 'application', '1B', '21.0.1-apache', '20.0.9-apache', [],
                    "Command line: 'apache2 -D FOREGROUND'"),
     'nextcloud-fpm': X('nextcloud', 'application', '1B', '21.0.1-fpm', '20.0.9-fpm', [],
                        "ready to handle connections"),

@@ -5,7 +5,7 @@ if __name__ == '__main__':
 
     event_suffix = "-v8"
 
-    for key in ['nextcloud']:
+    for key in ['wordpress-fpm', 'openjdk']:
         t = PopBench[key]
         r = Runner()
         discard = []
@@ -13,7 +13,7 @@ if __name__ == '__main__':
         r.service.reset_latency_bandwidth()
         # t.rtt = [2]
         t.rounds = 3
-        exp_methods = {'starlight', 'estargz', 'vanilla'}
+        exp_methods = {'starlight', 'estargz', 'vanilla', 'wget'}
         # exp_methods = {'starlight'}
         t.update_experiment_name()
 
