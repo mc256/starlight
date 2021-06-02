@@ -158,7 +158,7 @@ func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 // Walk the committed snapshots.
 func (o *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
-	log.G(ctx).WithField("fs", fs).WithField("fn", fn).Info("walk")
+	log.G(ctx).WithField("fs", fs).Info("walk")
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return err
@@ -261,12 +261,19 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 					return nil, err
 				}
 
+				// optimize
+				optimize := false
+				if val, ok := config.Labels[util.OptimizeLabel]; ok && val == "True" {
+					optimize = true
+				}
+
 				// fs instance
 				fsi, err := ir.NewFsInstance(
 					config.Labels[util.ImageNameLabel],
 					config.Labels[util.ImageTagLabel],
 					path.Join(o.root, "sfs", sn.ID),
 					config.Labels[util.CheckpointLabel],
+					optimize,
 				)
 				if err != nil {
 					return nil, err
@@ -461,19 +468,19 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 	if strings.HasPrefix(base, "worker") {
 		if fsi, hasFs := o.fsMap[path.Base(_key)]; hasFs {
 			// umount
-			err := fsi.GetServer().Unmount()
+			err := fsi.Teardown()
 			log.G(ctx).WithFields(logrus.Fields{
 				"key": key,
 				"fs":  fsi.GetMountPoint(),
 				"err": err,
-			}).Info("umount")
+			}).Info("teardown")
 		}
 	}
 
 	if id, _, err := storage.Remove(ctx, key); err != nil {
 		return errors.Wrap(err, "failed to remove")
 	} else {
-		//err := os.RemoveAll(o.getSnDir(id))
+		err := os.RemoveAll(o.getSnDir(id))
 		log.G(ctx).WithFields(logrus.Fields{
 			"key": key,
 			"id":  id,

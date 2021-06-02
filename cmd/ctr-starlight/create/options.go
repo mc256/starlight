@@ -31,6 +31,12 @@ var (
 			Value:    0,
 			Required: false,
 		},
+		&cli.BoolFlag{
+			Name:     "optimize",
+			Usage:    "collect the traces of the file access for optimization",
+			Value:    false,
+			Required: false,
+		},
 	}
 
 	// ContainerFlags are cli flags specifying container options

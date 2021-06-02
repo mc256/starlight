@@ -32,10 +32,11 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
-	DebugTrace = true
+	DebugTrace = false
 )
 
 type StarlightFsNode struct {
@@ -394,13 +395,13 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 				if errno := n.setRWAttrFromEntry(); errno != 0 {
 					return nil, 0, errno
 				}
-				/*
+				if DebugTrace {
 					log.G(ctx).WithFields(logrus.Fields{
 						"name":   n.Ent.Name,
 						"source": n.Ent.Source,
 						"state":  n.Ent.State,
 					}).Warn("OPEN-TOUCH")
-				*/
+				}
 			} else if n.Ent.State == EnRoLayer {
 				if errno := n.promote(false); errno != 0 {
 					return nil, 0, errno
@@ -424,30 +425,36 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 	} else {
 		// READ and READ-WRITE
 		if n.Ent.AtomicGetFileState() == EnEmpty {
-			/*
+			if DebugTrace {
 				log.G(ctx).WithFields(logrus.Fields{
 					"name":   n.Ent.Name,
 					"source": n.Ent.Source,
 					"state":  n.Ent.State,
-					"FLAG1":  flags & syscall.O_WRONLY,
-					"FLAG2":  flags,
-				}).Error("OPEN-BLOCK")
-			*/
-			//beginTs := time.Now()
+				}).Warn("OPEN-BLOCK")
+			}
 
-			<-n.Ent.ready
+			if n.Ent.fi.optimize {
+				beginTs := time.Now()
 
-			/*
+				<-n.Ent.ready
+
 				endTs := time.Now()
-				elapsed := endTs.Sub(beginTs)
-				if elapsed.Seconds() > 1 {
-					log.G(ctx).WithFields(logrus.Fields{
-						"name":   n.Ent.Name,
-						"source": n.Ent.Source,
-						"state":  n.Ent.State,
-					}).Error("OPEN-UNBLOCK")
-				}
-			*/
+
+				access := endTs.Sub(n.Ent.fi.startTime)
+				wait := endTs.Sub(beginTs)
+
+				n.Ent.fi.tracer.Log(n.Ent.Name, access, wait)
+			} else {
+				<-n.Ent.ready
+			}
+
+			if DebugTrace {
+				log.G(ctx).WithFields(logrus.Fields{
+					"name":   n.Ent.Name,
+					"source": n.Ent.Source,
+					"state":  n.Ent.State,
+				}).Error("OPEN-UNBLOCK")
+			}
 
 			_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 		}
@@ -623,13 +630,6 @@ func (n *StarlightFsNode) Setattr(ctx context.Context, fh fs.FileHandle, in *fus
 	}
 
 	if n.Ent.AtomicGetFileState() == EnEmpty {
-		/*
-			log.G(ctx).WithFields(logrus.Fields{
-				"name":   n.Ent.Name,
-				"source": n.Ent.Source,
-				"state":  n.Ent.State,
-			}).Error("SETATTR")
-		*/
 		<-n.Ent.ready
 		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 	}

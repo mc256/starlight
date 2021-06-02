@@ -166,7 +166,8 @@ func (ir *ImageReader) GetLayerMounts() []mount.Mount {
 // - imageName, imageTag  should be available in ImageReader. imageLookupMap
 // - snapshotId is the absolute path will be created to hold the rw layer and the mounting point.
 // - checkpoint is the starting point for the image reader
-func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint string) (*FsInstance, error) {
+// - optimize determines whether the file system should collect access traces for optimization
+func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint string, optimize bool) (*FsInstance, error) {
 	// Fs ID
 	randBuf := make([]byte, 64)
 	_, _ = rand.Read(randBuf)
@@ -188,6 +189,15 @@ func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint
 		return nil, util.ErrImageNotFound
 	}
 	fsi := newFsInstance(ir, &ir.layerLookupMap, d, lm.absPath, imageName, imageTag)
+	if optimize {
+		if err = fsi.SetOptimizerOn(); err != nil {
+			log.G(ir.ctx).WithError(err).Error("optimizer error")
+		} else {
+			log.G(ir.ctx).Info("optimizer on")
+		}
+	} else {
+		log.G(ir.ctx).Info("optimizer off")
+	}
 	fsi.Root = ir.fsTemplate[idx].(*TemplateEntry).DeepCopy(fsi)
 
 	// Wait for
@@ -286,12 +296,16 @@ func (ir *ImageReader) printLog(fn, dir, base, ref, comment string) {
 				"ref":      ref,
 			}).Error(comment)
 		}
-		log.G(ir.ctx).WithFields(logrus.Fields{
-			"filename": fn,
-			"dir":      dir,
-			"base":     base,
-			"ref":      ref,
-		}).Trace(comment)
+	*/
+	/*
+		if comment == "pre-extract" {
+			log.G(ir.ctx).WithFields(logrus.Fields{
+				"filename": fn,
+				"dir":      dir,
+				"base":     base,
+				"ref":      ref,
+			}).Error(comment)
+		}
 	*/
 }
 

@@ -43,6 +43,10 @@ type FsInstance struct {
 	mountPoint string
 
 	server *fuse.Server
+
+	optimize  bool
+	startTime time.Time
+	tracer    *Tracer
 }
 
 func (fi *FsInstance) GetRwTraceableBlobDigest() util.TraceableBlobDigest {
@@ -66,7 +70,26 @@ func newFsInstance(ir *ImageReader, layerLookupMap *[]*LayerMeta, d digest.Diges
 		rwLayerPath:    rwLayerPath,
 		name:           imageName,
 		tag:            imageTag,
+		optimize:       false,
+		tracer:         nil,
 	}
+}
+
+// Teardown unmounts the file system and close the logging file if there is one writing
+func (fi *FsInstance) Teardown() error {
+	if fi.tracer != nil {
+		_ = fi.tracer.Close()
+	}
+	return fi.GetServer().Unmount()
+}
+
+func (fi *FsInstance) SetOptimizerOn() (err error) {
+	fi.tracer, err = NewTracer(fi.name, fi.tag)
+	fi.optimize = true
+	if err != nil {
+		return
+	}
+	return nil
 }
 
 func (fi *FsInstance) NewFuseServer(dir string, options *fs.Options, debug bool) (*fuse.Server, error) {
@@ -89,6 +112,8 @@ func (fi *FsInstance) NewFuseServer(dir string, options *fs.Options, debug bool)
 	if debug {
 		options.Debug = true
 	}
+
+	fi.startTime = time.Now()
 
 	rawFs := fs.NewNodeFS(fi.rootInode, options)
 	var err error

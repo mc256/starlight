@@ -24,6 +24,7 @@ const (
 	CheckpointLabel       = "containerd.io/snapshot/remote/starlight/checkpoint.label"
 	FromImages            = "containerd.io/snapshot/remote/starlight/fromImages.label"
 	ToImages              = "containerd.io/snapshot/remote/starlight/toImages.label"
+	OptimizeLabel         = "containerd.io/snapshot/remote/starlight/optimize.label"
 	ImageMediaType        = "application/vnd.mc256.starlight.toc.json"
 	TestPullLabel         = "containerd.io/snapshot/remote/test.pull.label"
 	UserRwLayerText       = "containerd.io/layer/user-rw-layer"

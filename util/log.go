@@ -38,7 +38,8 @@ func ConfigLoggerWithLevel(level string) (ctx context.Context) {
 	log.GetLogger(ctx).Logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: time.StampNano,
-		ForceColors:     true,
+		//ForceColors:     true,
+		DisableColors: true,
 	})
 
 	switch level {
