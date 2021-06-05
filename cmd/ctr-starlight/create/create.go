@@ -79,10 +79,12 @@ func Action(c *cli.Context) error {
 
 	// Prepare snapshot
 	checkpoint := c.Int("start-checkpoint")
+
 	optimize := c.Bool("optimize")
+	optimizeGroup := c.String("optimize-group")
 
 	var mnt []mount.Mount
-	if t.SnId, mnt, err = t.Sn.PrepareContainerSnapshot(name, tag, imageCombo, checkpoint, optimize); err != nil {
+	if t.SnId, mnt, err = t.Sn.PrepareContainerSnapshot(name, tag, imageCombo, checkpoint, optimize, optimizeGroup); err != nil {
 		log.G(ctx).Error(err)
 		return nil
 	} else {

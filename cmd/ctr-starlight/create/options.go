@@ -33,9 +33,17 @@ var (
 		},
 		&cli.BoolFlag{
 			Name:     "optimize",
-			Usage:    "collect the traces of the file access for optimization",
+			Usage:    "collect workload information to optimize deployment speed for other peers",
 			Value:    false,
 			Required: false,
+		},
+		&cli.StringFlag{
+			Name:        "optimize-group",
+			Aliases:     []string{"app", "workload"},
+			Usage:       "assign a label to this workload",
+			Value:       "default",
+			DefaultText: "default",
+			Required:    false,
 		},
 	}
 

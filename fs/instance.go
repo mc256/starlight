@@ -44,9 +44,8 @@ type FsInstance struct {
 
 	server *fuse.Server
 
-	optimize  bool
-	startTime time.Time
-	tracer    *Tracer
+	optimize bool
+	tracer   *Tracer
 }
 
 func (fi *FsInstance) GetRwTraceableBlobDigest() util.TraceableBlobDigest {
@@ -83,8 +82,8 @@ func (fi *FsInstance) Teardown() error {
 	return fi.GetServer().Unmount()
 }
 
-func (fi *FsInstance) SetOptimizerOn() (err error) {
-	fi.tracer, err = NewTracer(fi.name, fi.tag)
+func (fi *FsInstance) SetOptimizerOn(optimizeGroup string) (err error) {
+	fi.tracer, err = NewTracer(optimizeGroup, fi.name, fi.tag)
 	fi.optimize = true
 	if err != nil {
 		return
@@ -112,8 +111,6 @@ func (fi *FsInstance) NewFuseServer(dir string, options *fs.Options, debug bool)
 	if debug {
 		options.Debug = true
 	}
-
-	fi.startTime = time.Now()
 
 	rawFs := fs.NewNodeFS(fi.rootInode, options)
 	var err error

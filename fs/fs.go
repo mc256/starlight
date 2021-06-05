@@ -47,6 +47,19 @@ type StarlightFsNode struct {
 	Ent *FsEntry
 }
 
+func (n *StarlightFsNode) FileReadyWait() {
+	if n.Ent.fi.optimize {
+		beginTs := time.Now()
+
+		<-n.Ent.ready
+
+		endTs := time.Now()
+		go n.Ent.fi.tracer.Log(n.Ent.Name, beginTs, endTs)
+	} else {
+		<-n.Ent.ready
+	}
+}
+
 var _ = (fs.NodeLookuper)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
@@ -433,20 +446,7 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 				}).Warn("OPEN-BLOCK")
 			}
 
-			if n.Ent.fi.optimize {
-				beginTs := time.Now()
-
-				<-n.Ent.ready
-
-				endTs := time.Now()
-
-				access := endTs.Sub(n.Ent.fi.startTime)
-				wait := endTs.Sub(beginTs)
-
-				n.Ent.fi.tracer.Log(n.Ent.Name, access, wait)
-			} else {
-				<-n.Ent.ready
-			}
+			n.FileReadyWait()
 
 			if DebugTrace {
 				log.G(ctx).WithFields(logrus.Fields{
@@ -629,8 +629,10 @@ func (n *StarlightFsNode) Setattr(ctx context.Context, fh fs.FileHandle, in *fus
 		}).Trace("SETATTR")
 	}
 
+	// TODO: we are waiting here for safety
+	// Possible way to speed up
 	if n.Ent.AtomicGetFileState() == EnEmpty {
-		<-n.Ent.ready
+		n.FileReadyWait()
 		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 	}
 
@@ -1091,7 +1093,7 @@ func (n *StarlightFsNode) Fsync(ctx context.Context, f fs.FileHandle, flags uint
 				"name": n.Ent.Name,
 			}).Error("FSYNC")
 		*/
-		<-n.Ent.ready
+		n.FileReadyWait()
 		_ = n.Ent.AtomicSetFileState(EnEmpty, EnRoLayer)
 	}
 

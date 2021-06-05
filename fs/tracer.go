@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"sort"
 	"sync"
 	"time"
 )
@@ -34,43 +35,66 @@ type TraceItem struct {
 	Wait     time.Duration `json:"w"`
 }
 
-type Tracer struct {
-	imageName string
-	imageTag  string
-	logPath   string
-	fh        *os.File
-	mtx       *sync.Mutex
+type ByAccessTime []*TraceItem
+
+func (b ByAccessTime) Len() int {
+	return len(b)
 }
 
-func (t *Tracer) Log(fileName string, access time.Duration, wait time.Duration) {
+func (b ByAccessTime) Less(i, j int) bool {
+	// should return true is i has higher priority
+	return b[i].Access < b[j].Access
+}
+func (b ByAccessTime) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+
+type Tracer struct {
+	// label could be the name of the application or the workload.
+	// Different workload might have
+	OptimizeGroup string    `json:"group"`
+	ImageName     string    `json:"name"`
+	ImageTag      string    `json:"tag"`
+	StartTime     time.Time `json:"start"`
+	logPath       string
+	fh            *os.File
+	mtx           *sync.Mutex
+	Swq           []*TraceItem `json:"seq"`
+}
+
+func (t *Tracer) Log(fileName string, accessTime, completeTime time.Time) {
 	item := TraceItem{
 		FileName: fileName,
-		Access:   access,
-		Wait:     wait,
+		Access:   accessTime.Sub(t.StartTime),
+		Wait:     completeTime.Sub(accessTime),
 	}
-	b, _ := json.Marshal(&item)
 
 	t.mtx.Lock()
 	defer t.mtx.Unlock()
 
-	_, _ = t.fh.Write(b)
-	_, _ = t.fh.WriteString("\n")
+	t.Swq = append(t.Swq, &item)
 }
 
 func (t *Tracer) Close() error {
 	t.mtx.Lock()
 	defer t.mtx.Unlock()
+
+	sort.Sort(ByAccessTime(t.Swq))
+
+	b, _ := json.Marshal(t)
+	_, _ = t.fh.Write(b)
+
 	return t.fh.Close()
 }
 
-func NewTracer(imageName, imageTag string) (*Tracer, error) {
+func NewTracer(optimizeGroup, imageName, imageTag string) (*Tracer, error) {
 	rand.Seed(time.Now().Unix())
 	r := rand.Intn(99999)
-	err := os.MkdirAll(path.Join(os.TempDir(), "starlight-optimizer", imageName, imageTag), 0775)
+	err := os.MkdirAll(path.Join(os.TempDir(), "starlight-optimizer", optimizeGroup, imageName, imageTag), 0775)
 	if err != nil {
 		return nil, err
 	}
-	logPath := path.Join(os.TempDir(), "starlight-optimizer", imageName, imageTag, fmt.Sprintf("%05d.log", r))
+	logPath := path.Join(os.TempDir(), "starlight-optimizer", optimizeGroup, imageName, imageTag, fmt.Sprintf("%05d.log", r))
 
 	fh, err := os.Create(logPath)
 	if err != nil {
@@ -78,10 +102,12 @@ func NewTracer(imageName, imageTag string) (*Tracer, error) {
 	}
 
 	return &Tracer{
-		imageName: imageName,
-		imageTag:  imageTag,
-		logPath:   logPath,
-		fh:        fh,
-		mtx:       &sync.Mutex{},
+		OptimizeGroup: optimizeGroup,
+		StartTime:     time.Now(),
+		ImageName:     imageName,
+		ImageTag:      imageTag,
+		logPath:       logPath,
+		fh:            fh,
+		mtx:           &sync.Mutex{},
 	}, nil
 }

@@ -263,8 +263,12 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 				// optimize
 				optimize := false
+				optimizeGroup := ""
 				if val, ok := config.Labels[util.OptimizeLabel]; ok && val == "True" {
 					optimize = true
+				}
+				if val, ok := config.Labels[util.OptimizeGroupLabel]; ok {
+					optimizeGroup = val
 				}
 
 				// fs instance
@@ -274,6 +278,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 					path.Join(o.root, "sfs", sn.ID),
 					config.Labels[util.CheckpointLabel],
 					optimize,
+					optimizeGroup,
 				)
 				if err != nil {
 					return nil, err

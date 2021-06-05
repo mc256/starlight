@@ -167,7 +167,7 @@ func (ir *ImageReader) GetLayerMounts() []mount.Mount {
 // - snapshotId is the absolute path will be created to hold the rw layer and the mounting point.
 // - checkpoint is the starting point for the image reader
 // - optimize determines whether the file system should collect access traces for optimization
-func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint string, optimize bool) (*FsInstance, error) {
+func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint string, optimize bool, optimizeGroup string) (*FsInstance, error) {
 	// Fs ID
 	randBuf := make([]byte, 64)
 	_, _ = rand.Read(randBuf)
@@ -190,10 +190,10 @@ func (ir *ImageReader) NewFsInstance(imageName, imageTag, snapshotId, checkpoint
 	}
 	fsi := newFsInstance(ir, &ir.layerLookupMap, d, lm.absPath, imageName, imageTag)
 	if optimize {
-		if err = fsi.SetOptimizerOn(); err != nil {
+		if err = fsi.SetOptimizerOn(optimizeGroup); err != nil {
 			log.G(ir.ctx).WithError(err).Error("optimizer error")
 		} else {
-			log.G(ir.ctx).Info("optimizer on")
+			log.G(ir.ctx).WithField("group", optimizeGroup).Info("optimizer on")
 		}
 	} else {
 		log.G(ir.ctx).Info("optimizer off")

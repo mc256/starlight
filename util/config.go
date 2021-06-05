@@ -19,16 +19,13 @@
 package util
 
 const (
-	ImageNameLabel        = "containerd.io/snapshot/remote/starlight/imageName.label"
-	ImageTagLabel         = "containerd.io/snapshot/remote/starlight/imageTag.label"
-	CheckpointLabel       = "containerd.io/snapshot/remote/starlight/checkpoint.label"
-	FromImages            = "containerd.io/snapshot/remote/starlight/fromImages.label"
-	ToImages              = "containerd.io/snapshot/remote/starlight/toImages.label"
-	OptimizeLabel         = "containerd.io/snapshot/remote/starlight/optimize.label"
-	ImageMediaType        = "application/vnd.mc256.starlight.toc.json"
-	TestPullLabel         = "containerd.io/snapshot/remote/test.pull.label"
-	UserRwLayerText       = "containerd.io/layer/user-rw-layer"
-	UserMountingPointText = "containerd.io/layer/mounting-point"
+	ImageNameLabel     = "containerd.io/snapshot/remote/starlight/imageName.label"
+	ImageTagLabel      = "containerd.io/snapshot/remote/starlight/imageTag.label"
+	CheckpointLabel    = "containerd.io/snapshot/remote/starlight/checkpoint.label"
+	OptimizeLabel      = "containerd.io/snapshot/remote/starlight/optimize.label"
+	OptimizeGroupLabel = "containerd.io/snapshot/remote/starlight/optimizeGroup.label"
+	ImageMediaType     = "application/vnd.mc256.starlight.toc.json"
+	UserRwLayerText    = "containerd.io/layer/user-rw-layer"
 
 	SnapshotterDbName = "metadata.db"
 	ProxyDbName       = "toc.db"

@@ -70,7 +70,15 @@ func Command() *cli.Command {
 		Action: func(c *cli.Context) error {
 			return Action(c)
 		},
-		Flags:     []cli.Flag{},
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "optimize-group",
+				Usage:    "label of this workflow",
+				Value:    "",
+				Aliases:  []string{"app", "workload"},
+				Required: false,
+			},
+		},
 		ArgsUsage: "[FromImages] ToImages",
 	}
 	return &cmd
