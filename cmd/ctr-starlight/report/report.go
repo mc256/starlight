@@ -19,21 +19,32 @@
 package report
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
 )
 
 func Action(c *cli.Context) error {
+	fmt.Println(c.String("path"))
+
 	return nil
 }
 
 func Command() *cli.Command {
 	cmd := cli.Command{
 		Name:  "report",
-		Usage: "Upload file access traces back to Starlight Proxy to speed up other similar deployment",
+		Usage: "Upload data collected by the optimizer back to Starlight Proxy to speed up other similar deployment",
 		Action: func(c *cli.Context) error {
 			return Action(c)
 		},
-		Flags:     []cli.Flag{},
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "path",
+				Usage:       "path the the optimizer logs",
+				Value:       "/tmp",
+				DefaultText: "/tmp",
+				Required:    false,
+			},
+		},
 		ArgsUsage: "",
 	}
 	return &cmd

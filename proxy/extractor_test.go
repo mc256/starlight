@@ -23,9 +23,9 @@ import (
 	"testing"
 )
 
-func TestCacheToc(t *testing.T) {
+func TestCacheToc1(t *testing.T) {
 	const (
-		ContainerRegistry = "http://10.219.31.127:5000"
+		ContainerRegistry = "http://10.219.31.214:5000"
 	)
 
 	ctx := util.ConfigLogger()
@@ -37,6 +37,29 @@ func TestCacheToc(t *testing.T) {
 	defer db.Close()
 
 	if err = CacheToc(ctx, db, "ubuntu", "18.04-starlight", ContainerRegistry); err != nil {
+		t.Fatal(err)
+		return
+	}
+}
+
+func TestCacheToc2(t *testing.T) {
+	const (
+		ContainerRegistry = "http://10.219.31.214:5000"
+	)
+
+	ctx := util.ConfigLogger()
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer db.Close()
+
+	if err = CacheToc(ctx, db, "mariadb", "10.4-starlight", ContainerRegistry); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = CacheToc(ctx, db, "mariadb", "10.5-starlight", ContainerRegistry); err != nil {
 		t.Fatal(err)
 		return
 	}

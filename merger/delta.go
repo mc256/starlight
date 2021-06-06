@@ -210,12 +210,16 @@ func (d *Delta) PopulateOffset() error {
 
 // ExportTOC writes TOC for this image
 // It must runs after the delta image has been consolidated (so that we have the correct offset point to the gzip chunks)
-func (d *Delta) ExportTOC(w io.Writer) error {
-	if d.consolidated == false {
+func (d *Delta) ExportTOC(w io.Writer, beautify bool) error {
+	if d.consolidated == false && beautify == false {
 		return util.ErrNotConsolidated
 	}
 
 	encoder := json.NewEncoder(w)
+	if beautify {
+		encoder.SetIndent("", "\t")
+	}
+
 	return encoder.Encode(d)
 }
 
@@ -231,7 +235,7 @@ func (d *Delta) OutputHeader(w io.Writer) (headerSize int64, err error) {
 	if err != nil {
 		return 0, err
 	}
-	err = d.ExportTOC(gw)
+	err = d.ExportTOC(gw, false)
 	if err != nil {
 		return 0, err
 	}

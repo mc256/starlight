@@ -69,13 +69,13 @@ func (ib *ImageBuilder) WriteBody(w io.Writer) (err error) {
 	return nil
 }
 
-func (ib *ImageBuilder) WriteHeader(w io.Writer) (headerSize int64, contentLength int64, err error) {
+func (ib *ImageBuilder) WriteHeader(w io.Writer, beautified bool) (headerSize int64, contentLength int64, err error) {
 	cw := util.GetCountWriter(w)
 	gw, err := gzip.NewWriterLevel(cw, gzip.BestCompression)
 	if err != nil {
 		return 0, 0, err
 	}
-	err = ib.c.ExportTOC(gw, false)
+	err = ib.c.ExportTOC(gw, beautified)
 	if err != nil {
 		return 0, 0, err
 	}

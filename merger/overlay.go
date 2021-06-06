@@ -58,6 +58,13 @@ type Overlay struct {
 	config []byte
 }
 
+// ExportTOC writes the TOC in json to a writer
+func (ov *Overlay) ExportTOC(w io.Writer) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "\t")
+	return encoder.Encode(ov)
+}
+
 func NewOverlayBuilder(ctx context.Context, db *bolt.DB) (ov *Overlay) {
 	root := util.GetRootNode()
 	root.SetSourceLayer(SourceLayerUnboundedIndex)
@@ -175,8 +182,8 @@ func (ov *Overlay) recursiveAdd(lDir, uDir *estargz.TOCEntry, upperPool *map[str
 
 }
 
-// Add overlays a single layer on top of what exists in the Overlay object.
-func (ov *Overlay) Add(tb *util.TraceableBlobDigest) error {
+// AddLayer overlays a single layer on top of what exists in the Overlay object.
+func (ov *Overlay) AddLayer(tb *util.TraceableBlobDigest) error {
 	/*
 		log.G(ov.ctx).WithFields(logrus.Fields{
 			"digest": tb.Digest.String(),
@@ -190,7 +197,7 @@ func (ov *Overlay) Add(tb *util.TraceableBlobDigest) error {
 	}
 	defer tx.Rollback()
 
-	// read toc from storage
+	// Read layer from storage
 	blob := tx.Bucket([]byte("blob"))
 	if blob == nil {
 		return bolt.ErrBucketNotFound
@@ -201,8 +208,10 @@ func (ov *Overlay) Add(tb *util.TraceableBlobDigest) error {
 	}
 
 	// Read TOC
+	// populate: ov.DigestList, ov.Root, ov.EntryMap
 	pool := make(map[string]*util.TraceableEntry)
 	ov.DigestList = append(ov.DigestList, tb)
+
 	idx := len(ov.DigestList) // starting from 1
 	err = layer.ForEach(func(k, v []byte) error {
 		ent := &util.TraceableEntry{}
@@ -265,6 +274,7 @@ func (ov *Overlay) AddImage(imageName, imageTag string) error {
 	if tag == nil {
 		return bolt.ErrBucketNotFound
 	}
+
 	bucket := tag.Bucket([]byte(imageTag))
 	if bucket == nil {
 		return bolt.ErrBucketNotFound
@@ -279,20 +289,169 @@ func (ov *Overlay) AddImage(imageName, imageTag string) error {
 		if err != nil {
 			return err
 		}
-		err = ov.Add(&util.TraceableBlobDigest{Digest: d, ImageName: imageName})
+		err = ov.AddLayer(&util.TraceableBlobDigest{Digest: d, ImageName: imageName})
 		if err != nil {
 			return err
 		}
 	}
 
+	// Load Config
 	ov.config = bucket.Get([]byte("config"))
 
 	return nil
 }
 
-// ExportTOC writes the TOC in json to a writer
-func (ov *Overlay) ExportTOC(w io.Writer) error {
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "\t")
-	return encoder.Encode(ov)
+func (ov *Overlay) SaveMergedImage() error {
+	log.G(ov.ctx).WithFields(logrus.Fields{
+		"name": ov.ImageName,
+		"tag":  ov.ImageTag,
+	}).Info("save merged image to directory db")
+
+	if len(ov.DigestList) == 0 {
+		return util.ErrImageNotFound
+	}
+
+	// Database
+	tx, err := ov.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Commit()
+
+	// read layers from database
+	img := tx.Bucket([]byte("image"))
+	if img == nil {
+		return bolt.ErrBucketNotFound
+	}
+	tag := img.Bucket([]byte(ov.ImageName))
+	if tag == nil {
+		return bolt.ErrBucketNotFound
+	}
+
+	bucket := tag.Bucket([]byte(ov.ImageTag))
+	if bucket == nil {
+		return bolt.ErrBucketNotFound
+	}
+
+	merged, err := bucket.CreateBucketIfNotExists([]byte("merged"))
+	if err != nil {
+		return bolt.ErrBucketNotFound
+	}
+
+	for k, v := range ov.EntryMap {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+
+		//fmt.Println(string(b[:]))
+		if err := merged.Put([]byte(k), b); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag string) (*Overlay, error) {
+	log.G(ctx).WithFields(logrus.Fields{
+		"name": imageName,
+		"tag":  imageTag,
+	}).Info("load image")
+
+	ov := NewOverlayBuilder(ctx, db)
+	ov.ImageName = imageName
+	ov.ImageTag = imageTag
+
+	// Database
+	tx, err := ov.db.Begin(false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// read layers from database
+	img := tx.Bucket([]byte("image"))
+	if img == nil {
+		return nil, bolt.ErrBucketNotFound
+	}
+	tag := img.Bucket([]byte(ov.ImageName))
+	if tag == nil {
+		return nil, bolt.ErrBucketNotFound
+	}
+
+	bucket := tag.Bucket([]byte(ov.ImageTag))
+	if bucket == nil {
+		return nil, bolt.ErrBucketNotFound
+	}
+
+	merged := bucket.Bucket([]byte("merged"))
+	if merged == nil {
+		return nil, util.ErrMergedImageNotFound
+	}
+
+	// Add Entry
+	err = merged.ForEach(func(k, v []byte) error {
+		ent := &util.TraceableEntry{}
+		err := json.Unmarshal(v, ent)
+		name := string(k[:])
+
+		ov.EntryMap[name] = ent
+
+		ent.SetSourceLayer(ent.Source)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Add Root
+	ov.Root = ov.EntryMap["."]
+
+	// Add Layer
+	n := int(util.BToInt32(bucket.Get([]byte("count"))))
+	for i := 0; i < n; i++ {
+		hash := bucket.Get(util.Int32ToB(uint32(i)))
+		if hash == nil {
+			return nil, util.ErrLayerNotFound
+		}
+		d, err := digest.Parse(string(hash[:]))
+		if err != nil {
+			return nil, err
+		}
+		ov.DigestList = append(ov.DigestList, &util.TraceableBlobDigest{Digest: d, ImageName: imageName})
+	}
+
+	// Rebuild Tree
+	for k, v := range ov.EntryMap {
+		if k != "." {
+			parent := path.Dir(k)
+			parentNode, _ := ov.EntryMap[parent]
+			parentNode.AddChild(path.Base(k), v.TOCEntry)
+
+			// keep the correct number of links
+			if v.TOCEntry.IsDir() {
+				parentNode.NumLink--
+			}
+
+		}
+	}
+
+	// Load Config
+	ov.config = bucket.Get([]byte("config"))
+
+	return ov, nil
+}
+
+func (ov *Overlay) AddOptimizedImage(imageName, imageTag, optimizeGroup string) error {
+	if err := ov.AddImage(imageName, imageTag); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ov *Overlay) SavePriorityScore(group, imageName, imageTag string, scores map[string]int) error {
+
+	return nil
 }

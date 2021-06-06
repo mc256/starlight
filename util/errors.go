@@ -29,6 +29,7 @@ var (
 	ErrAlreadyConsolidated      = errors.New("delta image has been consolidated already")
 	ErrHashCollision            = errors.New("found two files have the same hash but different size")
 	ErrNotImplemented           = errors.New("this feature has not yet been implemented")
+	ErrMergedImageNotFound      = errors.New("the requested image has not been merged")
 	ErrWrongImageFormat         = errors.New("please use this format <image>:<tag>")
 	ErrOrphanNode               = errors.New("an entry node has no parent")
 	ErrNoRoPath                 = errors.New("entry does not have path to RO layer")

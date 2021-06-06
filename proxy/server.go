@@ -83,19 +83,21 @@ func (a *StarlightProxyClient) getDeltaImage(w http.ResponseWriter, req *http.Re
 	}
 
 	c := merger.NewConsolidator(a.ctx)
-
 	for imageName, t := range pool {
-		m1 := merger.NewOverlayBuilder(a.ctx, a.database)
-		m2 := merger.NewOverlayBuilder(a.ctx, a.database)
+		var err error
+		var m1, m2 *merger.Overlay
 
 		if t.tagFrom != "" {
-			err := m1.AddImage(imageName, t.tagFrom)
+			m1, err = merger.LoadMergedImage(a.ctx, a.database, imageName, t.tagFrom)
 			if err != nil {
 				return err
 			}
+		} else {
+			m1 = merger.NewOverlayBuilder(a.ctx, a.database)
 		}
+
 		if t.tagTo != "" {
-			err := m2.AddImage(imageName, t.tagTo)
+			m2, err = merger.LoadMergedImage(a.ctx, a.database, imageName, t.tagTo)
 			if err != nil {
 				return err
 			}
@@ -110,7 +112,7 @@ func (a *StarlightProxyClient) getDeltaImage(w http.ResponseWriter, req *http.Re
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0))
-	headerSize, contentLength, err := ib.WriteHeader(buf)
+	headerSize, contentLength, err := ib.WriteHeader(buf, false)
 	if err != nil {
 		log.G(a.ctx).WithField("err", err).Error("write header cache")
 		return nil
@@ -148,11 +150,30 @@ func (a *StarlightProxyClient) getPrepared(w http.ResponseWriter, req *http.Requ
 		return err
 	}
 
+	ob := merger.NewOverlayBuilder(a.ctx, a.database)
+	if err = ob.AddImage(arr[0], arr[1]); err != nil {
+		return err
+	}
+	if err = ob.SaveMergedImage(); err != nil {
+		return err
+	}
+
 	header := w.Header()
 	header.Set("Content-Type", "text/plain")
 	header.Set("Starlight-Version", util.Version)
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprintf(w, "Cached TOC: %s\n", image)
+	return nil
+}
+
+func (a *StarlightProxyClient) getOptimize(w http.ResponseWriter, req *http.Request, group, imageName, imageTag string) error {
+	// TODO: receive optimized information.
+
+	header := w.Header()
+	header.Set("Content-Type", "text/plain")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(w, "Optimize: %s | %s | %s \n", group, imageName, imageTag)
 	return nil
 }
 
@@ -178,6 +199,9 @@ func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request
 		break
 	case len(params) == 2 && params[0] == "prepare":
 		err = a.getPrepared(w, req, params[1])
+		break
+	case len(params) == 4 && params[0] == "optimize":
+		err = a.getOptimize(w, req, params[1], params[2], params[3])
 		break
 	default:
 		a.getDefault(w, req)
