@@ -88,13 +88,14 @@ func (t *Tracer) Close() error {
 }
 
 func NewTracer(optimizeGroup, imageName, imageTag string) (*Tracer, error) {
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
+
 	r := rand.Intn(99999)
-	err := os.MkdirAll(path.Join(os.TempDir(), "starlight-optimizer", optimizeGroup, imageName, imageTag), 0775)
+	err := os.MkdirAll(path.Join(os.TempDir(), "starlight-optimizer"), 0775)
 	if err != nil {
 		return nil, err
 	}
-	logPath := path.Join(os.TempDir(), "starlight-optimizer", optimizeGroup, imageName, imageTag, fmt.Sprintf("%05d.log", r))
+	logPath := path.Join(os.TempDir(), "starlight-optimizer", fmt.Sprintf("%05d.log", r))
 
 	fh, err := os.Create(logPath)
 	if err != nil {

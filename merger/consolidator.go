@@ -263,6 +263,7 @@ func (c *Consolidator) PopulateOffset() error {
 	return nil
 }
 
+// AddDelta image to the pool of images, All the
 func (c *Consolidator) AddDelta(delta *Delta) error {
 	// lock the delta image
 	if c.consolidated {

@@ -129,7 +129,7 @@ func (s *SnapshotterService) CommitWorker(sn string) error {
 }
 
 func NewSnapshotterService(ctx context.Context, client *containerd.Client) (sn *SnapshotterService) {
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UnixNano())
 	sn = &SnapshotterService{
 		ctx:    ctx,
 		sn:     client.SnapshotService("starlight"),
