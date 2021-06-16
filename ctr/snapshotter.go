@@ -57,13 +57,8 @@ type SnapshotterService struct {
 // PrepareDeltaImage gets
 func (s *SnapshotterService) PrepareDeltaImage(fromImages, toImages string) error {
 	// sort image orders
-	arrFrom := strings.Split(fromImages, ",")
-	sort.Strings(arrFrom)
-	fromImages = strings.Join(arrFrom, ",")
-
-	arrTo := strings.Split(toImages, ",")
-	sort.Strings(arrTo)
-	toImages = strings.Join(arrTo, ",")
+	fromImages = util.SortImageArrayString(fromImages)
+	toImages = util.SortImageArrayString(toImages)
 
 	var target, source string
 	if fromImages == "" {

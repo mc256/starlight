@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/rand"
@@ -72,10 +73,9 @@ func (bo ByAccessTimeOptimized) Swap(i, j int) {
 type Tracer struct {
 	// label could be the name of the application or the workload.
 	// Different workload might have
-	OptimizeGroup string    `json:"group"`
-	ImageName     string    `json:"name"`
-	ImageTag      string    `json:"tag"`
-	StartTime     time.Time `json:"start"`
+	OptimizeGroup string        `json:"group"`
+	Image         util.ImageRef `json:"image"`
+	StartTime     time.Time     `json:"start"`
 	logPath       string
 	fh            *os.File
 	mtx           *sync.Mutex
@@ -126,12 +126,14 @@ func NewTracer(optimizeGroup, imageName, imageTag string) (*Tracer, error) {
 	return &Tracer{
 		OptimizeGroup: optimizeGroup,
 		StartTime:     time.Now(),
-		ImageName:     imageName,
-		ImageTag:      imageTag,
-		logPath:       logPath,
-		fh:            fh,
-		mtx:           &sync.Mutex{},
-		Seq:           make([]*TraceItem, 0),
+		Image: util.ImageRef{
+			ImageName: imageName,
+			ImageTag:  imageTag,
+		},
+		logPath: logPath,
+		fh:      fh,
+		mtx:     &sync.Mutex{},
+		Seq:     make([]*TraceItem, 0),
 	}, nil
 }
 
@@ -144,7 +146,7 @@ type OptimizedTraceItem struct {
 
 type OptimizedGroup struct {
 	History    []*OptimizedTraceItem `json:"h"`
-	Images     []string              `json:"i"`
+	Images     []*util.ImageRef      `json:"i"`
 	standalone bool
 }
 
@@ -182,8 +184,7 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 			log.G(ctx).WithFields(logrus.Fields{
 				"file":  f.Name(),
 				"group": t.OptimizeGroup,
-				"name":  t.ImageName,
-				"tag":   t.ImageTag,
+				"image": t.Image,
 			}).Info("parsed file")
 
 			if _, ok := tc.tracerMap[t.OptimizeGroup]; ok {
@@ -200,14 +201,14 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 				// Optimized group
 				g := &OptimizedGroup{
 					History:    make([]*OptimizedTraceItem, 0),
-					Images:     make([]string, 0),
+					Images:     make([]*util.ImageRef, 0),
 					standalone: true,
 				}
 				tc.groups = append(tc.groups, g)
 
 				visited := make(map[string]bool)
 
-				g.Images = append(g.Images, trace.ImageName+":"+trace.ImageTag)
+				g.Images = append(g.Images, &trace.Image)
 				for _, t := range trace.Seq {
 					if !visited[t.FileName] {
 						g.History = append(g.History, &OptimizedTraceItem{
@@ -231,7 +232,7 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 			// Optimized group
 			g := &OptimizedGroup{
 				History:    make([]*OptimizedTraceItem, 0),
-				Images:     make([]string, 0),
+				Images:     make([]*util.ImageRef, 0),
 				standalone: false,
 			}
 			tc.groups = append(tc.groups, g)
@@ -246,6 +247,16 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 						starTime = trace.StartTime
 					}
 				}
+				g.Images = append(g.Images, &util.ImageRef{
+					ImageName: trace.Image.ImageName,
+					ImageTag:  trace.Image.ImageTag,
+				})
+			}
+
+			sort.Sort(util.ByImageName(g.Images))
+			lookupMap := make(map[string]int, len(g.Images))
+			for i, img := range g.Images {
+				lookupMap[img.String()] = i
 			}
 
 			// Populate history from multiple traces
@@ -253,7 +264,8 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 				traceOffset := trace.StartTime.Sub(starTime)
 				visited := make(map[string]bool)
 
-				g.Images = append(g.Images, trace.ImageName+":"+trace.ImageTag)
+				idx := lookupMap[trace.Image.String()]
+
 				for _, t := range trace.Seq {
 					if !visited[t.FileName] {
 						g.History = append(g.History, &OptimizedTraceItem{
@@ -263,7 +275,7 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 								Wait:     t.Wait,
 							},
 							Rank:        0,
-							SourceImage: len(g.Images) - 1,
+							SourceImage: idx,
 						})
 						visited[t.FileName] = true
 					}
