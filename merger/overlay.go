@@ -390,7 +390,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 		return nil, util.ErrMergedImageNotFound
 	}
 
-	// Add Entry
+	// 1. Add Entry
 	err = merged.ForEach(func(k, v []byte) error {
 		ent := &util.TraceableEntry{}
 		err := json.Unmarshal(v, ent)
@@ -405,10 +405,10 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 		return nil, err
 	}
 
-	// Add Root
+	// 2. Add Root
 	ov.Root = ov.EntryMap["."]
 
-	// Add Layer
+	// 3. Add Layer
 	n := int(util.BToInt32(bucket.Get([]byte("count"))))
 	for i := 0; i < n; i++ {
 		hash := bucket.Get(util.Int32ToB(uint32(i)))
@@ -441,17 +441,4 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 	ov.config = bucket.Get([]byte("config"))
 
 	return ov, nil
-}
-
-func (ov *Overlay) AddOptimizedImage(imageName, imageTag, optimizeGroup string) error {
-	if err := ov.AddImage(imageName, imageTag); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (ov *Overlay) SavePriorityScore(group, imageName, imageTag string, scores map[string]int) error {
-
-	return nil
 }

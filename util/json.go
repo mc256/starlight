@@ -16,27 +16,26 @@
    file created by maverick in 2021
 */
 
-package fs
+package util
 
 import (
 	"encoding/json"
-	"github.com/mc256/starlight/util"
-	"io/ioutil"
 	"os"
-	"path"
-	"testing"
 )
 
-func TestLoadTraces(t *testing.T) {
-	ctx := util.ConfigLogger()
-	tc, err := NewTraceCollection(ctx, "/mnt/sandbox2")
+func ExportToJsonFile(v interface{}, p string) error {
+	fh, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE, 0644)
+	defer fh.Close()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	buf, err := json.MarshalIndent(tc, "", "\t")
+	buf, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
-	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
+
+	_, _ = fh.Write(buf)
+
+	return nil
 }

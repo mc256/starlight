@@ -24,6 +24,95 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
+type OptimizedTraceableEntry struct {
+	*TraceableEntry
+
+	// ------------------------------------
+	// SourceImage starts from 1 not 0.
+	// index 0 and -1 are reserved for special purpose.
+	SourceImage int `json:"si,omitempty"`
+
+	// ------------------------------------
+	// Statics
+
+	// AccessCount records number of access during start up
+	AccessCount int `json:"ac,omitempty"`
+	// SumRank
+	SumRank int `json:"sr,omitempty"`
+	// SumRankSquare
+	SumSquaredRank float64 `json:"sr2,omitempty"`
+
+	// -------------------------------------
+	// Statics populated after initialization
+	ranking float32
+	//ranking99 float32
+}
+
+func (ote *OptimizedTraceableEntry) Key() string {
+	return fmt.Sprintf("%d|%s", ote.SourceImage, ote.Name)
+}
+
+func (ote *OptimizedTraceableEntry) AddRanking(ranking int) {
+	ote.AccessCount++
+	ote.SumRank += ranking
+	ote.SumSquaredRank += float64(ranking * ranking)
+}
+
+func (ote *OptimizedTraceableEntry) ComputeRank() {
+	// average
+	ote.ranking = float32(ote.SumRank) / float32(ote.AccessCount)
+	//ote.ranking99 = float32(-3.0*math.Sqrt(ote.SumSquaredRank/float64(ote.AccessCount)-float64(ote.SumRank)/float64(ote.AccessCount)) + float64(ote.ranking))
+}
+
+type ByHashSize []*OptimizedTraceableEntry
+
+func (bhs ByHashSize) Len() int {
+	return len(bhs)
+}
+
+func (bhs ByHashSize) Less(i, j int) bool {
+	if bhs[i].Digest != bhs[j].Digest {
+		return bhs[i].Digest < bhs[j].Digest
+	}
+	return bhs[i].Size < bhs[j].Size
+}
+
+func (bhs ByHashSize) Swap(i, j int) {
+	bhs[i], bhs[j] = bhs[j], bhs[i]
+}
+
+type ByRanking []*OptimizedTraceableEntry
+
+func (br ByRanking) Len() int {
+	return len(br)
+}
+
+func (br ByRanking) Less(i, j int) bool {
+	return br[i].ranking < br[j].ranking
+}
+
+func (br ByRanking) Swap(i, j int) {
+	br[i], br[j] = br[j], br[i]
+}
+
+type ByFilename []*OptimizedTraceableEntry
+
+func (bfn ByFilename) Len() int {
+	return len(bfn)
+}
+
+func (bfn ByFilename) Less(i, j int) bool {
+	if bfn[i].Name != bfn[j].Name {
+		return bfn[i].Name < bfn[j].Name
+	}
+	return bfn[i].SourceImage < bfn[j].SourceImage
+}
+
+func (bfn ByFilename) Swap(i, j int) {
+	bfn[i], bfn[j] = bfn[j], bfn[i]
+}
+
+//////////////////////////
 type TraceableEntry struct {
 	*estargz.TOCEntry
 
@@ -42,6 +131,9 @@ type TraceableEntry struct {
 	Chunks      []*estargz.TOCEntry `json:"chunks,omitempty"`
 	DeltaOffset *[]int64            `json:"df,omitempty"`
 
+	// UpdateMeta indicates whether this entry is just a metadata update.
+	// The content of the file is the same as the old one in the same layer (referring to the same image)
+	// If false, it means the content of the file has changed.
 	UpdateMeta int `json:"md,omitempty"`
 }
 

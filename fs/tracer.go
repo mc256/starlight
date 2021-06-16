@@ -144,18 +144,35 @@ type OptimizedTraceItem struct {
 	SourceImage int `json:"s"`
 }
 
+func (oti OptimizedTraceItem) Key() string {
+	return fmt.Sprintf("%d|%s", oti.SourceImage, oti.TraceItem.FileName)
+}
+
 type OptimizedGroup struct {
-	History    []*OptimizedTraceItem `json:"h"`
-	Images     []*util.ImageRef      `json:"i"`
-	standalone bool
+	History []*OptimizedTraceItem `json:"h"`
+	Images  []*util.ImageRef      `json:"i"`
 }
 
 type TraceCollection struct {
 	tracerMap map[string][]Tracer
-	groups    []*OptimizedGroup
+	Groups    []*OptimizedGroup
 }
 
-func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error) {
+func (tc TraceCollection) ToJsonBuffer() []byte {
+	buf, _ := json.Marshal(tc)
+	return buf
+}
+
+func NewTraceCollectionFromBuffer(buf []byte) (*TraceCollection, error) {
+	tc := &TraceCollection{}
+	err := json.Unmarshal(buf, tc)
+	if err != nil {
+		return nil, err
+	}
+	return tc, nil
+}
+
+func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error) {
 	pp := path.Join(p, "starlight-optimizer")
 	files, err := ioutil.ReadDir(pp)
 	if err != nil {
@@ -164,7 +181,7 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 
 	tc := &TraceCollection{
 		tracerMap: make(map[string][]Tracer),
-		groups:    make([]*OptimizedGroup, 0),
+		Groups:    make([]*OptimizedGroup, 0),
 	}
 
 	for _, f := range files {
@@ -200,15 +217,14 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 			for _, trace := range arr {
 				// Optimized group
 				g := &OptimizedGroup{
-					History:    make([]*OptimizedTraceItem, 0),
-					Images:     make([]*util.ImageRef, 0),
-					standalone: true,
+					History: make([]*OptimizedTraceItem, 0),
+					Images:  make([]*util.ImageRef, 0),
 				}
-				tc.groups = append(tc.groups, g)
+				tc.Groups = append(tc.Groups, g)
 
 				visited := make(map[string]bool)
 
-				g.Images = append(g.Images, &trace.Image)
+				g.Images = append(g.Images, trace.Image.DeepCopy())
 				for _, t := range trace.Seq {
 					if !visited[t.FileName] {
 						g.History = append(g.History, &OptimizedTraceItem{
@@ -231,11 +247,10 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 		} else {
 			// Optimized group
 			g := &OptimizedGroup{
-				History:    make([]*OptimizedTraceItem, 0),
-				Images:     make([]*util.ImageRef, 0),
-				standalone: false,
+				History: make([]*OptimizedTraceItem, 0),
+				Images:  make([]*util.ImageRef, 0),
 			}
-			tc.groups = append(tc.groups, g)
+			tc.Groups = append(tc.Groups, g)
 
 			// Find earliest timestamp
 			var starTime time.Time
@@ -247,10 +262,7 @@ func LoadTraceCollection(ctx context.Context, p string) (*TraceCollection, error
 						starTime = trace.StartTime
 					}
 				}
-				g.Images = append(g.Images, &util.ImageRef{
-					ImageName: trace.Image.ImageName,
-					ImageTag:  trace.Image.ImageTag,
-				})
+				g.Images = append(g.Images, trace.Image.DeepCopy())
 			}
 
 			sort.Sort(util.ByImageName(g.Images))

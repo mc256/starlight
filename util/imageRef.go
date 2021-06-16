@@ -32,6 +32,13 @@ func (i ImageRef) String() string {
 	return i.ImageName + ":" + i.ImageTag
 }
 
+func (i ImageRef) DeepCopy() *ImageRef {
+	return &ImageRef{
+		ImageName: i.ImageName,
+		ImageTag:  i.ImageTag,
+	}
+}
+
 type ByImageName []*ImageRef
 
 func (b ByImageName) Len() int {

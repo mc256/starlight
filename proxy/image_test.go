@@ -23,13 +23,118 @@ import (
 	"compress/gzip"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"io"
+	"io/ioutil"
 	"os"
+	"path"
 	"testing"
 )
+
+func TestAddOptimizeTrace(t *testing.T) {
+
+	// --------------------------------------------------------------
+	// Connect to database
+	ctx := util.ConfigLoggerWithLevel("trace")
+
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer db.Close()
+
+	// --------------------------------------------------------------
+	buf, err := ioutil.ReadFile(path.Join(os.TempDir(), "group-optimize.json"))
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	tc, err := fs.NewTraceCollectionFromBuffer(buf)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	for idx, grp := range tc.Groups {
+		log.G(ctx).WithField("collection", grp.Images)
+		fso, err := LoadCollection(ctx, db, grp.Images)
+		if err != nil {
+			t.Fatal(err)
+			return
+		}
+
+		fso.AddOptimizeTrace(grp)
+
+		if err = util.ExportToJsonFile(
+			fso,
+			path.Join(os.TempDir(), fmt.Sprintf("fso-table-%d.json", idx)),
+		); err != nil {
+			t.Fatal(err)
+			return
+		}
+
+		if err := fso.SaveMergedApp(); err != nil {
+			t.Fatal(err)
+			return
+		}
+	}
+
+	// --------------------------------------------------------------
+	// Build Collection
+
+}
+
+func TestPrepareMergedImage(t *testing.T) {
+	/*
+		"wordpress:5.7-apache-starlight"
+		"wordpress:php7.3-fpm-starlight"
+		"mariadb:10.4-starlight"
+		"mariadb:10.4-starlight"
+	*/
+	const (
+		ImageName         = "mariadb"
+		ImageTag          = "10.4-starlight"
+		ContainerRegistry = "http://10.219.31.214:5000"
+	)
+
+	// --------------------------------------------------------------
+	// Connect to database
+	ctx := util.ConfigLoggerWithLevel("trace")
+
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer db.Close()
+
+	// --------------------------------------------------------------
+	// Cache ToC
+	if err = CacheToc(ctx, db, ImageName, ImageTag, ContainerRegistry); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// --------------------------------------------------------------
+	// Add Image to file system simulator (Overlay Builder)
+	ob2 := merger.NewOverlayBuilder(ctx, db)
+	if err = ob2.AddImage(ImageName, ImageTag); err != nil {
+		t.Fatal(err)
+		return
+	}
+	// --------------------------------------------------------------
+	// Save merged image
+	err = ob2.SaveMergedImage()
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+}
 
 func TestOverlayToc(t *testing.T) {
 	const (
@@ -104,7 +209,7 @@ func TestOverlayToc(t *testing.T) {
 
 }
 
-func TestOverlayDelta(t *testing.T) {
+func TestDeltaToc(t *testing.T) {
 	const (
 		ImageName         = "ubuntu"
 		ImageTag          = "18.04-starlight"

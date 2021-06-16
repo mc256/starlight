@@ -82,6 +82,7 @@ func (a *StarlightProxyClient) getDeltaImage(w http.ResponseWriter, req *http.Re
 		}
 	}
 
+	// Consolidator
 	c := merger.NewConsolidator(a.ctx)
 	for imageName, t := range pool {
 		var err error
@@ -166,14 +167,15 @@ func (a *StarlightProxyClient) getPrepared(w http.ResponseWriter, req *http.Requ
 	return nil
 }
 
-func (a *StarlightProxyClient) getOptimize(w http.ResponseWriter, req *http.Request, group, imageName, imageTag string) error {
+func (a *StarlightProxyClient) getOptimize(w http.ResponseWriter, req *http.Request, group string) error {
 	// TODO: receive optimized information.
+	//_, _ = io.Copy(os.Stdout, req.Body)
 
 	header := w.Header()
 	header.Set("Content-Type", "text/plain")
 	header.Set("Starlight-Version", util.Version)
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "Optimize: %s | %s | %s \n", group, imageName, imageTag)
+	_, _ = fmt.Fprintf(w, "Optimize: %s \n", group)
 	return nil
 }
 
@@ -201,7 +203,7 @@ func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request
 		err = a.getPrepared(w, req, params[1])
 		break
 	case len(params) == 4 && params[0] == "optimize":
-		err = a.getOptimize(w, req, params[1], params[2], params[3])
+		err = a.getOptimize(w, req, params[1])
 		break
 	default:
 		a.getDefault(w, req)
