@@ -24,7 +24,7 @@ import (
 )
 
 func ExportToJsonFile(v interface{}, p string) error {
-	fh, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE, 0644)
+	fh, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE, 0644)
 	defer fh.Close()
 	if err != nil {
 		return err

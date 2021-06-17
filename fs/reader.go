@@ -276,16 +276,6 @@ func (ir *ImageReader) touchFile(wg *sync.WaitGroup) {
 	}
 }
 
-var (
-	superSuperHot = map[string]bool{
-		"etc/localtime":   true,
-		"etc/passwd":      true,
-		"etc/hosts":       true,
-		"etc/group":       true,
-		"etc/resolv.conf": true,
-	}
-)
-
 func (ir *ImageReader) printLog(fn, dir, base, ref, comment string) {
 	/*
 		if superSuperHot[fn] {

@@ -23,71 +23,13 @@ import (
 	"compress/gzip"
 	"fmt"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"os"
-	"path"
 	"testing"
 )
-
-func TestAddOptimizeTrace(t *testing.T) {
-
-	// --------------------------------------------------------------
-	// Connect to database
-	ctx := util.ConfigLoggerWithLevel("trace")
-
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	defer db.Close()
-
-	// --------------------------------------------------------------
-	buf, err := ioutil.ReadFile(path.Join(os.TempDir(), "group-optimize.json"))
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-
-	tc, err := fs.NewTraceCollectionFromBuffer(buf)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-
-	for idx, grp := range tc.Groups {
-		log.G(ctx).WithField("collection", grp.Images)
-		fso, err := LoadCollection(ctx, db, grp.Images)
-		if err != nil {
-			t.Fatal(err)
-			return
-		}
-
-		fso.AddOptimizeTrace(grp)
-
-		if err = util.ExportToJsonFile(
-			fso,
-			path.Join(os.TempDir(), fmt.Sprintf("fso-table-%d.json", idx)),
-		); err != nil {
-			t.Fatal(err)
-			return
-		}
-
-		if err := fso.SaveMergedApp(); err != nil {
-			t.Fatal(err)
-			return
-		}
-	}
-
-	// --------------------------------------------------------------
-	// Build Collection
-
-}
 
 func TestPrepareMergedImage(t *testing.T) {
 	/*

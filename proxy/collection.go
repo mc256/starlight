@@ -29,7 +29,26 @@ import (
 	"sort"
 )
 
+type OutputEntry struct {
+	Source       int   // maps to Consolidator.source
+	SourceOffset int64 // offset in the source layer
+
+	Offset         int64
+	CompressedSize int64
+}
+
+type OutputCollection struct {
+	Image                []*util.ImageRef            `json:"refs"`
+	Table                [][]*util.TraceableEntry    `json:"tables"`
+	Config               []string                    `json:"config"`
+	DigestList           []*util.TraceableBlobDigest `json:"digests"`
+	ImageDigestReference [][]int                     `json:"idr"`
+	Offsets              []int64                     `json:"offsets"`
+	outputQueue          []*OutputEntry
+}
+
 // Collection defines the operations between set of files
+// This data structure only use for data storage in the database
 type Collection struct {
 	ctx context.Context
 	db  *bolt.DB
@@ -43,6 +62,144 @@ type Collection struct {
 	// ImageDigestReference maps Collection.Images 's layers to the
 	// position in the Collection.DigestList.
 	ImageDigestReference [][]int `json:"idr"`
+}
+
+func (c *Collection) Minus(old *Collection) {
+	i, j := 0, 0
+	for {
+		if i >= len(c.Table) {
+			break
+		}
+		if j >= len(old.Table) {
+			break
+		}
+		want := c.Table[i]
+		have := old.Table[j]
+		res := util.CompareByFilename(want, have)
+		want.UpdateMeta = 0 // send file content by default
+
+		if res == 1 { // want < have
+			i++
+		} else if res == -1 { // want > have
+			j++
+		} else if res == 0 { // found the same file
+			if have.Digest == want.Digest {
+				if have.IsDataType() && have.Size > 0 {
+					want.UpdateMeta = 1
+					want.ConsolidatedSource = have.GetSourceLayer()
+				}
+			}
+
+			i++
+			j++
+		}
+	}
+}
+
+func (c *Collection) GetOutputQueue() (outputQueue []*OutputEntry, outputOffsets []int64, requiredLayers []bool) {
+	// Deduplicate
+	uniqueMap := make(map[string]*util.OptimizedTraceableEntries)
+	for _, ent := range c.Table {
+		if ent.IsDataType() && ent.Size > 0 {
+			if ent.UpdateMeta == 0 {
+				if m, ok := uniqueMap[ent.Digest]; ok {
+					m.List = append(m.List, ent)
+					r := ent.ComputeRank()
+					if r < m.Ranking {
+						m.Ranking = r
+					}
+				} else {
+					uniqueMap[ent.Digest] = &util.OptimizedTraceableEntries{
+						List:    []*util.OptimizedTraceableEntry{ent},
+						Ranking: ent.ComputeRank(),
+					}
+				}
+			}
+		}
+	}
+
+	// Sort
+	uniqueList := make([]*util.OptimizedTraceableEntries, 0, len(uniqueMap))
+	for _, v := range uniqueMap {
+		uniqueList = append(uniqueList, v)
+	}
+	sort.Sort(util.ByRanking(uniqueList))
+
+	// Output Queue
+	requiredLayers = make([]bool, len(c.DigestList))
+
+	// Update offsets in the entries
+	offset := int64(0)
+	for _, v := range uniqueList {
+		prevOffset := offset
+		sample := v.List[0]
+
+		// Update the offset to match the output queue
+		// There might be multiple chunks, therefore we have to calculate
+		// the sum of chunks
+		// ---|------------------|--------------------
+		//    ^ prevOffset       ^ offset
+		var offsets []int64
+		if sample.HasChunk() { // multiple parts
+			offsets = make([]int64, len(sample.Chunks))
+			for i, c := range sample.Chunks {
+				offsets[i] = offset
+				offset += c.CompressedSize
+			}
+		} else { // single part
+			offsets = []int64{offset}
+			offset += sample.CompressedSize
+		}
+		sample.SetDeltaOffset(&offsets)
+		requiredLayers[sample.GetSourceLayer()] = true
+
+		// push to output queue
+		outputEnt := &OutputEntry{
+			Source:         sample.GetSourceLayer(),
+			SourceOffset:   sample.Offset,
+			Offset:         prevOffset,
+			CompressedSize: offset - prevOffset,
+		}
+
+		outputQueue = append(outputQueue, outputEnt)
+
+		// set offset for the rest of entries
+		// point the reference to the first one.
+		for i := 1; i < len(v.List); i++ {
+			ent := v.List[i]
+
+			// offset
+			ent.SetDeltaOffset(&offsets)
+
+			// update meta data
+			ent.ChunkSize = sample.ChunkSize
+			ent.CompressedSize = sample.CompressedSize
+			ent.Offset = sample.Offset
+			if sample.GetSourceLayer() != ent.GetSourceLayer() {
+				ent.ConsolidatedSource = sample.GetSourceLayer()
+			} // same file might appear multiple times in the same layer
+
+			// update chunk information
+			if ent.Chunks != nil {
+				for i, c := range ent.Chunks {
+					c.Digest = ""
+					c.Offset = sample.Chunks[i].Offset
+					c.ChunkOffset = sample.Chunks[i].ChunkOffset
+					c.ChunkSize = sample.Chunks[i].ChunkSize
+					c.ChunkDigest = sample.Chunks[i].ChunkDigest
+					c.CompressedSize = sample.Chunks[i].CompressedSize
+				}
+			}
+		}
+
+		outputOffsets = append(outputOffsets, prevOffset)
+	}
+
+	return
+}
+
+func (c *Collection) GetClientFsTemplates(outputQueue []*OutputEntry, outputOffsets []int64) {
+
 }
 
 func (c *Collection) AddOptimizeTrace(opt *fs.OptimizedGroup) {
@@ -68,8 +225,6 @@ func (c *Collection) SaveMergedApp() error {
 	if err != nil {
 		return err
 	}
-	_ = tx.DeleteBucket([]byte(util.ByImageName(c.Images).String()))
-
 	buf, err := json.Marshal(c)
 	if err != nil {
 		return err
@@ -79,6 +234,20 @@ func (c *Collection) SaveMergedApp() error {
 		return err
 	}
 	return nil
+}
+
+func (c *Collection) RemoveMergedApp() error {
+	tx, err := c.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Commit()
+
+	store, err := tx.CreateBucketIfNotExists([]byte("collection"))
+	if err != nil {
+		return err
+	}
+	return store.Delete([]byte(util.ByImageName(c.Images).String()))
 }
 
 func newCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef) (*Collection, error) {
@@ -157,12 +326,12 @@ func LoadCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef
 	if store == nil {
 		return newCollection(ctx, db, imageList)
 	}
-
-	log.G(ctx).WithField("collection", util.ByImageName(imageList).String()).Info("load collection from db")
 	buf := store.Get([]byte(util.ByImageName(imageList).String()))
 	if buf == nil {
 		return newCollection(ctx, db, imageList)
 	}
+
+	log.G(ctx).WithField("collection", util.ByImageName(imageList).String()).Info("load collection from db")
 	c := &Collection{}
 	err = json.Unmarshal(buf, c)
 	if err != nil {
@@ -170,6 +339,10 @@ func LoadCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef
 	}
 	c.ctx = ctx
 	c.db = db
+
+	for _, ent := range c.Table {
+		ent.SetSourceLayer(ent.Source)
+	}
 
 	return c, nil
 }

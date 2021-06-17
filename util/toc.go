@@ -22,8 +22,40 @@ import (
 	"fmt"
 	"github.com/mc256/stargz-snapshotter/estargz"
 	"github.com/opencontainers/go-digest"
+	"math"
 )
 
+type OptimizedTraceableEntries struct {
+	List    []*OptimizedTraceableEntry
+	Ranking float64
+}
+
+type ByRanking []*OptimizedTraceableEntries
+
+func (br ByRanking) Len() int {
+	return len(br)
+}
+
+func (br ByRanking) Less(i, j int) bool {
+	nani := math.IsNaN(br[i].Ranking)
+	nanj := math.IsNaN(br[j].Ranking)
+	if nani && nanj {
+		return false
+	}
+	if nani {
+		return false
+	}
+	if nanj {
+		return true
+	}
+	return br[i].Ranking < br[j].Ranking
+}
+
+func (br ByRanking) Swap(i, j int) {
+	br[i], br[j] = br[j], br[i]
+}
+
+////////////////////////////////////////////////////
 type OptimizedTraceableEntry struct {
 	*TraceableEntry
 
@@ -44,7 +76,7 @@ type OptimizedTraceableEntry struct {
 
 	// -------------------------------------
 	// Statics populated after initialization
-	ranking float32
+	//ranking float32
 	//ranking99 float32
 }
 
@@ -58,10 +90,11 @@ func (ote *OptimizedTraceableEntry) AddRanking(ranking int) {
 	ote.SumSquaredRank += float64(ranking * ranking)
 }
 
-func (ote *OptimizedTraceableEntry) ComputeRank() {
+func (ote *OptimizedTraceableEntry) ComputeRank() float64 {
 	// average
-	ote.ranking = float32(ote.SumRank) / float32(ote.AccessCount)
+	ranking := float64(ote.SumRank) / float64(ote.AccessCount)
 	//ote.ranking99 = float32(-3.0*math.Sqrt(ote.SumSquaredRank/float64(ote.AccessCount)-float64(ote.SumRank)/float64(ote.AccessCount)) + float64(ote.ranking))
+	return ranking
 }
 
 type ByHashSize []*OptimizedTraceableEntry
@@ -81,20 +114,6 @@ func (bhs ByHashSize) Swap(i, j int) {
 	bhs[i], bhs[j] = bhs[j], bhs[i]
 }
 
-type ByRanking []*OptimizedTraceableEntry
-
-func (br ByRanking) Len() int {
-	return len(br)
-}
-
-func (br ByRanking) Less(i, j int) bool {
-	return br[i].ranking < br[j].ranking
-}
-
-func (br ByRanking) Swap(i, j int) {
-	br[i], br[j] = br[j], br[i]
-}
-
 type ByFilename []*OptimizedTraceableEntry
 
 func (bfn ByFilename) Len() int {
@@ -112,7 +131,25 @@ func (bfn ByFilename) Swap(i, j int) {
 	bfn[i], bfn[j] = bfn[j], bfn[i]
 }
 
-//////////////////////////
+func CompareByFilename(a, b *OptimizedTraceableEntry) int {
+	if a.Name != b.Name {
+		if a.Name < b.Name {
+			return 1
+		} else {
+			return -1
+		}
+	} else if a.SourceImage != b.SourceImage {
+		if a.SourceImage < b.SourceImage {
+			return 1
+		} else {
+			return -1
+		}
+	} else {
+		return 0
+	}
+}
+
+////////////////////////////////////////////////////
 type TraceableEntry struct {
 	*estargz.TOCEntry
 
@@ -132,7 +169,8 @@ type TraceableEntry struct {
 	DeltaOffset *[]int64            `json:"df,omitempty"`
 
 	// UpdateMeta indicates whether this entry is just a metadata update.
-	// The content of the file is the same as the old one in the same layer (referring to the same image)
+	// The content of the file is the same as the old one in the same layer
+	// (referring to the same image)
 	// If false, it means the content of the file has changed.
 	UpdateMeta int `json:"md,omitempty"`
 }
@@ -184,6 +222,10 @@ func (t *TraceableEntry) SetSourceLayer(d int) {
 	t.Source = d
 }
 
+// GetSourceLayer get the source layer from the entry.
+// WARNING: if you get load this object from a JSON serialized source (e.g. database), it might
+// not give you the correct information because TOCEntry.sourceLayer is not exported. Please
+// use TraceableEntry.Source instead
 func (t *TraceableEntry) GetSourceLayer() int {
 	t.Source = t.TOCEntry.GetSourceLayer()
 	return t.TOCEntry.GetSourceLayer()

@@ -398,7 +398,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 
 		ov.EntryMap[name] = ent
 
-		ent.SetSourceLayer(ent.Source)
+		ent.SetSourceLayer(ent.Source) // VERY IMPORTANT
 		return err
 	})
 	if err != nil {
