@@ -26,43 +26,8 @@ import (
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	bolt "go.etcd.io/bbolt"
-	"io"
 	"sort"
 )
-
-type OutputEntry struct {
-	Source       int   // maps to Consolidator.source
-	SourceOffset int64 // offset in the source layer
-
-	Offset         int64
-	CompressedSize int64
-}
-
-type OutputCollection struct {
-	Image                []*util.ImageRef            `json:"refs"`
-	Table                [][]*util.TraceableEntry    `json:"tables"`
-	Config               []string                    `json:"config"`
-	DigestList           []*util.TraceableBlobDigest `json:"digests"`
-	ImageDigestReference [][]int                     `json:"idr"`
-	Offsets              []int64                     `json:"offsets"`
-	outputQueue          []*OutputEntry
-
-	// requiredLayer index starts from 1 not 0
-	requiredLayer []bool
-}
-
-func (oc OutputCollection) Json() (buf []byte) {
-	buf, _ = json.Marshal(oc)
-	return
-}
-
-func (oc OutputCollection) Write(w io.Writer, beautify bool) error {
-	encoder := json.NewEncoder(w)
-	if beautify {
-		encoder.SetIndent("", "\t")
-	}
-	return encoder.Encode(oc)
-}
 
 // Collection defines the operations between set of files
 // This data structure only use for data storage in the database
@@ -74,6 +39,7 @@ type Collection struct {
 
 	Table []*util.OptimizedTraceableEntry `json:"t"`
 
+	// DigestList starting from 0
 	DigestList []*util.TraceableBlobDigest `json:"dl"`
 
 	// ImageDigestReference maps Collection.Images 's layers to the
@@ -84,6 +50,7 @@ type Collection struct {
 }
 
 func (c *Collection) Minus(old *Collection) {
+	shift := len(c.DigestList)
 	i, j := 0, 0
 	for {
 		if i >= len(c.Table) {
@@ -105,7 +72,7 @@ func (c *Collection) Minus(old *Collection) {
 			if have.Digest == want.Digest {
 				if have.IsDataType() && have.Size > 0 {
 					want.UpdateMeta = 1
-					want.ConsolidatedSource = have.GetSourceLayer()
+					want.ConsolidatedSource = have.GetSourceLayer() + shift
 				}
 			}
 
@@ -113,9 +80,11 @@ func (c *Collection) Minus(old *Collection) {
 			j++
 		}
 	}
+
+	c.DigestList = append(c.DigestList, old.DigestList...)
 }
 
-func (c *Collection) getOutputQueue() (outputQueue []*OutputEntry, outputOffsets []int64, requiredLayers []bool) {
+func (c *Collection) getOutputQueue() (outputQueue []*util.OutputEntry, outputOffsets []int64, requiredLayers []bool) {
 	// Deduplicate
 	uniqueMap := make(map[string]*util.OptimizedTraceableEntries)
 	for _, ent := range c.Table {
@@ -173,7 +142,7 @@ func (c *Collection) getOutputQueue() (outputQueue []*OutputEntry, outputOffsets
 		requiredLayers[sample.GetSourceLayer()] = true
 
 		// push to output queue
-		outputEnt := &OutputEntry{
+		outputEnt := &util.OutputEntry{
 			Source:         sample.GetSourceLayer(),
 			SourceOffset:   sample.Offset,
 			Offset:         prevOffset,
@@ -225,17 +194,17 @@ func (c *Collection) getClientFsTemplates() [][]*util.TraceableEntry {
 	return pool
 }
 
-func (c *Collection) ComposeDeltaBundle() (out *OutputCollection) {
+func (c *Collection) ComposeDeltaBundle() (out *util.OutputCollection) {
 	outQueue, outOffsets, requiredLayer := c.getOutputQueue()
-	out = &OutputCollection{
+	out = &util.OutputCollection{
 		Image:                c.Images,
 		Table:                c.getClientFsTemplates(),
 		Config:               c.Configs,
 		DigestList:           c.DigestList,
 		ImageDigestReference: c.ImageDigestReference,
 		Offsets:              outOffsets,
-		outputQueue:          outQueue,
-		requiredLayer:        requiredLayer,
+		OutputQueue:          outQueue,
+		RequiredLayer:        requiredLayer,
 	}
 
 	return

@@ -19,6 +19,7 @@
 package util
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -26,6 +27,10 @@ import (
 type ImageRef struct {
 	ImageName string `json:"n"`
 	ImageTag  string `json:"t"`
+}
+
+func (i ImageRef) JsonConfigFile() string {
+	return fmt.Sprintf("%s_%s.json", i.ImageName, i.ImageTag)
 }
 
 func (i ImageRef) String() string {
