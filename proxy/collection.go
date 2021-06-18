@@ -72,7 +72,7 @@ func (c *Collection) Minus(old *Collection) {
 			if have.Digest == want.Digest {
 				if have.IsDataType() && have.Size > 0 {
 					want.UpdateMeta = 1
-					want.ConsolidatedSource = have.GetSourceLayer() + shift
+					want.SetSourceLayer(have.GetSourceLayer() + shift)
 				}
 			}
 

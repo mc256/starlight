@@ -89,7 +89,7 @@ func (s *SnapshotterService) PrepareDeltaImage(fromImages, toImages string) erro
 	return nil
 }
 
-func (s *SnapshotterService) PrepareContainerSnapshot(name, tag, acceleratedImages string, temperature int, optimize bool, optimizeGroup string) (sn string, mnt []mount.Mount, err error) {
+func (s *SnapshotterService) PrepareContainerSnapshot(name, tag, acceleratedImages string, optimize bool, optimizeGroup string) (sn string, mnt []mount.Mount, err error) {
 	arrAcc := strings.Split(acceleratedImages, ",")
 	sort.Strings(arrAcc)
 	acceleratedImages = strings.Join(arrAcc, ",")
@@ -97,9 +97,8 @@ func (s *SnapshotterService) PrepareContainerSnapshot(name, tag, acceleratedImag
 	accelerated := fmt.Sprintf("accelerated(%s)-XXXXXX", acceleratedImages)
 
 	labels := map[string]string{
-		util.ImageNameLabel:  name,
-		util.ImageTagLabel:   tag,
-		util.CheckpointLabel: fmt.Sprintf("v%d", temperature),
+		util.ImageNameLabel: name,
+		util.ImageTagLabel:  tag,
 	}
 	if optimize {
 		labels[util.OptimizeLabel] = "True"

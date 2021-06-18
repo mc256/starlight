@@ -24,13 +24,6 @@ import (
 
 var (
 	StarlightFlags = []cli.Flag{
-		&cli.IntFlag{
-			Name:     "start-checkpoint",
-			Aliases:  []string{"cp"},
-			Usage:    "wait until a specific checkpoint  (0 will start the container immediately and likely block on IO)",
-			Value:    0,
-			Required: false,
-		},
 		&cli.BoolFlag{
 			Name:     "optimize",
 			Usage:    "collect workload information to optimize deployment speed for other peers",

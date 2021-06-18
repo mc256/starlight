@@ -21,7 +21,6 @@ package util
 const (
 	ImageNameLabel     = "containerd.io/snapshot/remote/starlight/imageName.label"
 	ImageTagLabel      = "containerd.io/snapshot/remote/starlight/imageTag.label"
-	CheckpointLabel    = "containerd.io/snapshot/remote/starlight/checkpoint.label"
 	OptimizeLabel      = "containerd.io/snapshot/remote/starlight/optimize.label"
 	OptimizeGroupLabel = "containerd.io/snapshot/remote/starlight/optimizeGroup.label"
 	ImageMediaType     = "application/vnd.mc256.starlight.toc.json"
