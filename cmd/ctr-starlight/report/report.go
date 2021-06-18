@@ -39,6 +39,7 @@ func Action(c *cli.Context) error {
 	if err := proxy.Report(tc.ToJsonBuffer()); err != nil {
 		return err
 	}
+
 	return nil
 }
 

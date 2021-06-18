@@ -26,6 +26,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 )
 
@@ -65,7 +66,8 @@ func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	builder := NewBuilder(ctx, ContainerRegistry)
 	out := bytes.NewBuffer([]byte{})
 
-	headerSize, contentSize, err := builder.WriteHeader(out, deltaBundle, true)
+	wg := &sync.WaitGroup{}
+	headerSize, contentSize, err := builder.WriteHeader(out, deltaBundle, wg, true)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -116,8 +118,8 @@ func TestDeltaBundleBuilder_WriteBodyPre(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
-
-	headerSize, contentSize, err := builder.WriteHeader(f, deltaBundle, false)
+	wg := &sync.WaitGroup{}
+	headerSize, contentSize, err := builder.WriteHeader(f, deltaBundle, wg, false)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -126,7 +128,7 @@ func TestDeltaBundleBuilder_WriteBodyPre(t *testing.T) {
 	log.G(ctx).WithField("header-size", headerSize).Info("header size")
 	log.G(ctx).WithField("content-size", contentSize).Info("content size")
 
-	err = builder.WriteBody(f, deltaBundle)
+	err = builder.WriteBody(f, deltaBundle, wg)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -175,7 +177,8 @@ func TestDeltaBundleBuilder_WriteBody(t *testing.T) {
 		return
 	}
 
-	headerSize, contentSize, err := builder.WriteHeader(f, deltaBundle, false)
+	wg := &sync.WaitGroup{}
+	headerSize, contentSize, err := builder.WriteHeader(f, deltaBundle, wg, false)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -184,7 +187,7 @@ func TestDeltaBundleBuilder_WriteBody(t *testing.T) {
 	log.G(ctx).WithField("header-size", headerSize).Info("header size")
 	log.G(ctx).WithField("content-size", contentSize).Info("content size")
 
-	err = builder.WriteBody(f, deltaBundle)
+	err = builder.WriteBody(f, deltaBundle, wg)
 	if err != nil {
 		t.Fatal(err)
 		return

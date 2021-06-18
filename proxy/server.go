@@ -84,7 +84,9 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 	deltaBundle := cTo.ComposeDeltaBundle()
 
 	buf := bytes.NewBuffer(make([]byte, 0))
-	headerSize, contentLength, err := a.builder.WriteHeader(buf, deltaBundle, false)
+	wg := &sync.WaitGroup{}
+
+	headerSize, contentLength, err := a.builder.WriteHeader(buf, deltaBundle, wg, false)
 	if err != nil {
 		log.G(a.ctx).WithField("err", err).Error("write header cache")
 		return nil
@@ -103,7 +105,7 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 		return nil
 	}
 
-	if err = a.builder.WriteBody(w, deltaBundle); err != nil {
+	if err = a.builder.WriteBody(w, deltaBundle, wg); err != nil {
 		log.G(a.ctx).WithField("err", err).Error("write body error")
 		return nil
 	}

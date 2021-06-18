@@ -172,6 +172,10 @@ func NewTraceCollectionFromBuffer(buf []byte) (*TraceCollection, error) {
 	return tc, nil
 }
 
+func clearTraceCollection(f string) error {
+	return os.Remove(f)
+}
+
 func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error) {
 	pp := path.Join(p, "starlight-optimizer")
 	files, err := ioutil.ReadDir(pp)
@@ -203,6 +207,8 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 				"group": t.OptimizeGroup,
 				"image": t.Image,
 			}).Info("parsed file")
+
+			_ = clearTraceCollection(path.Join(pp, f.Name()))
 
 			if _, ok := tc.tracerMap[t.OptimizeGroup]; ok {
 				tc.tracerMap[t.OptimizeGroup] = append(tc.tracerMap[t.OptimizeGroup], t)

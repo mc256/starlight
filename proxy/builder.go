@@ -35,7 +35,7 @@ import (
 
 type layerReader struct {
 	*io.SectionReader
-	ready chan bool
+	//ready chan bool
 }
 
 type DeltaBundleBuilder struct {
@@ -50,11 +50,12 @@ type DeltaBundleBuilder struct {
 	client http.Client
 }
 
-func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *util.ProtocolTemplate) (err error) {
+func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *util.ProtocolTemplate, wg *sync.WaitGroup) (err error) {
+	wg.Wait()
+
 	readers := make([]*io.SectionReader, len(c.DigestList)+1)
 	for i, d := range c.DigestList {
 		if c.RequiredLayer[i+1] {
-			<-ib.layerReaders[d.Digest.String()].ready
 			readers[i+1] = ib.layerReaders[d.Digest.String()].SectionReader
 		}
 	}
@@ -81,10 +82,12 @@ func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *util.ProtocolTemplate) (
 	return nil
 }
 
-func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *util.ProtocolTemplate, beautified bool) (headerSize int64, contentLength int64, err error) {
+func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *util.ProtocolTemplate, wg *sync.WaitGroup, beautified bool) (headerSize int64, contentLength int64, err error) {
+
 	for i, d := range c.DigestList {
 		if c.RequiredLayer[i+1] {
-			ib.fetchLayer(d.ImageName, d.Digest.String())
+			wg.Add(1)
+			ib.fetchLayer(d.ImageName, d.Digest.String(), wg)
 		}
 	}
 
@@ -111,7 +114,7 @@ func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *util.ProtocolTemplate,
 	return headerSize, contentLength, nil
 }
 
-func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string) {
+func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string, wg *sync.WaitGroup) {
 	skip := false
 	func() {
 		ib.layerReadersLock.Lock()
@@ -119,10 +122,10 @@ func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string) {
 
 		if _, ok := ib.layerReaders[digest]; ok {
 			skip = true
+			wg.Done()
 		}
 		ib.layerReaders[digest] = &layerReader{
 			SectionReader: nil,
-			ready:         make(chan bool, 1),
 		}
 	}()
 	if skip {
@@ -167,8 +170,14 @@ func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string) {
 			return
 		}
 
-		ib.layerReaders[digest].SectionReader = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, length)
-		close(ib.layerReaders[digest].ready)
+		func() {
+			ib.layerReadersLock.Lock()
+			defer ib.layerReadersLock.Unlock()
+
+			ib.layerReaders[digest].SectionReader = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, length)
+			wg.Done()
+		}()
+
 	}()
 }
 
