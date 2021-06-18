@@ -33,18 +33,13 @@ import (
 	"time"
 )
 
-type layerReader struct {
-	*io.SectionReader
-	//ready chan bool
-}
-
 type DeltaBundleBuilder struct {
 	ctx      context.Context
 	registry string
 
 	// layerReaders stores the layer needed to build the delta bundle
 	// key is only the digest (no image name)
-	layerReaders     map[string]*layerReader
+	layerReaders     map[string]*io.SectionReader
 	layerReadersLock sync.Mutex
 
 	client http.Client
@@ -53,22 +48,19 @@ type DeltaBundleBuilder struct {
 func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *util.ProtocolTemplate, wg *sync.WaitGroup) (err error) {
 	wg.Wait()
 
-	readers := make([]*io.SectionReader, len(c.DigestList)+1)
+	readers := make(map[int]*io.SectionReader, len(c.DigestList)+1)
 	for i, d := range c.DigestList {
 		if c.RequiredLayer[i+1] {
-			readers[i+1] = ib.layerReaders[d.Digest.String()].SectionReader
+			readers[i+1] = ib.layerReaders[d.Digest.String()]
 		}
 	}
 	for _, ent := range c.OutputQueue {
+		log.G(ib.ctx).WithFields(logrus.Fields{
+			"offset": ent.SourceOffset,
+			"length": ent.CompressedSize,
+			"source": ent.Source,
+		}).Trace("request range")
 		sr := io.NewSectionReader(readers[ent.Source], ent.SourceOffset, ent.CompressedSize)
-
-		/*
-			log.G(ib.ctx).WithFields(logrus.Fields{
-				"offset": ent.SourceOffset,
-				"length": ent.CompressedSize,
-				"source": ent.Source,
-			}).Trace("request range")
-		*/
 
 		_, err := io.CopyN(w, sr, ent.CompressedSize)
 		if err != nil {
@@ -124,9 +116,6 @@ func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string, wg *sync.Wait
 			skip = true
 			wg.Done()
 		}
-		ib.layerReaders[digest] = &layerReader{
-			SectionReader: nil,
-		}
 	}()
 	if skip {
 		return
@@ -174,7 +163,7 @@ func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string, wg *sync.Wait
 			ib.layerReadersLock.Lock()
 			defer ib.layerReadersLock.Unlock()
 
-			ib.layerReaders[digest].SectionReader = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, length)
+			ib.layerReaders[digest] = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, length)
 			wg.Done()
 		}()
 
@@ -185,7 +174,7 @@ func NewBuilder(ctx context.Context, registry string) *DeltaBundleBuilder {
 	ib := &DeltaBundleBuilder{
 		ctx:              ctx,
 		registry:         registry,
-		layerReaders:     make(map[string]*layerReader, 0),
+		layerReaders:     make(map[string]*io.SectionReader, 0),
 		layerReadersLock: sync.Mutex{},
 		client:           http.Client{},
 	}
