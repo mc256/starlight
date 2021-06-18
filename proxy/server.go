@@ -19,6 +19,7 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
@@ -27,6 +28,7 @@ import (
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -46,7 +48,7 @@ type StarlightProxyServer struct {
 
 	containerRegistry string
 
-	ib *DeltaBundleBuilder
+	builder *DeltaBundleBuilder
 }
 
 func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
@@ -79,32 +81,32 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 		cTo.Minus(cFrom)
 	}
 
-	/*
-		buf := bytes.NewBuffer(make([]byte, 0))
-		headerSize, contentLength, err := ib.WriteHeader(buf, false)
-		if err != nil {
-			log.G(a.ctx).WithField("err", err).Error("write header cache")
-			return nil
-		}
+	deltaBundle := cTo.ComposeDeltaBundle()
 
-		header := w.Header()
-		header.Set("Content-Type", "application/octet-stream")
-		header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
-		header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
-		header.Set("Starlight-Version", util.Version)
-		header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
-		w.WriteHeader(http.StatusOK)
+	buf := bytes.NewBuffer(make([]byte, 0))
+	headerSize, contentLength, err := a.builder.WriteHeader(buf, deltaBundle, false)
+	if err != nil {
+		log.G(a.ctx).WithField("err", err).Error("write header cache")
+		return nil
+	}
 
-		if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
-			log.G(a.ctx).WithField("err", err).Error("write header error")
-			return nil
-		}
+	header := w.Header()
+	header.Set("Content-Type", "application/octet-stream")
+	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
+	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
+	header.Set("Starlight-Version", util.Version)
+	header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
+	w.WriteHeader(http.StatusOK)
 
-		if err = ib.WriteBody(w); err != nil {
-			log.G(a.ctx).WithField("err", err).Error("write body error")
-			return nil
-		}
-	*/
+	if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
+		log.G(a.ctx).WithField("err", err).Error("write header error")
+		return nil
+	}
+
+	if err = a.builder.WriteBody(w, deltaBundle); err != nil {
+		log.G(a.ctx).WithField("err", err).Error("write body error")
+		return nil
+	}
 
 	return nil
 }
@@ -236,7 +238,7 @@ func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxySer
 		database:          db,
 		ctx:               ctx,
 		containerRegistry: registry,
-		ib:                NewBuilder(ctx, registry),
+		builder:           NewBuilder(ctx, registry),
 	}
 	http.HandleFunc("/", server.rootFunc)
 
