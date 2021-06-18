@@ -71,7 +71,7 @@ type OptimizedTraceableEntry struct {
 	AccessCount int `json:"ac,omitempty"`
 	// SumRank
 	SumRank int `json:"sr,omitempty"`
-	// SumRankSquare
+	// SumSquaredRank
 	SumSquaredRank float64 `json:"sr2,omitempty"`
 
 	// -------------------------------------
@@ -93,7 +93,10 @@ func (ote *OptimizedTraceableEntry) AddRanking(ranking int) {
 func (ote *OptimizedTraceableEntry) ComputeRank() float64 {
 	// average
 	ranking := float64(ote.SumRank) / float64(ote.AccessCount)
-	//ote.ranking99 = float32(-3.0*math.Sqrt(ote.SumSquaredRank/float64(ote.AccessCount)-float64(ote.SumRank)/float64(ote.AccessCount)) + float64(ote.ranking))
+	//ex := float64(ote.SumRank)/float64(ote.AccessCount)
+	//ote.ranking99 = float64(
+	//	-3.0*math.Sqrt(ote.SumSquaredRank/float64(ote.AccessCount)- ex * ex)
+	//	+ float64(ote.ranking))
 	return ranking
 }
 

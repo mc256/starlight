@@ -55,7 +55,7 @@ type Overlay struct {
 	ImageName string `json:"-"`
 	ImageTag  string `json:"-"`
 
-	config []byte
+	Config []byte `json:"-"`
 }
 
 // ExportTOC writes the TOC in json to a writer
@@ -296,7 +296,7 @@ func (ov *Overlay) AddImage(imageName, imageTag string) error {
 	}
 
 	// Load Config
-	ov.config = bucket.Get([]byte("config"))
+	ov.Config = bucket.Get([]byte("config"))
 
 	return nil
 }
@@ -438,7 +438,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 	}
 
 	// Load Config
-	ov.config = bucket.Get([]byte("config"))
+	ov.Config = bucket.Get([]byte("config"))
 
 	return ov, nil
 }

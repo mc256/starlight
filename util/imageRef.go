@@ -39,6 +39,22 @@ func (i ImageRef) DeepCopy() *ImageRef {
 	}
 }
 
+func NewImageRef(s string) ([]*ImageRef, error) {
+	arr := strings.Split(s, ",")
+	out := make([]*ImageRef, 0, len(arr))
+	for _, is := range arr {
+		imgArr := strings.Split(is, ":")
+		if len(imgArr) != 2 || strings.Trim(imgArr[0], " ") == "" || strings.Trim(imgArr[1], " ") == "" {
+			return nil, ErrWrongImageFormat
+		}
+		out = append(out, &ImageRef{
+			ImageName: imgArr[0],
+			ImageTag:  imgArr[1],
+		})
+	}
+	return out, nil
+}
+
 type ByImageName []*ImageRef
 
 func (b ByImageName) Len() int {

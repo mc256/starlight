@@ -26,6 +26,7 @@ import (
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	bolt "go.etcd.io/bbolt"
+	"io"
 	"sort"
 )
 
@@ -45,6 +46,22 @@ type OutputCollection struct {
 	ImageDigestReference [][]int                     `json:"idr"`
 	Offsets              []int64                     `json:"offsets"`
 	outputQueue          []*OutputEntry
+
+	// requiredLayer index starts from 1 not 0
+	requiredLayer []bool
+}
+
+func (oc OutputCollection) Json() (buf []byte) {
+	buf, _ = json.Marshal(oc)
+	return
+}
+
+func (oc OutputCollection) Write(w io.Writer, beautify bool) error {
+	encoder := json.NewEncoder(w)
+	if beautify {
+		encoder.SetIndent("", "\t")
+	}
+	return encoder.Encode(oc)
 }
 
 // Collection defines the operations between set of files
@@ -62,6 +79,8 @@ type Collection struct {
 	// ImageDigestReference maps Collection.Images 's layers to the
 	// position in the Collection.DigestList.
 	ImageDigestReference [][]int `json:"idr"`
+
+	Configs []string `json:"cfg"`
 }
 
 func (c *Collection) Minus(old *Collection) {
@@ -96,7 +115,7 @@ func (c *Collection) Minus(old *Collection) {
 	}
 }
 
-func (c *Collection) GetOutputQueue() (outputQueue []*OutputEntry, outputOffsets []int64, requiredLayers []bool) {
+func (c *Collection) getOutputQueue() (outputQueue []*OutputEntry, outputOffsets []int64, requiredLayers []bool) {
 	// Deduplicate
 	uniqueMap := make(map[string]*util.OptimizedTraceableEntries)
 	for _, ent := range c.Table {
@@ -126,7 +145,7 @@ func (c *Collection) GetOutputQueue() (outputQueue []*OutputEntry, outputOffsets
 	sort.Sort(util.ByRanking(uniqueList))
 
 	// Output Queue
-	requiredLayers = make([]bool, len(c.DigestList))
+	requiredLayers = make([]bool, len(c.DigestList)+1)
 
 	// Update offsets in the entries
 	offset := int64(0)
@@ -194,12 +213,32 @@ func (c *Collection) GetOutputQueue() (outputQueue []*OutputEntry, outputOffsets
 
 		outputOffsets = append(outputOffsets, prevOffset)
 	}
-
+	outputOffsets = append(outputOffsets, offset) // last one is the content-length
 	return
 }
 
-func (c *Collection) GetClientFsTemplates(outputQueue []*OutputEntry, outputOffsets []int64) {
+func (c *Collection) getClientFsTemplates() [][]*util.TraceableEntry {
+	pool := make([][]*util.TraceableEntry, len(c.Images))
+	for _, ent := range c.Table {
+		pool[ent.SourceImage] = append(pool[ent.SourceImage], ent.TraceableEntry)
+	}
+	return pool
+}
 
+func (c *Collection) ComposeDeltaBundle() (out *OutputCollection) {
+	outQueue, outOffsets, requiredLayer := c.getOutputQueue()
+	out = &OutputCollection{
+		Image:                c.Images,
+		Table:                c.getClientFsTemplates(),
+		Config:               c.Configs,
+		DigestList:           c.DigestList,
+		ImageDigestReference: c.ImageDigestReference,
+		Offsets:              outOffsets,
+		outputQueue:          outQueue,
+		requiredLayer:        requiredLayer,
+	}
+
+	return
 }
 
 func (c *Collection) AddOptimizeTrace(opt *fs.OptimizedGroup) {
@@ -262,10 +301,12 @@ func newCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef)
 		Table:                make([]*util.OptimizedTraceableEntry, 0),
 		DigestList:           make([]*util.TraceableBlobDigest, 0),
 		ImageDigestReference: make([][]int, 0),
+		Configs:              make([]string, 0),
 	}
 
+	// digestMap indexes starting from Zero therefore we need to add 1
 	digestMap := make(map[string]int, 0)
-	for siidx, img := range imageList {
+	for sourceIdx, img := range imageList {
 		// load merged images
 		overlay, err := merger.LoadMergedImage(ctx, db, img.ImageName, img.ImageTag)
 		if err != nil {
@@ -273,19 +314,20 @@ func newCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef)
 		}
 
 		c.Images = append(c.Images, img.DeepCopy())
-		layerRef := make([]int, 0)
+		layerRef := make([]int, 1, 1)
 
 		// layer mapping
 		layerUpdateMap := make(map[int]int, 0)
 		layerUpdateMap[-1] = -1
+		layerUpdateMap[0] = 0
 		for i, dig := range overlay.DigestList {
 			if idx, ok := digestMap[dig.String()]; ok {
-				layerUpdateMap[i] = idx
+				layerUpdateMap[i+1] = idx + 1
 				layerRef = append(layerRef, idx)
 			} else {
-				idx := len(c.DigestList)
+				idx := len(c.DigestList) + 1
 				digestMap[dig.String()] = idx
-				layerUpdateMap[i] = idx
+				layerUpdateMap[i+1] = idx
 				layerRef = append(layerRef, idx)
 				c.DigestList = append(c.DigestList, dig)
 			}
@@ -295,7 +337,7 @@ func newCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef)
 		for _, file := range overlay.EntryMap {
 			ent := &util.OptimizedTraceableEntry{
 				TraceableEntry: file,
-				SourceImage:    siidx,
+				SourceImage:    sourceIdx,
 				AccessCount:    0,
 				SumRank:        0,
 				SumSquaredRank: 0,
@@ -304,6 +346,7 @@ func newCollection(ctx context.Context, db *bolt.DB, imageList []*util.ImageRef)
 			c.Table = append(c.Table, ent)
 		}
 
+		c.Configs = append(c.Configs, string(overlay.Config[:]))
 	}
 
 	// shift source layer if necessary

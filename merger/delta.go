@@ -152,7 +152,7 @@ func GetDelta(ctx context.Context, a, b *Overlay) (d *Delta) {
 		consolidated: false,
 		ImageName:    b.ImageName,
 		ImageTag:     b.ImageTag,
-		Config:       string(b.config),
+		Config:       string(b.Config),
 	}
 
 	for i := 0; i <= MaxLandmark; i++ {

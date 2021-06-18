@@ -19,7 +19,6 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
@@ -27,120 +26,88 @@ import (
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
 )
 
 type transition struct {
-	tagFrom string
-	tagTo   string
+	tagFrom []*util.ImageRef
+	tagTo   []*util.ImageRef
 }
 
-type StarlightProxyClient struct {
+type StarlightProxyServer struct {
 	http.Server
 
 	ctx      context.Context
 	database *bolt.DB
 
 	containerRegistry string
+
+	ib *DeltaBundleBuilder
 }
 
-func (a *StarlightProxyClient) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
-
-	fromImages := strings.Split(from, ",")
-	toImages := strings.Split(to, ",")
-
-	pool := make(map[string]*transition, len(toImages))
-	for _, f := range fromImages {
-		if f == "_" {
-			break
-		}
-		arr := strings.Split(f, ":")
-		if len(arr) != 2 || strings.Trim(arr[0], " ") == "" || strings.Trim(arr[1], " ") == "" {
-			return util.ErrWrongImageFormat
-		}
-		pool[arr[0]] = &transition{
-			tagFrom: arr[1],
-		}
+func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
+	// Parse Image Reference
+	t := &transition{
+		tagFrom: make([]*util.ImageRef, 0),
+		tagTo:   make([]*util.ImageRef, 0),
 	}
 
-	for _, t := range toImages {
-		arr := strings.Split(t, ":")
-		if len(arr) != 2 || strings.Trim(arr[0], " ") == "" || strings.Trim(arr[1], " ") == "" {
-			return util.ErrWrongImageFormat
-		}
-		te, ok := pool[arr[0]]
-		if ok {
-			te.tagTo = arr[1]
-		} else {
-			pool[arr[0]] = &transition{
-				tagFrom: "",
-				tagTo:   arr[1],
-			}
+	var err error
+	if from != "_" {
+		if t.tagFrom, err = util.NewImageRef(from); err != nil {
+			return err
 		}
 	}
-
-	// Consolidator
-	c := merger.NewConsolidator(a.ctx)
-	for imageName, t := range pool {
-		var err error
-		var m1, m2 *merger.Overlay
-
-		if t.tagFrom != "" {
-			m1, err = merger.LoadMergedImage(a.ctx, a.database, imageName, t.tagFrom)
-			if err != nil {
-				return err
-			}
-		} else {
-			m1 = merger.NewOverlayBuilder(a.ctx, a.database)
-		}
-
-		if t.tagTo != "" {
-			m2, err = merger.LoadMergedImage(a.ctx, a.database, imageName, t.tagTo)
-			if err != nil {
-				return err
-			}
-			d := merger.GetDelta(a.ctx, m1, m2)
-			err = c.AddDelta(d)
-		}
-	}
-
-	ib, err := NewPreloadImageBuilder(a.ctx, c, a.containerRegistry)
-	if err != nil {
+	if t.tagTo, err = util.NewImageRef(to); err != nil {
 		return err
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0))
-	headerSize, contentLength, err := ib.WriteHeader(buf, false)
-	if err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write header cache")
-		return nil
+	// Load Optimized Merged Image Collections
+	var cTo, cFrom *Collection
+
+	if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
+		return err
+	}
+	if len(t.tagFrom) != 0 {
+		if cFrom, err = LoadCollection(a.ctx, a.database, t.tagFrom); err != nil {
+			return err
+		}
+		cTo.Minus(cFrom)
 	}
 
-	header := w.Header()
-	header.Set("Content-Type", "application/octet-stream")
-	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
-	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
-	header.Set("Starlight-Version", util.Version)
-	header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
-	w.WriteHeader(http.StatusOK)
+	/*
+		buf := bytes.NewBuffer(make([]byte, 0))
+		headerSize, contentLength, err := ib.WriteHeader(buf, false)
+		if err != nil {
+			log.G(a.ctx).WithField("err", err).Error("write header cache")
+			return nil
+		}
 
-	if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
-		log.G(a.ctx).WithField("err", err).Error("write header error")
-		return nil
-	}
+		header := w.Header()
+		header.Set("Content-Type", "application/octet-stream")
+		header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
+		header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
+		header.Set("Starlight-Version", util.Version)
+		header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
+		w.WriteHeader(http.StatusOK)
 
-	if err = ib.WriteBody(w); err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write body error")
-		return nil
-	}
+		if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
+			log.G(a.ctx).WithField("err", err).Error("write header error")
+			return nil
+		}
+
+		if err = ib.WriteBody(w); err != nil {
+			log.G(a.ctx).WithField("err", err).Error("write body error")
+			return nil
+		}
+	*/
 
 	return nil
 }
 
-func (a *StarlightProxyClient) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
+func (a *StarlightProxyServer) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
 	arr := strings.Split(strings.Trim(image, ""), ":")
 	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
 		return util.ErrWrongImageFormat
@@ -167,7 +134,7 @@ func (a *StarlightProxyClient) getPrepared(w http.ResponseWriter, req *http.Requ
 	return nil
 }
 
-func (a *StarlightProxyClient) getOptimize(w http.ResponseWriter, req *http.Request, group string) error {
+func (a *StarlightProxyServer) getOptimize(w http.ResponseWriter, req *http.Request, group string) error {
 	// TODO: receive optimized information.
 	//_, _ = io.Copy(os.Stdout, req.Body)
 
@@ -179,11 +146,11 @@ func (a *StarlightProxyClient) getOptimize(w http.ResponseWriter, req *http.Requ
 	return nil
 }
 
-func (a *StarlightProxyClient) getDefault(w http.ResponseWriter, req *http.Request) {
+func (a *StarlightProxyServer) getDefault(w http.ResponseWriter, req *http.Request) {
 	_, _ = fmt.Fprint(w, "Starlight Proxy OK!\n")
 }
 
-func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request) {
+func (a *StarlightProxyServer) rootFunc(w http.ResponseWriter, req *http.Request) {
 	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
 	remoteAddr := req.RemoteAddr
 
@@ -197,7 +164,7 @@ func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request
 	var err error
 	switch {
 	case len(params) == 4 && params[0] == "from" && params[2] == "to":
-		err = a.getDeltaImage(w, req, params[1], params[3])
+		err = a.getDeltaImage(w, req, strings.TrimSpace(params[1]), strings.TrimSpace(params[3]))
 		break
 	case len(params) == 2 && params[0] == "prepare":
 		err = a.getPrepared(w, req, params[1])
@@ -223,7 +190,7 @@ func (a *StarlightProxyClient) rootFunc(w http.ResponseWriter, req *http.Request
 	}
 }
 
-func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyClient {
+func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyServer {
 	ctx := util.ConfigLoggerWithLevel(logLevel)
 
 	log.G(ctx).WithFields(logrus.Fields{
@@ -237,13 +204,14 @@ func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyCli
 		return nil
 	}
 
-	server := &StarlightProxyClient{
+	server := &StarlightProxyServer{
 		Server: http.Server{
 			Addr: ":8090",
 		},
 		database:          db,
 		ctx:               ctx,
 		containerRegistry: registry,
+		ib:                NewBuilder(ctx, registry),
 	}
 	http.HandleFunc("/", server.rootFunc)
 

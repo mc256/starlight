@@ -187,9 +187,29 @@ func TestCollection_RemoveMergedApp(t *testing.T) {
 		return
 	}
 
+	fso3, err := LoadCollection(ctx, db, []*util.ImageRef{{"wordpress", "5.7-apache-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	fso4, err := LoadCollection(ctx, db, []*util.ImageRef{{"wordpress", "php7.3-fpm-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	fso5, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
 	_ = fso1.RemoveMergedApp()
 	_ = fso2.RemoveMergedApp()
-
+	_ = fso3.RemoveMergedApp()
+	_ = fso4.RemoveMergedApp()
+	_ = fso5.RemoveMergedApp()
 }
 
 func TestCollection_Minus_OutputQueue(t *testing.T) {
@@ -219,7 +239,7 @@ func TestCollection_Minus_OutputQueue(t *testing.T) {
 	// --------------------------------------------------------------
 	// Build Collection
 	fso1.Minus(fso2)
-	outQueue, outOffsets, requiredLayer := fso1.GetOutputQueue()
+	outQueue, outOffsets, requiredLayer := fso1.getOutputQueue()
 
 	if err = util.ExportToJsonFile(
 		outQueue,
@@ -238,6 +258,45 @@ func TestCollection_Minus_OutputQueue(t *testing.T) {
 	if err = util.ExportToJsonFile(
 		requiredLayer,
 		path.Join(os.TempDir(), fmt.Sprintf("fso-requiredLayer.json")),
+	); err != nil {
+		t.Fatal(err)
+		return
+	}
+}
+
+func TestCollection_GetClientFsTemplates(t *testing.T) {
+	// --------------------------------------------------------------
+	// Connect to database
+	ctx := util.ConfigLoggerWithLevel("trace")
+
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer db.Close()
+
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// --------------------------------------------------------------
+	// Build Collection
+	fso1.Minus(fso2)
+
+	deltaBundle := fso1.ComposeDeltaBundle()
+
+	if err = util.ExportToJsonFile(
+		deltaBundle,
+		path.Join(os.TempDir(), fmt.Sprintf("fso-fsRoots9.json")),
 	); err != nil {
 		t.Fatal(err)
 		return
