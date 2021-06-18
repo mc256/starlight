@@ -31,24 +31,28 @@ type OutputEntry struct {
 	CompressedSize int64
 }
 
-type OutputCollection struct {
-	Image                []*ImageRef            `json:"refs"`
-	Table                [][]*TraceableEntry    `json:"tables"`
-	Config               []string               `json:"config"`
-	DigestList           []*TraceableBlobDigest `json:"digests"`
-	ImageDigestReference [][]int                `json:"idr"`
-	Offsets              []int64                `json:"offsets"`
+type Protocol struct {
+	Images                []*ImageRef            `json:"refs"`
+	Tables                [][]*TraceableEntry    `json:"tables"`
+	Configs               []string               `json:"config"`
+	DigestList            []*TraceableBlobDigest `json:"digests"`
+	ImageDigestReferences [][]int                `json:"idr"`
+	Offsets               []int64                `json:"offsets"`
+}
+
+type ProtocolTemplate struct {
+	Protocol
 
 	OutputQueue   []*OutputEntry `json:"-"`
 	RequiredLayer []bool         `json:"-"` // requiredLayer index starts from 1 not 0
 }
 
-func (oc OutputCollection) Json() (buf []byte) {
+func (oc ProtocolTemplate) Json() (buf []byte) {
 	buf, _ = json.Marshal(oc)
 	return
 }
 
-func (oc OutputCollection) Write(w io.Writer, beautify bool) error {
+func (oc ProtocolTemplate) Write(w io.Writer, beautify bool) error {
 	encoder := json.NewEncoder(w)
 	if beautify {
 		encoder.SetIndent("", "\t")

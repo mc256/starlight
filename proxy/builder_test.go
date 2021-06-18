@@ -65,7 +65,7 @@ func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	builder := NewBuilder(ctx, ContainerRegistry)
 	out := bytes.NewBuffer([]byte{})
 
-	headerSize, contentSize, err := builder.WriteHeader(out, deltaBundle, false)
+	headerSize, contentSize, err := builder.WriteHeader(out, deltaBundle, true)
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -77,10 +77,60 @@ func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	gr, err := gzip.NewReader(out)
 	gzOut := bytes.NewBuffer([]byte{})
 	_, _ = io.Copy(gzOut, gr)
-	_ = ioutil.WriteFile("./data/deltaHeader.json", gzOut.Bytes(), 0644)
+	_ = ioutil.WriteFile("./data/jun18_deltaHeader.json", gzOut.Bytes(), 0644)
 
-	_ = util.ExportToJsonFile(deltaBundle.outputQueue, "./data/outputqueue.json")
-	_ = util.ExportToJsonFile(deltaBundle.requiredLayer, "./data/requiredLayer.json")
+	_ = util.ExportToJsonFile(deltaBundle.OutputQueue, "./data/jun18_outputqueue.json")
+	_ = util.ExportToJsonFile(deltaBundle.RequiredLayer, "./data/jun18_requiredLayer.json")
+}
+
+func TestDeltaBundleBuilder_WriteBodyPre(t *testing.T) {
+	const (
+		ContainerRegistry = "http://10.219.31.214:5000"
+	)
+	// --------------------------------------------------------------
+	// Connect to database
+	ctx := util.ConfigLoggerWithLevel("trace")
+
+	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer db.Close()
+
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	deltaBundle := fso2.ComposeDeltaBundle()
+
+	// --------------------------------------------------------------
+	// Build Collection
+
+	builder := NewBuilder(ctx, ContainerRegistry)
+
+	f, err := os.OpenFile("./data/deltabundle-old.img", os.O_RDWR|os.O_CREATE, 0644)
+	defer f.Close()
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	headerSize, contentSize, err := builder.WriteHeader(f, deltaBundle, false)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	log.G(ctx).WithField("header-size", headerSize).Info("header size")
+	log.G(ctx).WithField("content-size", contentSize).Info("content size")
+
+	err = builder.WriteBody(f, deltaBundle)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
 }
 
 func TestDeltaBundleBuilder_WriteBody(t *testing.T) {

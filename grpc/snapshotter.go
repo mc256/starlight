@@ -59,7 +59,7 @@ type snapshotter struct {
 	remote     *StarlightProxy
 	layerStore *starlightfs.LayerStore
 
-	imageReaders map[string]*starlightfs.ImageReader
+	receiver map[string]*starlightfs.Receiver
 	//imageReadersMux sync.Mutex
 	fsMap map[string]*starlightfs.FsInstance
 
@@ -101,8 +101,8 @@ func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy, fs
 		remote:     remote,
 		layerStore: layerStore,
 
-		imageReaders: make(map[string]*starlightfs.ImageReader, 0),
-		fsMap:        make(map[string]*starlightfs.FsInstance, 0),
+		receiver: make(map[string]*starlightfs.Receiver, 0),
+		fsMap:    make(map[string]*starlightfs.FsInstance, 0),
 
 		fsTrace: fsTrace,
 		//imageReadersMux: sync.Mutex{},
@@ -254,7 +254,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 		parentBase := path.Base(_parent)
 		if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
 			acceleratedImage := strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
-			if ir, hasIr := o.imageReaders[acceleratedImage]; hasIr {
+			if ir, hasIr := o.receiver[acceleratedImage]; hasIr {
 				// snapshot
 				sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
 				if err != nil {
@@ -276,7 +276,6 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 					config.Labels[util.ImageNameLabel],
 					config.Labels[util.ImageTagLabel],
 					path.Join(o.root, "sfs", sn.ID),
-					config.Labels[util.CheckpointLabel],
 					optimize,
 					optimizeGroup,
 				)
@@ -350,7 +349,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 			return nil, err
 		}
 
-		if ir, hasIr := o.imageReaders[targetImage]; hasIr {
+		if ir, hasIr := o.receiver[targetImage]; hasIr {
 			mnt = ir.GetLayerMounts()
 		} else {
 			rc, headerSize, err := o.remote.FetchWithString(sourceImage, targetImage)
@@ -358,14 +357,14 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 				return nil, err
 			}
 
-			nir, err := starlightfs.NewImageReader(ctx, o.layerStore, rc, headerSize, sn.ID)
+			nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID)
 			if err != nil {
 				return nil, err
 			}
 
 			nir.ExtractFiles()
 
-			o.imageReaders[targetImage] = nir
+			o.receiver[targetImage] = nir
 			mnt = nir.GetLayerMounts()
 		}
 	}

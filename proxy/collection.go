@@ -194,17 +194,19 @@ func (c *Collection) getClientFsTemplates() [][]*util.TraceableEntry {
 	return pool
 }
 
-func (c *Collection) ComposeDeltaBundle() (out *util.OutputCollection) {
+func (c *Collection) ComposeDeltaBundle() (out *util.ProtocolTemplate) {
 	outQueue, outOffsets, requiredLayer := c.getOutputQueue()
-	out = &util.OutputCollection{
-		Image:                c.Images,
-		Table:                c.getClientFsTemplates(),
-		Config:               c.Configs,
-		DigestList:           c.DigestList,
-		ImageDigestReference: c.ImageDigestReference,
-		Offsets:              outOffsets,
-		OutputQueue:          outQueue,
-		RequiredLayer:        requiredLayer,
+	out = &util.ProtocolTemplate{
+		Protocol: util.Protocol{
+			Images:                c.Images,
+			Tables:                c.getClientFsTemplates(),
+			Configs:               c.Configs,
+			DigestList:            c.DigestList,
+			ImageDigestReferences: c.ImageDigestReference,
+			Offsets:               outOffsets,
+		},
+		OutputQueue:   outQueue,
+		RequiredLayer: requiredLayer,
 	}
 
 	return

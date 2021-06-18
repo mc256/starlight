@@ -28,7 +28,7 @@ import (
 
 // FsInstance should be created using
 type FsInstance struct {
-	r    *ImageReader
+	r    *Receiver
 	Root *FsEntry
 
 	layerLookupMap *[]*LayerMeta
@@ -61,9 +61,9 @@ func (fi *FsInstance) GetImageTag() string           { return fi.tag }
 func (fi *FsInstance) GetMountPoint() string         { return fi.mountPoint }
 func (fi *FsInstance) GetServer() *fuse.Server       { return fi.server }
 
-func newFsInstance(ir *ImageReader, layerLookupMap *[]*LayerMeta, d digest.Digest, rwLayerPath, imageName, imageTag string) *FsInstance {
+func newFsInstance(r *Receiver, layerLookupMap *[]*LayerMeta, d digest.Digest, rwLayerPath, imageName, imageTag string) *FsInstance {
 	return &FsInstance{
-		r:              ir,
+		r:              r,
 		layerLookupMap: layerLookupMap,
 		rwLayerHash:    d,
 		rwLayerPath:    rwLayerPath,

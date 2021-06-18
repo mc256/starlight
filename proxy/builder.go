@@ -50,15 +50,15 @@ type DeltaBundleBuilder struct {
 	client http.Client
 }
 
-func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *OutputCollection) (err error) {
+func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *util.ProtocolTemplate) (err error) {
 	readers := make([]*io.SectionReader, len(c.DigestList)+1)
 	for i, d := range c.DigestList {
-		if c.requiredLayer[i+1] {
+		if c.RequiredLayer[i+1] {
 			<-ib.layerReaders[d.Digest.String()].ready
 			readers[i+1] = ib.layerReaders[d.Digest.String()].SectionReader
 		}
 	}
-	for _, ent := range c.outputQueue {
+	for _, ent := range c.OutputQueue {
 		sr := io.NewSectionReader(readers[ent.Source], ent.SourceOffset, ent.CompressedSize)
 
 		/*
@@ -81,9 +81,9 @@ func (ib *DeltaBundleBuilder) WriteBody(w io.Writer, c *OutputCollection) (err e
 	return nil
 }
 
-func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *OutputCollection, beautified bool) (headerSize int64, contentLength int64, err error) {
+func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *util.ProtocolTemplate, beautified bool) (headerSize int64, contentLength int64, err error) {
 	for i, d := range c.DigestList {
-		if c.requiredLayer[i+1] {
+		if c.RequiredLayer[i+1] {
 			ib.fetchLayer(d.ImageName, d.Digest.String())
 		}
 	}
