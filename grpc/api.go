@@ -19,12 +19,14 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"strconv"
@@ -38,6 +40,33 @@ type StarlightProxy struct {
 	serverAddress string
 
 	client *http.Client
+}
+
+func (a *StarlightProxy) Report(buf []byte) error {
+	url := fmt.Sprintf("%s://%s", a.protocol, path.Join(a.serverAddress, "report"))
+	postBody := bytes.NewBuffer(buf)
+	resp, err := http.Post(url, "application/json", postBody)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		log.G(a.ctx).WithFields(logrus.Fields{
+			"code":    fmt.Sprintf("%d", resp.StatusCode),
+			"version": resp.Header.Get("Starlight-Version"),
+		}).Warn("server error")
+		return util.ErrUnknownManifest
+	}
+
+	log.G(a.ctx).WithFields(logrus.Fields{
+		"version": resp.Header.Get("Starlight-Version"),
+	}).Info("uploaded filesystem traces")
+
+	resBuf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.G(a.ctx).WithError(err).Error("response body error")
+	}
+	fmt.Println(string(resBuf[:]))
+	return nil
 }
 
 func (a *StarlightProxy) Prepare(imageName, imageTag string) error {

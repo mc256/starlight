@@ -19,13 +19,26 @@
 package report
 
 import (
-	"fmt"
+	"context"
+	"github.com/mc256/starlight/fs"
+	"github.com/mc256/starlight/grpc"
 	"github.com/urfave/cli/v2"
 )
 
 func Action(c *cli.Context) error {
-	fmt.Println(c.String("path"))
-
+	ctx := context.Background()
+	tc, err := fs.NewTraceCollection(ctx, c.String("path"))
+	if err != nil {
+		return err
+	}
+	protocol := "https"
+	if c.Bool("plain-http") {
+		protocol = "http"
+	}
+	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
+	if err := proxy.Report(tc.ToJsonBuffer()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -43,6 +56,17 @@ func Command() *cli.Command {
 				Value:       "/tmp",
 				DefaultText: "/tmp",
 				Required:    false,
+			},
+			&cli.StringFlag{
+				Name:     "server",
+				Value:    "worker1",
+				Usage:    "starlight proxy address",
+				Required: false,
+			},
+			&cli.BoolFlag{
+				Name:     "plain-http",
+				Usage:    "use plain http connects to the remote server",
+				Required: false,
 			},
 		},
 		ArgsUsage: "",

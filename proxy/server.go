@@ -22,10 +22,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -134,15 +136,38 @@ func (a *StarlightProxyServer) getPrepared(w http.ResponseWriter, req *http.Requ
 	return nil
 }
 
-func (a *StarlightProxyServer) getOptimize(w http.ResponseWriter, req *http.Request, group string) error {
-	// TODO: receive optimized information.
-	//_, _ = io.Copy(os.Stdout, req.Body)
-
+func (a *StarlightProxyServer) postReport(w http.ResponseWriter, req *http.Request) error {
 	header := w.Header()
 	header.Set("Content-Type", "text/plain")
 	header.Set("Starlight-Version", util.Version)
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "Optimize: %s \n", group)
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	tc, err := fs.NewTraceCollectionFromBuffer(buf)
+	if err != nil {
+		log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
+		return err
+	}
+
+	for _, grp := range tc.Groups {
+		log.G(a.ctx).WithField("collection", grp.Images)
+		fso, err := LoadCollection(a.ctx, a.database, grp.Images)
+		if err != nil {
+			return err
+		}
+
+		fso.AddOptimizeTrace(grp)
+
+		if err := fso.SaveMergedApp(); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(w, "Optimized: %s \n", grp.Images)
+	}
+
 	return nil
 }
 
@@ -169,8 +194,8 @@ func (a *StarlightProxyServer) rootFunc(w http.ResponseWriter, req *http.Request
 	case len(params) == 2 && params[0] == "prepare":
 		err = a.getPrepared(w, req, params[1])
 		break
-	case len(params) == 4 && params[0] == "optimize":
-		err = a.getOptimize(w, req, params[1])
+	case len(params) == 1 && params[0] == "report":
+		err = a.postReport(w, req)
 		break
 	default:
 		a.getDefault(w, req)

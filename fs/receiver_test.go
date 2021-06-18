@@ -19,19 +19,42 @@
 package fs
 
 import (
+	"fmt"
 	"github.com/mc256/starlight/util"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestNewReceiverFromFile(t *testing.T) {
+	const (
+		root = "/mnt/sandbox/receiver"
+	)
+	_ = os.MkdirAll(filepath.Join(root, "sfs"), 0755)
 
 	ctx := util.ConfigLoggerWithLevel("trace")
 
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	db, err := util.OpenDatabase(ctx, filepath.Join(root, "sfs"), "layer.db")
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 	defer db.Close()
+
+	layerStore, err := NewLayerStore(ctx, db, filepath.Join(root, "sfs"))
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	rec, err := NewReceiverFromFile(ctx, layerStore, "data/deltabundle-old.img", 498746)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	fmt.Println(rec.name)
+	//rec.ExtractFiles()
+	rec.extractFiles()
 
 }

@@ -571,5 +571,5 @@ func NewReceiverFromFile(ctx context.Context, layerStore *LayerStore, filename s
 		return nil, err
 	}
 	sr := io.NewSectionReader(f, 0, fi.Size())
-	return NewReceiver(ctx, layerStore, io.Reader(sr), headerOffset, "")
+	return NewReceiver(ctx, layerStore, io.Reader(sr), headerOffset, "file")
 }
