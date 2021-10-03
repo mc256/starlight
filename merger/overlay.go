@@ -21,14 +21,14 @@ package merger
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"path"
+
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/stargz-snapshotter/estargz"
 	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
-	"io"
-	"path"
 )
 
 const (
@@ -84,7 +84,7 @@ func NewOverlayBuilder(ctx context.Context, db *bolt.DB) (ov *Overlay) {
 
 // Overlay functions
 
-func (ov *Overlay) recursiveDelete(ent *estargz.TOCEntry) {
+func (ov *Overlay) recursiveDelete(ent *util.TOCEntry) {
 	delete(ov.EntryMap, ent.Name)
 	for _, c := range ent.Children() {
 		if c.IsDir() {
@@ -97,7 +97,7 @@ func (ov *Overlay) recursiveDelete(ent *estargz.TOCEntry) {
 }
 
 // recursiveAdd upper layer to the lower layer. Parameter lDir and uDir must be directories only.
-func (ov *Overlay) recursiveAdd(lDir, uDir *estargz.TOCEntry, upperPool *map[string]*util.TraceableEntry) {
+func (ov *Overlay) recursiveAdd(lDir, uDir *util.TOCEntry, upperPool *map[string]*util.TraceableEntry) {
 	// Merge all the child
 	if lDir == nil {
 		for _, upperChild := range uDir.Children() {

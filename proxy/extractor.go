@@ -22,19 +22,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+
 	"github.com/containerd/containerd/log"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
 	manifest2 "github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/reference"
 	regClient "github.com/docker/distribution/registry/client"
-	"github.com/mc256/stargz-snapshotter/estargz"
 	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
-	"io"
-	"net/http"
 )
 
 const (
@@ -94,7 +94,7 @@ func getToc(ctx context.Context, repo distribution.Repository, imageName, imageT
 		}
 		reader := bytes.NewReader(buf)
 		sr := io.NewSectionReader(reader, 0, reader.Size())
-		layerFile, err := estargz.Open(sr)
+		layerFile, err := util.OpenStargz(sr)
 		if err != nil {
 			return err
 		}
@@ -249,7 +249,7 @@ func CacheToc(ctx context.Context, db *bolt.DB, imageName, imageTag, registry st
 }
 
 // InitField save the TOC to the bucket
-func SaveLayer(bucket *bolt.Bucket, entryMap map[string]*estargz.TOCEntry, chunks map[string][]*estargz.TOCEntry) error {
+func SaveLayer(bucket *bolt.Bucket, entryMap map[string]*util.TOCEntry, chunks map[string][]*util.TOCEntry) error {
 
 	// entries map
 	entBuffer := make(map[string]*util.TraceableEntry)
@@ -257,7 +257,7 @@ func SaveLayer(bucket *bolt.Bucket, entryMap map[string]*estargz.TOCEntry, chunk
 		entBuffer[k] = &util.TraceableEntry{
 			TOCEntry: v,
 			Landmark: v.Landmark(),
-			Chunks:   make([]*estargz.TOCEntry, 0),
+			Chunks:   make([]*util.TOCEntry, 0),
 		}
 	}
 

@@ -22,11 +22,11 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
+
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/stargz-snapshotter/estargz"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
-	"io"
 )
 
 const (
@@ -56,7 +56,7 @@ type Delta struct {
 	Config string `json:"config"`
 }
 
-func (d *Delta) recursiveDelta(aDir, bDir *estargz.TOCEntry, bSource *Overlay) {
+func (d *Delta) recursiveDelta(aDir, bDir *util.TOCEntry, bSource *Overlay) {
 	if aDir == nil && bDir != nil {
 		// copy b dir to the list recursively
 		for _, entry := range bDir.Children() {
@@ -109,10 +109,10 @@ func (d *Delta) recursiveDelta(aDir, bDir *estargz.TOCEntry, bSource *Overlay) {
 
 		// Remove files
 		if opaque == true && len(aDir.Children()) != 0 {
-			d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(estargz.MakeOpaqueWhiteoutFile(aDir.Name)))
+			d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(util.MakeOpaqueWhiteoutFile(aDir.Name)))
 		} else {
 			for _, fileName := range pendingDelete {
-				d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(estargz.MakeWhiteoutFile(fileName, aDir.Name)))
+				d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(util.MakeWhiteoutFile(fileName, aDir.Name)))
 			}
 		}
 

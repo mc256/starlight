@@ -18,7 +18,11 @@
 
 package util
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 var (
 	ErrImageMediaType           = errors.New("unknown image type")
@@ -38,3 +42,20 @@ var (
 	ErrUnknownSnapshotParameter = errors.New("snapshots should follow a standard format")
 	ErrTocUnknown               = errors.New("please prefetch the delta image")
 )
+
+// Aggregate combines a list of errors into a single new error.
+func ErrorAggregate(errs []error) error {
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		points := make([]string, len(errs)+1)
+		points[0] = fmt.Sprintf("%d error(s) occurred:", len(errs))
+		for i, err := range errs {
+			points[i+1] = fmt.Sprintf("* %s", err)
+		}
+		return errors.New(strings.Join(points, "\n\t"))
+	}
+}
