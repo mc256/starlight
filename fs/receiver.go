@@ -24,17 +24,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/mc256/starlight/util"
-	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
+	"github.com/mc256/starlight/util"
+	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 )
 
 type Receiver struct {
@@ -160,7 +161,7 @@ func (r *Receiver) touchFile(wg *sync.WaitGroup) {
 	}
 	for _, entS := range *r.entryMap[-1] {
 		ent, isTemplate := entS.(*TemplateEntry)
-		if isTemplate == false {
+		if !isTemplate {
 			continue
 		}
 
@@ -222,7 +223,7 @@ func (r *Receiver) decompress(wg *sync.WaitGroup, cur, size int64, buf *bytes.Bu
 	for _, entS := range *r.entryMap[cur] {
 		ent, isTemplate := entS.(*TemplateEntry)
 		// send landmark signal
-		if isTemplate == false {
+		if !isTemplate {
 			continue
 		}
 
@@ -447,6 +448,9 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 		if err == util.ErrLayerNotFound {
 			count++
 			layer, err = layerStore.RegisterLayerWithPrefix(prefix, count, *d, false, false)
+			if err != nil {
+				return nil, err
+			}
 		} else if err != nil {
 			return nil, err
 		}

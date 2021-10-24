@@ -21,17 +21,18 @@ package fs
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/containerd/containerd/log"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
-	"os"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
 )
 
 const (
@@ -1023,7 +1024,7 @@ func (n *StarlightFsNode) Listxattr(ctx context.Context, dest []byte) (uint32, s
 	}
 
 	kl := make([]string, len(n.Ent.Xattrs))
-	for k, _ := range n.Ent.Xattrs {
+	for k := range n.Ent.Xattrs {
 		kl = append(kl, k)
 	}
 	res := strings.Join(kl, "\x00")

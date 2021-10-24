@@ -19,25 +19,19 @@
 package fs
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-	"path"
+	"fmt"
 	"testing"
-
-	"github.com/mc256/starlight/util"
 )
 
-func TestLoadTraces(t *testing.T) {
-	ctx := util.ConfigLogger()
-	tc, err := NewTraceCollection(ctx, "/mnt/sandbox2")
-	if err != nil {
-		t.Fatal(err)
+func TestListxattr(t *testing.T) {
+	m := map[string]string{
+		"asdfasdf": "asdfasdf",
+		"123":      "asdfasdf",
+		"asdfe":    "asdfasdf",
+		"as23dfe":  "asdfasdf",
 	}
 
-	buf, err := json.MarshalIndent(tc, "", "\t")
-	if err != nil {
-		t.Fatal(err)
+	for i := range m {
+		fmt.Println(i)
 	}
-	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
 }

@@ -19,11 +19,12 @@
 package fs
 
 import (
+	"time"
+
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
 	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
-	"time"
 )
 
 // FsInstance should be created using

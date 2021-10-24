@@ -20,6 +20,7 @@ package report
 
 import (
 	"context"
+
 	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/grpc"
 	"github.com/urfave/cli/v2"
@@ -36,7 +37,7 @@ func Action(c *cli.Context) error {
 		protocol = "http"
 	}
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
-	if err := proxy.Report(tc.ToJsonBuffer()); err != nil {
+	if err := proxy.Report(tc.ToJSONBuffer()); err != nil {
 		return err
 	}
 

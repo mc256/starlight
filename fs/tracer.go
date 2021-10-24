@@ -22,9 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -32,6 +29,10 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/util"
+	"github.com/sirupsen/logrus"
 )
 
 //////////////////////////
@@ -137,7 +138,7 @@ func NewTracer(optimizeGroup, imageName, imageTag string) (*Tracer, error) {
 	}, nil
 }
 
-//////////////////////////
+// OptimizedTraceItem with ranking
 type OptimizedTraceItem struct {
 	TraceItem
 	Rank        int `json:"r"`
@@ -158,7 +159,7 @@ type TraceCollection struct {
 	Groups    []*OptimizedGroup
 }
 
-func (tc TraceCollection) ToJsonBuffer() []byte {
+func (tc TraceCollection) ToJSONBuffer() []byte {
 	buf, _ := json.Marshal(tc)
 	return buf
 }

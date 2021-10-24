@@ -21,14 +21,15 @@ package fs
 import (
 	"context"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
-	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/util"
+	"github.com/sirupsen/logrus"
+	bolt "go.etcd.io/bbolt"
 )
 
 type LayerMeta struct {

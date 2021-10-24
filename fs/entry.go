@@ -21,15 +21,16 @@ package fs
 import (
 	"archive/tar"
 	"fmt"
-	fuseFs "github.com/hanwen/go-fuse/v2/fs"
-	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/mc256/starlight/util"
-	"golang.org/x/sys/unix"
 	"os"
 	"path"
 	"sync"
 	"syscall"
 	"unsafe"
+
+	fuseFs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
+	"github.com/mc256/starlight/util"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -367,7 +368,7 @@ type Entry struct {
 
 func (en *Entry) AddChild(base string, entry TocEntry) {
 	if en.child == nil {
-		en.child = make(map[string]TocEntry, 0)
+		en.child = make(map[string]TocEntry)
 	}
 	en.child[base] = entry
 }

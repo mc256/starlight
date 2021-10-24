@@ -20,10 +20,11 @@ package fs
 
 import (
 	"fmt"
-	"github.com/mc256/starlight/util"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mc256/starlight/util"
 )
 
 func TestNewReceiverFromFile(t *testing.T) {
