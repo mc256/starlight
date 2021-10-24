@@ -20,6 +20,13 @@ package grpc
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
@@ -31,12 +38,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.etcd.io/bbolt"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 /*
@@ -59,7 +60,9 @@ type snapshotter struct {
 	remote     *StarlightProxy
 	layerStore *starlightfs.LayerStore
 
+	//receiver has all the images in the local storage
 	receiver map[string]*starlightfs.Receiver
+
 	//imageReadersMux sync.Mutex
 	fsMap map[string]*starlightfs.FsInstance
 
@@ -212,6 +215,129 @@ func (o *snapshotter) getSnDir(id string) string {
 	return path.Join(o.root, "sfs", id)
 }
 
+// pullImage is the fist step get the Starlight Image
+// this method is referenced by Prepare()
+func (o *snapshotter) pullImage(ctx context.Context, key, parent, _key, _parent string, mnt []mount.Mount, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	var targetImage, sourceImage string
+	parentBase := path.Base(_parent)
+	keyBase := path.Base(_key)
+	if _parent == "" {
+		sourceImage = "_"
+	} else if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
+		sourceImage = strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
+	} else {
+		return nil, util.ErrUnknownSnapshotParameter
+	}
+
+	if strings.HasPrefix(keyBase, "target(") && strings.HasSuffix(keyBase, ")") {
+		targetImage = strings.TrimSuffix(strings.TrimPrefix(keyBase, "target("), ")")
+	} else {
+		return nil, util.ErrUnknownSnapshotParameter
+	}
+
+	sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	snd := filepath.Join(o.root, "sfs", sn.ID)
+	if err := os.MkdirAll(snd, 0755); err != nil {
+		return nil, err
+	}
+
+	if ir, hasIr := o.receiver[targetImage]; hasIr {
+		mnt = ir.GetLayerMounts()
+	} else {
+		rc, headerSize, err := o.remote.FetchWithString(sourceImage, targetImage)
+		if err != nil {
+			return nil, err
+		}
+
+		nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		nir.ExtractFiles()
+
+		o.receiver[targetImage] = nir
+		mnt = nir.GetLayerMounts()
+	}
+	return mnt, nil
+}
+
+func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _parent string, config *snapshots.Info, mnt []mount.Mount, opts ...snapshots.Opt) ([]mount.Mount, error) {
+	parentBase := path.Base(_parent)
+	if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
+		acceleratedImage := strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
+		if ir, hasIr := o.receiver[acceleratedImage]; hasIr {
+			// snapshot
+			sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// optimize
+			optimize := false
+			optimizeGroup := ""
+			if val, ok := config.Labels[util.OptimizeLabel]; ok && val == "True" {
+				optimize = true
+			}
+			if val, ok := config.Labels[util.OptimizeGroupLabel]; ok {
+				optimizeGroup = val
+			}
+
+			// fs instance
+			fsi, err := ir.NewFsInstance(
+				config.Labels[util.ImageNameLabel],
+				config.Labels[util.ImageTagLabel],
+				path.Join(o.root, "sfs", sn.ID),
+				optimize,
+				optimizeGroup,
+			)
+			if err != nil {
+				return nil, err
+			}
+			o.fsMap[path.Base(_key)] = fsi
+
+			// mounting point
+			mp := filepath.Join(o.root, "sfs", sn.ID, "m")
+			if err := os.MkdirAll(mp, 0755); err != nil {
+				return nil, err
+			}
+
+			// fuse server
+			fsOpts := fusefs.Options{}
+			fsOpts.Debug = o.fsTrace
+
+			fsServer, err := fsi.NewFuseServer(mp, &fsOpts, fsOpts.Debug)
+			if err != nil {
+				return nil, err
+			}
+			go fsServer.Serve()
+			if err := fsServer.WaitMount(); err != nil {
+				return nil, err
+			}
+
+			// mounting point
+			mountingPoint := fsi.GetMountPoint()
+			mnt = []mount.Mount{{
+				Type:   "bind",
+				Source: mountingPoint,
+				Options: []string{
+					"rw",
+					"rbind",
+				},
+			}}
+			log.G(ctx).WithField("mnt", mnt).Info("fs mounted")
+
+		} else {
+			return nil, util.ErrTocUnknown
+		}
+	}
+	return mnt, nil
+}
+
 func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	//o.imageReadersMux.Lock()
 	//defer o.imageReadersMux.Unlock()
@@ -242,130 +368,24 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 		prepareWorker = false
 	}
 
+	// remove the 6-digit random tag at the end of the command
 	_key := key[:len(key)-7]
 	_parent := ""
 	if parent != "" {
 		_parent = parent[:len(parent)-7]
 	}
 
+	// this method shares with two commands
 	var mnt []mount.Mount
 	if prepareWorker {
 		// Step 2 - container create
-		parentBase := path.Base(_parent)
-		if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
-			acceleratedImage := strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
-			if ir, hasIr := o.receiver[acceleratedImage]; hasIr {
-				// snapshot
-				sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
-				if err != nil {
-					return nil, err
-				}
-
-				// optimize
-				optimize := false
-				optimizeGroup := ""
-				if val, ok := config.Labels[util.OptimizeLabel]; ok && val == "True" {
-					optimize = true
-				}
-				if val, ok := config.Labels[util.OptimizeGroupLabel]; ok {
-					optimizeGroup = val
-				}
-
-				// fs instance
-				fsi, err := ir.NewFsInstance(
-					config.Labels[util.ImageNameLabel],
-					config.Labels[util.ImageTagLabel],
-					path.Join(o.root, "sfs", sn.ID),
-					optimize,
-					optimizeGroup,
-				)
-				if err != nil {
-					return nil, err
-				}
-				o.fsMap[path.Base(_key)] = fsi
-
-				// mounting point
-				mp := filepath.Join(o.root, "sfs", sn.ID, "m")
-				if err := os.MkdirAll(mp, 0755); err != nil {
-					return nil, err
-				}
-
-				// fuse server
-				fsOpts := fusefs.Options{}
-				fsOpts.Debug = o.fsTrace
-
-				fsServer, err := fsi.NewFuseServer(mp, &fsOpts, fsOpts.Debug)
-				if err != nil {
-					return nil, err
-				}
-				go fsServer.Serve()
-				if err := fsServer.WaitMount(); err != nil {
-					return nil, err
-				}
-
-				// mounting point
-				mountingPoint := fsi.GetMountPoint()
-				mnt = []mount.Mount{{
-					Type:   "bind",
-					Source: mountingPoint,
-					Options: []string{
-						"rw",
-						"rbind",
-					},
-				}}
-				log.G(ctx).WithField("mnt", mnt).Info("fs mounted")
-
-			} else {
-				return nil, util.ErrTocUnknown
-			}
+		if mnt, err = o.createContainer(ctx, key, parent, _key, _parent, &config, mnt, opts...); err != nil {
+			return nil, err
 		}
-
 	} else {
 		// Step 1 - image pull
-		var targetImage, sourceImage string
-		parentBase := path.Base(_parent)
-		keyBase := path.Base(_key)
-		if _parent == "" {
-			sourceImage = "_"
-		} else if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
-			sourceImage = strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
-		} else {
-			return nil, util.ErrUnknownSnapshotParameter
-		}
-
-		if strings.HasPrefix(keyBase, "target(") && strings.HasSuffix(keyBase, ")") {
-			targetImage = strings.TrimSuffix(strings.TrimPrefix(keyBase, "target("), ")")
-		} else {
-			return nil, util.ErrUnknownSnapshotParameter
-		}
-
-		sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
-		if err != nil {
+		if mnt, err = o.pullImage(ctx, key, parent, _key, _parent, mnt, opts...); err != nil {
 			return nil, err
-		}
-
-		snd := filepath.Join(o.root, "sfs", sn.ID)
-		if err := os.MkdirAll(snd, 0755); err != nil {
-			return nil, err
-		}
-
-		if ir, hasIr := o.receiver[targetImage]; hasIr {
-			mnt = ir.GetLayerMounts()
-		} else {
-			rc, headerSize, err := o.remote.FetchWithString(sourceImage, targetImage)
-			if err != nil {
-				return nil, err
-			}
-
-			nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID)
-			if err != nil {
-				return nil, err
-			}
-
-			nir.ExtractFiles()
-
-			o.receiver[targetImage] = nir
-			mnt = nir.GetLayerMounts()
 		}
 	}
 
