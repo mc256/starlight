@@ -66,6 +66,9 @@ type Receiver struct {
 	// Image protocol
 	name   string
 	prefix string
+
+	// function called when the receiver has received the entire image
+	cb func()
 }
 
 func (r *Receiver) GetLayerMounts() []mount.Mount {
@@ -368,6 +371,11 @@ func (r *Receiver) extractFiles() {
 	log.G(r.ctx).WithFields(logrus.Fields{
 		"name": r.name,
 	}).Info("entire image extracted")
+
+	// call the callback function if it has finished
+	if r.cb != nil {
+		r.cb()
+	}
 }
 
 func (r *Receiver) ExtractFiles() {
@@ -381,7 +389,7 @@ func (r *Receiver) ExtractFiles() {
 // - reader: image reader
 // - tocOffset: size of the TOC in reader
 // - prefix: to store the layers in one single folder (snapshot id)
-func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, headerOffset int64, prefix string) (*Receiver, error) {
+func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, headerOffset int64, prefix string, cb func()) (*Receiver, error) {
 	// Delta bundle header
 	headerGzBuf := bytes.NewBuffer(make([]byte, 0, headerOffset))
 	if n, err := io.CopyN(headerGzBuf, reader, headerOffset); n != headerOffset || err != nil {
@@ -417,6 +425,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 
 		name:   util.ByImageName(header.Images).String(),
 		prefix: prefix,
+		cb:     cb,
 	}
 
 	// #1 -Image config file
@@ -575,5 +584,5 @@ func NewReceiverFromFile(ctx context.Context, layerStore *LayerStore, filename s
 		return nil, err
 	}
 	sr := io.NewSectionReader(f, 0, fi.Size())
-	return NewReceiver(ctx, layerStore, io.Reader(sr), headerOffset, "file")
+	return NewReceiver(ctx, layerStore, io.Reader(sr), headerOffset, "file", nil)
 }

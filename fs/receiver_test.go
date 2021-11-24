@@ -27,6 +27,22 @@ import (
 	"github.com/mc256/starlight/util"
 )
 
+func TestCallbackFunction(t *testing.T) {
+	var f func()
+	fmt.Print("1.------")
+	if f == nil {
+		fmt.Println("test")
+	}
+
+	f = func() {
+		fmt.Print("hello")
+	}
+
+	fmt.Print("2.------")
+	f()
+
+}
+
 func TestNewReceiverFromFile(t *testing.T) {
 	const (
 		root = "/mnt/sandbox/receiver"

@@ -253,17 +253,23 @@ func (o *snapshotter) pullImage(ctx context.Context, key, parent, _key, _parent 
 			return nil, err
 		}
 
-		nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID)
+		nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID, func() {
+			o.extractionCompleted(targetImage)
+		})
 		if err != nil {
 			return nil, err
 		}
 
-		nir.ExtractFiles()
+		nir.ExtractFiles() //async call
 
 		o.receiver[targetImage] = nir
 		mnt = nir.GetLayerMounts()
 	}
 	return mnt, nil
+}
+
+func (o *snapshotter) extractionCompleted(targetImage string) {
+
 }
 
 func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _parent string, config *snapshots.Info, mnt []mount.Mount, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -377,14 +383,14 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 	// this method shares with two commands
 	var mnt []mount.Mount
-	if prepareWorker {
-		// Step 2 - container create
-		if mnt, err = o.createContainer(ctx, key, parent, _key, _parent, &config, mnt, opts...); err != nil {
+	if !prepareWorker {
+		// Step 1 - image pull
+		if mnt, err = o.pullImage(ctx, key, parent, _key, _parent, mnt, opts...); err != nil {
 			return nil, err
 		}
 	} else {
-		// Step 1 - image pull
-		if mnt, err = o.pullImage(ctx, key, parent, _key, _parent, mnt, opts...); err != nil {
+		// Step 2 - container create
+		if mnt, err = o.createContainer(ctx, key, parent, _key, _parent, &config, mnt, opts...); err != nil {
 			return nil, err
 		}
 	}
