@@ -11,26 +11,26 @@ TARGETS=starlight-proxy starlight-grpc ctr-starlight
 build: build-starlight-proxy build-starlight-grpc build-ctr-starlight
 
 build-starlight-proxy:
-	-mkdir ./out 2>/dev/null | true
-	go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
+	-mkdir ./_out 2>/dev/null | true
+	go build -o ./_out/starlight-proxy ./cmd/starlight-proxy/main.go
 
 build-starlight-grpc:
-	-mkdir ./out 2>/dev/null | true
-	go build -o ./out/starlight-grpc ./cmd/starlight-grpc/main.go
+	-mkdir ./_out 2>/dev/null | true
+	go build -o ./_out/starlight-grpc ./cmd/starlight-grpc/main.go
 
 build-ctr-starlight:
-	-mkdir ./out 2>/dev/null | true
-	go build -o ./out/ctr-starlight ./cmd/ctr-starlight/main.go
+	-mkdir ./_out 2>/dev/null | true
+	go build -o ./_out/ctr-starlight ./cmd/ctr-starlight/main.go
 
 ######################################################################
 # Clean
 ######################################################################
 clean:
-	-rm -rf ./out/*
+	-rm -rf ./_out/*
 
 
 ######################################################################
 # Install
 ######################################################################
 install:
-	install ./out/*-* /bin
+	install ./_out/*-* /bin
