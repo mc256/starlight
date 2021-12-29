@@ -1,0 +1,7 @@
+#shell script (excluding some local test cases)
+*.sh
+!config/*.sh
+temp.sh
+!convert*
+
+*.class

@@ -21,14 +21,23 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
+
+	"github.com/containerd/containerd/log"
+	"github.com/joho/godotenv"
+	"github.com/mc256/starlight/util"
 )
+
+func init() {
+	if err := godotenv.Load("../.env"); err != nil {
+		fmt.Print("Failed to load environment variables from `.env` file. ")
+	}
+}
 
 func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	const (
@@ -45,13 +54,18 @@ func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.5-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"},
+		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -100,7 +114,9 @@ func TestDeltaBundleBuilder_WriteBodyPre(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.5-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -150,13 +166,18 @@ func TestDeltaBundleBuilder_WriteBody(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.5-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"},
+		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return

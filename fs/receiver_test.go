@@ -27,23 +27,11 @@ import (
 	"github.com/mc256/starlight/util"
 )
 
-func TestCallbackFunction(t *testing.T) {
-	var f func()
-	fmt.Print("1.------")
-	if f == nil {
-		fmt.Println("test")
-	}
-
-	f = func() {
-		fmt.Print("hello")
-	}
-
-	fmt.Print("2.------")
-	f()
-
-}
-
+// Not Ready
 func TestNewReceiverFromFile(t *testing.T) {
+	// path, err := os.Getwd()
+	// path is the current directory
+
 	const (
 		root = "/mnt/sandbox/receiver"
 	)
@@ -73,5 +61,4 @@ func TestNewReceiverFromFile(t *testing.T) {
 	fmt.Println(rec.name)
 	//rec.ExtractFiles()
 	rec.extractFiles()
-
 }

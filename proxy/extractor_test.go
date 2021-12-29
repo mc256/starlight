@@ -19,47 +19,57 @@
 package proxy
 
 import (
-	"github.com/mc256/starlight/util"
 	"testing"
+
+	"github.com/mc256/starlight/test"
+	"github.com/mc256/starlight/util"
 )
 
+// Before running these test cases, we need to prepare Starlight format container images in the registry.
+// These test cases are testing redis:6.0-starlight and redis:5.0-starlight
+
 func TestCacheToc1(t *testing.T) {
-	const (
-		ContainerRegistry = "http://10.219.31.214:5000"
-	)
+	containerRegistry := test.GetContainerRegistry(t)
 
 	ctx := util.ConfigLogger()
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	db, err := util.OpenDatabase(
+		ctx,
+		test.GetSandboxDirectory(t),
+		test.GetProxyDBName(),
+	)
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 	defer db.Close()
 
-	if err = CacheToc(ctx, db, "ubuntu", "18.04-starlight", ContainerRegistry); err != nil {
+	if err = CacheToc(ctx, db, "redis", "6.0-starlight", containerRegistry); err != nil {
 		t.Fatal(err)
 		return
 	}
 }
 
 func TestCacheToc2(t *testing.T) {
-	const (
-		ContainerRegistry = "http://10.219.31.214:5000"
-	)
+	containerRegistry := test.GetContainerRegistry(t)
 
 	ctx := util.ConfigLogger()
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
+	db, err := util.OpenDatabase(
+		ctx,
+		test.GetSandboxDirectory(t),
+		test.GetProxyDBName(),
+	)
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 	defer db.Close()
 
-	if err = CacheToc(ctx, db, "mariadb", "10.4-starlight", ContainerRegistry); err != nil {
+	if err = CacheToc(ctx, db, "redis", "5.0-starlight", containerRegistry); err != nil {
 		t.Fatal(err)
 		return
 	}
-	if err = CacheToc(ctx, db, "mariadb", "10.5-starlight", ContainerRegistry); err != nil {
+
+	if err = CacheToc(ctx, db, "redis", "6.0-starlight", containerRegistry); err != nil {
 		t.Fatal(err)
 		return
 	}
