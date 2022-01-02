@@ -19,7 +19,7 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/net v0.0.0-20211111160137-58aab5ef257a
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08
 	google.golang.org/grpc v1.42.0
 )

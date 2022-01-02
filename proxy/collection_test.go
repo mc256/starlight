@@ -20,13 +20,14 @@ package proxy
 
 import (
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
-	"github.com/mc256/starlight/util"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/fs"
+	"github.com/mc256/starlight/util"
 )
 
 /* =============================================
@@ -138,13 +139,13 @@ func TestCollection_Minus(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.5-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.4-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -175,31 +176,34 @@ func TestCollection_RemoveMergedApp(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.5-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.4-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso3, err := LoadCollection(ctx, db, []*util.ImageRef{{"wordpress", "5.7-apache-starlight"}})
+	fso3, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso4, err := LoadCollection(ctx, db, []*util.ImageRef{{"wordpress", "php7.3-fpm-starlight"}})
+	fso4, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "wordpress", ImageTag: "php7.3-fpm-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso5, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	fso5, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"}, 
+		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -224,13 +228,13 @@ func TestCollection_Minus_OutputQueue(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.5-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.4-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
@@ -276,13 +280,16 @@ func TestCollection_GetClientFsTemplates(t *testing.T) {
 	}
 	defer db.Close()
 
-	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.5-starlight"}})
+	fso2, err := LoadCollection(ctx, db, []*util.ImageRef{{ImageName: "mariadb", ImageTag: "10.5-starlight"}})
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
 
-	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{{"mariadb", "10.4-starlight"}, {ImageName: "wordpress", ImageTag: "5.7-apache-starlight"}})
+	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"}, 
+		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
+	})
 	if err != nil {
 		t.Fatal(err)
 		return
