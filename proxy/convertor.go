@@ -26,7 +26,7 @@ type StarlightLayer struct {
 
 	// Diff is the hash of the uncompressed layer
 	Diff goreg.Hash
-	// Hash is hte hash of the compressed layer
+	// Hash is the hash of the compressed layer
 	Hash goreg.Hash
 
 	SizeVal int64
