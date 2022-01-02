@@ -230,7 +230,7 @@ func (d *Delta) OutputHeader(w io.Writer) (headerSize int64, err error) {
 		return 0, util.ErrNotConsolidated
 	}
 
-	cw := util.GetCountWriter(w)
+	cw := util.NewCountWriter(w)
 	gw, err := gzip.NewWriterLevel(cw, gzip.BestCompression)
 	if err != nil {
 		return 0, err

@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/joho/godotenv"
 )
 
@@ -32,4 +33,12 @@ func GetSandboxDirectory(t *testing.T) (val string) {
 
 func GetProxyDBName() string {
 	return "proxy_metadata.db"
+}
+
+func GetRegistryOptions() (opt []name.Option) {
+	return []name.Option{
+		// most of the testing environment does not have porper HTTPS certificate.
+		// therefore, use HTTP
+		name.Insecure,
+	}
 }

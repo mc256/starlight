@@ -27,6 +27,7 @@ import (
 
 // Before running these test cases, we need to prepare Starlight format container images in the registry.
 // These test cases are testing redis:6.0-starlight and redis:5.0-starlight
+// Please find relative instruction in .demo/convert-starlight.sh
 
 func TestCacheToc1(t *testing.T) {
 	containerRegistry := test.GetContainerRegistry(t)

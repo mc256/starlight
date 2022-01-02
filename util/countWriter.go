@@ -35,7 +35,7 @@ func (c *CountWriter) GetWrittenSize() int64 {
 	return c.count
 }
 
-func GetCountWriter(w io.Writer) (cw *CountWriter) {
+func NewCountWriter(w io.Writer) (cw *CountWriter) {
 	cw = &CountWriter{
 		w:     w,
 		count: 0,

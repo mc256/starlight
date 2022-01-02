@@ -29,4 +29,6 @@ const (
 	SnapshotterDbName = "metadata.db"
 	ProxyDbName       = "toc.db"
 	DataPath          = "data/"
+
+	StarlightTOCDigestAnnotation = "containerd.io/snapshot/remote/starlight/toc.digest"
 )

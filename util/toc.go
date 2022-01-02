@@ -71,7 +71,10 @@ const (
 	// digest of the TOC JSON.
 	// This annotation is valid only when it is specified in `.[]layers.annotations`
 	// of an image manifest.
-	TOCJSONDigestAnnotation = "containerd.io/snapshot/stargz/toc.digest"
+	//
+	// This is not needed in Starlight
+	//
+	// TOCJSONDigestAnnotation = "containerd.io/snapshot/stargz/toc.digest"
 
 	// PrefetchLandmark is a file entry which indicates the end position of
 	// prefetch in the stargz file.

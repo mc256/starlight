@@ -22,15 +22,16 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"path"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/util"
+	"github.com/sirupsen/logrus"
 )
 
 type DeltaBundleBuilder struct {
@@ -84,7 +85,7 @@ func (ib *DeltaBundleBuilder) WriteHeader(w io.Writer, c *util.ProtocolTemplate,
 	}
 
 	// Write Header
-	cw := util.GetCountWriter(w)
+	cw := util.NewCountWriter(w)
 	gw, err := gzip.NewWriterLevel(cw, gzip.BestCompression)
 	if err != nil {
 		return 0, 0, err
