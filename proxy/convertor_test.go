@@ -25,7 +25,7 @@ func TestConvertorConstructor(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestReadImage(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestReadImage2(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestReadImageLayers(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestToStarlightImage(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestToStarlightImage2(t *testing.T) {
 	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
 	dstRef := fmt.Sprintf("%s/%s:%s", "registry.yuri.moe", TestImageName, TestImageDstTag)
 
-	c, err := GetConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{})
+	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}

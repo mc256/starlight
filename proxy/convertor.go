@@ -97,7 +97,7 @@ type Convertor struct {
 	src, dst name.Reference
 }
 
-func GetConvertor(src, dst string, optsSrc, dstSrc []name.Option) (c *Convertor, err error) {
+func NewConvertor(src, dst string, optsSrc, dstSrc []name.Option) (c *Convertor, err error) {
 	c = &Convertor{}
 	if c.src, err = name.ParseReference(src, optsSrc...); err != nil {
 		return nil, err
@@ -106,6 +106,14 @@ func GetConvertor(src, dst string, optsSrc, dstSrc []name.Option) (c *Convertor,
 		return nil, err
 	}
 	return c, nil
+}
+
+func (c *Convertor) GetSrc() string {
+	return c.src.String()
+}
+
+func (c *Convertor) GetDst() string {
+	return c.dst.String()
 }
 
 func (c *Convertor) readImage() (goreg.Image, error) {
