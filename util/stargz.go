@@ -15,6 +15,11 @@
 */
 
 /*
+Original Repo: https://github.com/containerd/stargz-snapshotter
+Modified some code
+*/
+
+/*
    Copyright 2019 The Go Authors. All rights reserved.
    Use of this source code is governed by a BSD-style
    license that can be found in the LICENSE file.
@@ -461,10 +466,11 @@ func (fr *fileReader) ReadAt(p []byte, off int64) (n int, err error) {
 //
 // Use NewWriter to create a new Writer.
 type Writer struct {
-	bw       *bufio.Writer
-	cw       *countWriter
-	toc      *jtoc
-	diffHash hash.Hash // SHA-256 of uncompressed tar
+	bw         *bufio.Writer
+	cw         *countWriter
+	toc        *jtoc
+	diffHash   hash.Hash // SHA-256 of uncompressed tar
+	digestHash hash.Hash // SHA-256 of compressed tar
 
 	closed           bool
 	gz               *gzip.Writer
@@ -510,13 +516,16 @@ func NewWriter(w io.Writer) *Writer {
 //
 // The writer must be closed to write its trailing table of contents.
 func NewWriterLevel(w io.Writer, compressionLevel int) *Writer {
-	bw := bufio.NewWriter(w)
+	digest := sha256.New()
+	mw := io.MultiWriter(w, digest)
+	bw := bufio.NewWriter(mw)
 	cw := &countWriter{w: bw}
 	return &Writer{
 		bw:               bw,
 		cw:               cw,
 		toc:              &jtoc{Version: 1},
 		diffHash:         sha256.New(),
+		digestHash:       digest,
 		compressionLevel: compressionLevel,
 	}
 }
@@ -761,6 +770,12 @@ func (w *Writer) AppendTar(r io.Reader) error {
 // It is only valid to call DiffID after Close.
 func (w *Writer) DiffID() string {
 	return fmt.Sprintf("sha256:%x", w.diffHash.Sum(nil))
+}
+
+// Digest returns the SHA-256 of the compressed tar bytes.
+// It is only valid to call Digest after Close
+func (w *Writer) Digest() string {
+	return fmt.Sprintf("sha256:%x", w.digestHash.Sum(nil))
 }
 
 // footerBytes returns the 51 bytes footer.

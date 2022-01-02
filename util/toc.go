@@ -74,7 +74,7 @@ const (
 	//
 	// This is not needed in Starlight
 	//
-	// TOCJSONDigestAnnotation = "containerd.io/snapshot/stargz/toc.digest"
+	TOCJSONDigestAnnotation = "containerd.io/snapshot/stargz/toc.digest"
 
 	// PrefetchLandmark is a file entry which indicates the end position of
 	// prefetch in the stargz file.
