@@ -97,12 +97,12 @@ type Convertor struct {
 	src, dst name.Reference
 }
 
-func GetConvertor(src, dst string, opts ...name.Option) (c *Convertor, err error) {
+func GetConvertor(src, dst string, optsSrc, dstSrc []name.Option) (c *Convertor, err error) {
 	c = &Convertor{}
-	if c.src, err = name.ParseReference(src, opts...); err != nil {
+	if c.src, err = name.ParseReference(src, optsSrc...); err != nil {
 		return nil, err
 	}
-	if c.dst, err = name.ParseReference(dst, opts...); err != nil {
+	if c.dst, err = name.ParseReference(dst, dstSrc...); err != nil {
 		return nil, err
 	}
 	return c, nil
