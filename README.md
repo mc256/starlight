@@ -1,8 +1,32 @@
 # Starlight: Fast Container Provisioning on the Edge and over the WAN
 
-We want to extend cloud practices further to the edge! Starlight speeds up the container deployment on the edge. 
+Starlight speeds up deploying and updating containers to workers, while maintaining backwards compatibility with existing tools.
+It so fast that it starts containers faster than merely downloading an optimized data package, yet with practically no overhead.
 
+## We want to extend cloud practices further to the edge
+Using containers to provision workers in high latency environments is often tricky.
+The time it takes to deploy software and start a container increase dramatically with latency, and increase at a higher rate than the equivalent time to simply download the data.
+Outside the datacenter, where round-trip times are in the order of tens or hundreds of milliseconds, container provisioning can be several times higher than in the cloud, even when the network has reasoinable bandwidth.
+The root cause for this slow provisioning time is the overall design of the provisioning pipeline: it is pull-based, designed around the stack-of-layers abstraction container images, and does not explicitly consider container updates. 
 
+Starlight is an accelerator for provisioning container-based applications that decouples the mechanism of container provisioning from container development.
+Starlight maintains the convenient stack-of-layers structure of container images, but uses a different representation when deploying them over the network.
+The development and operational pipelines remain unchanged: users can use existing containers, tools, and registries. 
+On average, Starlight provisioning is 3 times faster than the current containerd implementation, and almost 2 times faster than eStargz.
+Starlight improves provisioning time inside the cloud as well: for example it can deploy updates much faster than standard containerd and eStargz.
+Happily, Starlight has little-to-no runtime overhead: its worker performance matches the standard containerd.
+
+## Citation
+If you find Starlight useful in your work, please cite our NSDI 2022 paper:
+```
+@inproceedings{starlight,
+author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
+title = {Starlight: Fast Container Provisioning on the Edge and over the WAN },
+booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI '22)},
+year = {2022},
+note = {To appear.}
+}
+```
 ---
 
 ## Starlight Proxy
