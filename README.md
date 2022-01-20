@@ -1,5 +1,4 @@
-# Starlight: Fast Container Provisioning on the Edge and over the WAN
-
+# Starlight: Fast Container Provisioning
 Starlight speeds up deploying and updating containers to workers, while maintaining backwards compatibility with existing tools.
 It so fast that it starts containers faster than merely downloading an optimized data package, yet with practically no overhead.
 
