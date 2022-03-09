@@ -28,83 +28,22 @@ note = {To appear.}
 ```
 ---
 
-## Starlight Proxy
+Suppose you have a container you on some standard registry server that you want to deploy.
+You need to:
 
+1) Set up a Starlight proxy server, ideally close to the registry server you are using. Configure the proxy server to point to the registry and run it.
+Starlight supports any standard registry, but some features may not be ready yet like Docker Hub authentication.
 
-### Prebuild Docker Image and Docker-Compose
+2) Set up the worker to be able to run Starlight. This involves installing containerd and the Starlight plugin, configuring containerd to use the plugin, and starting the Starlight snapshotter daemon (you also need to tell the snapshotter the address of the proxy server).
 
-The prebuild image is available in 
+3) Convert the container image to the Starlight format.
+More specifically, the storage format of the compressed layers needs to be converted to the new format and then the layers stored in the registry. The new format is backwards compatible and almost the same size, so you don't need to store every layer twice.
+In addition, the proxy server needs some metadata about the list of files in the container.
+There is (supposed to be) an converter script/command that does all this easily and automatic.
 
-```url
-registry.yuri.moe/starlight-proxy:latest
-```
+4) Collect traces on the worker for container startup. This entails starting the container on the worker while collecting file access traces that are sent to the proxy.
+There is supposed to be a command to do this automatically, but it currently may or may not require a special branch of Starlight
 
-Please first clone this project and go to the proxy demo folder
-```shell
-git clone git@github.com:mc256/starlight.git
-cd ./starlight/demo/proxy
-```
+DONE! You can now deploy the container to as many Starlight workers as you want, and it should be fast!
 
-Update the registry address in `config.env` and then launch the proxy using `docker-compose up -d`
-
-
-
-
----
-
-## Starlight Snapshotter
-
-### 1. Prerequisites
-
-Starlight depends on `containerd`. Please install `containerd` follow the instructions on [containerd's Github repository](https://github.com/containerd/containerd).
-
-To enable the Starlight snapshotter plugin, add the following configuration to `/etc/containerd/config.toml`
-
-```yaml
-[proxy_plugins]
-  [proxy_plugins.starlight]
-    type = "snapshot"
-    address = "/run/starlight-grpc/starlight-snapshotter.socket"
-```
-
-### 2. Build From Source
-
-Checkout this repository
-
-```shell
-git clone git@github.com:mc256/starlight.git
-```
-
-Build and install this project
-
-```shell
-make && sudo make install
-```
-
-
-### 3. Run this project
-
-```shell
-starlight-grpc run --server $STARLIGHT_PROXY_ADDRESS --socket /run/starlight-grpc/starlight-snapshotter.socket
-```
-
----
-
-## Other configurations
-
-Latency can impact the available bandwith if the TCP window is too small.
-Please use the following configurations in `/etc/sysctl.conf` to increase the default TCP window size or compute a suitable configuration using https://www.speedguide.net/bdp.php.
-
-```shell
-net.core.wmem_max=125829120
-net.core.rmem_max=125829120
-net.ipv4.tcp_rmem= 10240 87380 125829120
-net.ipv4.tcp_wmem= 10240 87380 125829120
-net.ipv4.tcp_window_scaling = 1
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_sack = 1
-net.ipv4.tcp_no_metrics_save = 1
-net.core.netdev_max_backlog = 10000
-```
-
-After setting the new TCP window in `/etc/sysctl.conf`, use `sysctl -p` to apply the configuration.
+Note steps 3 and 4 must be done for every container image you want to deploy using Starlight. The good news is that they should be quick, a few minutes for each container, and only done for each container (*not* once per worker!).
