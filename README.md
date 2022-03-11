@@ -65,7 +65,6 @@ and then the layers stored in the registry.
 The new format is backwards compatible and almost the same size, 
 so you don't need to store every layer twice.
 In addition, the proxy needs some metadata about the list of files in the container to compute the delta bundle for deployment.
-<br>
 <br>The **Starlight CLI tool** features the image conversion, example:
 <br>```ctr-starlight convert $MY_REGISTRY/redis:6.0.2 $MY_REGISTRY/redis:6.0.2-sl```
 
@@ -73,7 +72,6 @@ In addition, the proxy needs some metadata about the list of files in the contai
 5) Collect traces on the worker for container startup. 
 This entails starting the container on the worker while collecting file access traces 
 that are sent to the proxy.
-<br>
 <br>The **Starlight CLI tool** features trace collection, example:
 <br>```ctr-starlight pull $MY_REGISTRY/redis:6.0.2-starlight &&```
 <br>```ctr-starlight create --optimize $MY_REGISTRY/redis:6.0.2-sl $MY_REGISTRY/redis:6.0.2-sl $MY_RUNTIME &&```
