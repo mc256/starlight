@@ -2,8 +2,10 @@ name: Publish Docker image (release)
 on:
   push:
     branches:
+      - master
       - release
-      - feature_optimize
+      - 'build/*'
+      - feature_documentation
 jobs:
   push_to_registry:
     name: Push Docker image to GitHub Packages
@@ -11,13 +13,23 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      - name: Push to GitHub Packages
-        uses: docker/build-push-action@v1
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
         with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Private Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: registry.yuri.moe
           username: github
           password: ${{ secrets.REGISTRY_PASSWORD }}
-          registry: registry.yuri.moe
-          repository: starlight-proxy
-          pull: true
-          target: starlight-proxy
-          tag_with_ref: true
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            registry.yuri.moe/starlight-proxy:latest
+            ghcr.io/mc256/starlight/proxy:latest
