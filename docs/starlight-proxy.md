@@ -42,6 +42,12 @@ services:
     restart: always
 ```
 
+The Starlight proxy listens on port 8090. 
+We should put a Nginx reverse proxy to handle SSL certificates or load balancing.
+But for simplicity, this part is ignored in this example.
+The Starlight proxy writes data to `./data` folder, and it needs some environment variables (in the next step).
+
+
 2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.
 (You may want to change `starlightregistry` to your container registry.)
 ```dotenv

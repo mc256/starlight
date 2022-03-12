@@ -43,7 +43,7 @@ configuring containerd to use the plugin,
 and starting the Starlight snapshotter daemon
 (you also need to tell the snapshotter the address of the proxy server).
 <br>[Find out how to install **containerd** ➡️](https://containerd.io/downloads/)
-<br>[Find out how to install **Starlight snapshotter plugin** & **Starlight CLI tool** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-snapshotter.md)
+<br>[Find out how to install **Starlight snapshotter plugin** & **Starlight CLI tool** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-snapshotter-cli.md)
 
 
 4) Convert the container image to the **Starlight format** container image.
