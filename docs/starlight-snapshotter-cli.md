@@ -17,7 +17,7 @@ and starting the Starlight snapshotter daemon
 
 ## Step 1. Install Dependencies
 
-This uses Ubuntu 20.04 as example. We will need `build-essential` and `containerd`.
+This uses Ubuntu 20.04 as an example. We will need `build-essential` and `containerd`.
 
 ```shell
 sudo apt update && sudo apt upgrade -y &&
