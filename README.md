@@ -24,19 +24,6 @@ but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
 
 
-## Citation
-If you find Starlight useful in your work, please cite our NSDI 2022 paper:
-```
-@inproceedings{starlight,
-author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
-title = {Starlight: Fast Container Provisioning on the Edge and over the WAN },
-booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI '22)},
-year = {2022},
-note = {To appear.}
-}
-```
----
-
 ## Get Started
 
 Suppose you have a container that you want to deploy 
@@ -88,3 +75,16 @@ Note:
 - step **2** must be done on each worker.
 - steps **3** and **4** must be done for every container image you want to deploy using Starlight. 
 The good news is that they should be quick, a few minutes for each container.
+
+
+## Citation
+If you find Starlight useful in your work, please cite our NSDI 2022 paper:
+```bibtex
+@inproceedings{starlight,
+author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
+title = {Starlight: Fast Container Provisioning on the Edge and over the WAN },
+booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI '22)},
+year = {2022},
+note = {To appear.}
+}
+```
