@@ -4,7 +4,7 @@ while maintaining backwards compatibility with existing tools.
 It so fast that it starts containers faster than merely downloading an optimized data package, 
 yet with practically no overhead.
 
-## We want to extend cloud practices further to the edge
+## Extend cloud practices further to the edge
 Using containers to provision workers in high latency environments is often tricky.
 The time it takes to deploy software and start a container increase dramatically with latency, 
 and increase at a higher rate than the equivalent time to simply download the data.
@@ -40,13 +40,13 @@ note = {To appear.}
 ## Get Started
 
 Suppose you have a container that you want to deploy 
-on a [standard **registry**](https://github.com/distribution/distribution).
+on a [OCI compatible **registry**](https://github.com/distribution/distribution).
 You need to:
 
 1) Set up a **Starlight proxy**, 
 ideally close to the **registry** server you are using. Configure the proxy server to point to the registry and run it.
 Starlight supports any standard registry.
-<br>[Find out how to install **Starlight proxy** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-proxy.md)
+<br>[Find out how to install **Starlight proxy** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-proxy.md) 
 
 
 2) Set up the worker to be able to run Starlight. 
