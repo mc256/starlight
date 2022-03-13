@@ -57,7 +57,6 @@ go version
 ### Step 2. Clone and Build
 
 Clone the Starlight repository
-
 ```shell
 git clone https://github.com/mc256/starlight.git &&
 cd starlight
@@ -65,7 +64,6 @@ cd starlight
 
 
 Build the snapshotter plugin and CLI tool
-
 ```shell
 make build-starlight-grpc build-ctr-starlight
 ```
@@ -75,14 +73,15 @@ Install snapshotter plugin and CLI tool
 sudo make install install-systemd-service
 ```
 
-### Step 3. Create Starlight Snapshotter Service
+Enable Starlight snapshotter service
+```shell
+sudo systemctl enable starlight
+sudo systemctl start starlight
+```
 
-
-
-### Step 4. Configure Snapshotter
+### Step 3. Configure Snapshotter
 
 Add the following configuration to `/etc/containerd/config.toml`.
-
 ```toml
 [proxy_plugins]
   [proxy_plugins.starlight]
@@ -91,13 +90,11 @@ Add the following configuration to `/etc/containerd/config.toml`.
 ```
 
 Restart `containerd` service
-
 ```shell
 sudo systemctl restart containerd
 ```
 
 Verify the Starlight snapshotter plugin is functioning
-
 ```shell
 sudo ctr plugin ls | grep starlight 
 # io.containerd.snapshotter.v1    starlight                -              ok

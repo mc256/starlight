@@ -4,7 +4,7 @@ Documentation=https://github.com/mc256/starlight
 After=network.target local-fs.target
 
 [Service]
-ExecStart=/usr/bin/starlight-grpc
+ExecStart=/usr/bin/starlight-grpc run
 
 Type=notify
 Delegate=yes

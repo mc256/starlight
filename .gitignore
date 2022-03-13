@@ -15,6 +15,7 @@
 # vendor/
 
 .out/
+out/
 .sandbox/
 
 # GoLand
