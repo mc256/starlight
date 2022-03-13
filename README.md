@@ -68,6 +68,30 @@ that are sent to the proxy.
 
 🙌 That's it ! You can now deploy the container to as many Starlight workers as you want, and it should be fast!
 
+6) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
+```shell
+sudo systemctl stop containerd && \
+sudo systemctl stop starlight && \
+sudo rm -rf /var/lib/starlight-grpc && \
+sudo rm -rf /var/lib/containerd && \
+sudo systemctl start containerd && \
+sudo systemctl start starlight 
+```
+
+7) Start the container using Starlight
+```shell
+ctr-starlight pull $MY_REGISTRY/redis:6.0.2-starlight && \
+mkdir /tmp/test-redis-data
+sudo ctr-starlight create \
+	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+	--env-file ./config/all.env \
+	--net-host \
+	redis:6.2.1-starlight \
+	redis:6.2.1-starlight \
+    $MY_RUNTIME && \
+ctr task start $MY_RUNTIME
+```
+
 <br>
 
 Note:

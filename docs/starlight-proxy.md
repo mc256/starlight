@@ -45,7 +45,8 @@ services:
 The Starlight proxy listens on port 8090. 
 We should put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
-The Starlight proxy writes data to `./data` folder, and it needs some environment variables (in the next step).
+The Starlight proxy writes image metadata to `./data` folder, 
+and it needs some environment variables in `config.env` (details are in the next step).
 
 
 2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.
@@ -83,20 +84,26 @@ export PATH=$PATH:/usr/local/go/bin
 3. Install necessary tools to build this project
 
 ```shell
-sudo apt update && sudo apt upgrade -y
+sudo apt update && \
+sudo apt upgrade -y && \
 sudo apt install build-essential
 ```
 
 4. Clone this project.
 
 ```shell
-git clone https://github.com/mc256/starlight.git &&
+git clone https://github.com/mc256/starlight.git && \
 cd starlight
 ```
 
 5. Build Starlight proxy
 ```shell
 make build-starlight-proxy
+```
+
+6. Verify the Starlight Proxy is working
+```shell
+curl http://localhost:8090/
 ```
 
 ---

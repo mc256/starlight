@@ -68,7 +68,15 @@ Build the snapshotter plugin and CLI tool
 make build-starlight-grpc build-ctr-starlight
 ```
 
-Install snapshotter plugin and CLI tool
+Edit `./demo/starlight.service` to use Starlight Proxy. 
+Find the line that starts with `ExecStart=` and add `--server=YOURDNSSERVER`
+If you are using HTTP, please also add `--plain-http`. 
+Example:
+```service
+ExecStart=/usr/bin/starlight-grpc run  --plain-http --server=proxy.yuri.moe
+```
+
+Install snapshotter service and CLI tool
 ```shell
 sudo make install install-systemd-service
 ```
