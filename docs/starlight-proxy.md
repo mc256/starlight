@@ -104,6 +104,7 @@ make build-starlight-proxy
 6. Verify the Starlight Proxy is working
 ```shell
 curl http://localhost:8090/
+# Starlight Proxy OK!
 ```
 
 ---
