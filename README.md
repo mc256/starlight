@@ -53,20 +53,35 @@ The new format is backwards compatible and almost the same size,
 so you don't need to store every layer twice.
 In addition, the proxy needs some metadata about the list of files in the container to compute the delta bundle for deployment.
 <br>The **Starlight CLI tool** features the image conversion, example:
-<br>```ctr-starlight convert $MY_REGISTRY/redis:6.0.2 $MY_REGISTRY/redis:6.0.2-sl```
+<br>```ctr-starlight convert $MY_REGISTRY/redis:6.2.1 $MY_REGISTRY/redis:6.2.1-starlight```
 
 
 5) Collect traces on the worker for container startup. 
 This entails starting the container on the worker while collecting file access traces 
 that are sent to the proxy.
 <br>The **Starlight CLI tool** features trace collection, example:
-<br>```ctr-starlight pull $MY_REGISTRY/redis:6.0.2-starlight &&```
-<br>```ctr-starlight create --optimize $MY_REGISTRY/redis:6.0.2-sl $MY_REGISTRY/redis:6.0.2-sl $MY_RUNTIME &&```
-<br>```ctr task start $MY_RUNTIME```
+```shell
+ctr-starlight pull redis:6.2.1-starlight && \
+mkdir /tmp/test-redis-data && \
+sudo ctr-starlight create --optimize \
+	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+	--env-file ./demo/config/all.env \
+	--net-host \
+	redis:6.2.1-starlight \
+	redis:6.2.1-starlight \
+    $MY_RUNTIME && \
+ctr task start $MY_RUNTIME
+```
+
 <br> After finished running the container several times, then we can report all the traces to the proxy, using:
 <br>```ctr-starlight report --server $MY_STARLIGHT_PROXY```
 
+---
+
 🙌 That's it ! You can now deploy the container to as many Starlight workers as you want, and it should be fast!
+
+---
+
 
 6) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
 ```shell
@@ -74,22 +89,39 @@ sudo systemctl stop containerd && \
 sudo systemctl stop starlight && \
 sudo rm -rf /var/lib/starlight-grpc && \
 sudo rm -rf /var/lib/containerd && \
+sudo rm -rf /tmp/test-redis-data && \
 sudo systemctl start containerd && \
 sudo systemctl start starlight 
 ```
 
+
 7) Start the container using Starlight
 ```shell
-ctr-starlight pull $MY_REGISTRY/redis:6.0.2-starlight && \
+ctr-starlight pull redis:6.2.1-starlight && \
 mkdir /tmp/test-redis-data
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-	--env-file ./config/all.env \
+	--env-file ./demo/config/all.env \
 	--net-host \
 	redis:6.2.1-starlight \
 	redis:6.2.1-starlight \
     $MY_RUNTIME && \
 ctr task start $MY_RUNTIME
+```
+
+
+8) Update the container using Starlight
+```shell
+ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
+mkdir /tmp/test-redis-data
+sudo ctr-starlight create \
+	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+	--env-file ./demo/config/all.env \
+	--net-host \
+	redis:6.2.2-starlight \
+	redis:6.2.2-starlight \
+    $MY_RUNTIME_2 && \
+ctr task start $MY_RUNTIME_2
 ```
 
 <br>
