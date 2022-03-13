@@ -79,6 +79,12 @@ sudo systemctl enable starlight
 sudo systemctl start starlight
 ```
 
+Verify Starlight is running
+```shell
+sudo systemctl status starlight
+# it should be "active".
+```
+
 ### Step 3. Configure Snapshotter
 
 Add the following configuration to `/etc/containerd/config.toml`.

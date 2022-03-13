@@ -6,8 +6,7 @@ After=network.target local-fs.target
 [Service]
 ExecStart=/usr/bin/starlight-grpc run
 
-Type=notify
-Delegate=yes
+Type=simple
 KillMode=process
 Restart=always
 RestartSec=5
