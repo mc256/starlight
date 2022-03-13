@@ -15,14 +15,13 @@ and starting the Starlight snapshotter daemon
 
 ---
 
-## Step 1. Install Dependencies
+### Step 1. Install Dependencies
 
 This uses Ubuntu 20.04 as an example. We will need `build-essential` and `containerd`.
 
 ```shell
-sudo apt update && sudo apt upgrade -y &&
-sudo apt install build-essential
-sudo apt install containerd
+sudo apt update && sudo apt upgrade -y && \
+sudo apt install build-essential containerd
 ```
 
 Enable `containerd`
@@ -33,7 +32,7 @@ sudo systemctl start containerd
 
 Verify `containerd` is running
 ```shell
-sudo systemctl status containerde
+sudo systemctl status containerd
 ```
 
 Install Go https://go.dev/doc/install ➡️
@@ -55,7 +54,7 @@ go version
 ```
 
 
-## Step 2. Clone and Build
+### Step 2. Clone and Build
 
 Clone the Starlight repository
 
@@ -71,8 +70,16 @@ Build the snapshotter plugin and CLI tool
 make build-starlight-grpc build-ctr-starlight
 ```
 
+Install snapshotter plugin and CLI tool
+```shell
+sudo make install install-systemd-service
+```
 
-## Step 3. Configure Snapshotter
+### Step 3. Create Starlight Snapshotter Service
+
+
+
+### Step 4. Configure Snapshotter
 
 Add the following configuration to `/etc/containerd/config.toml`.
 
@@ -83,6 +90,11 @@ Add the following configuration to `/etc/containerd/config.toml`.
     address = "/run/starlight-grpc/starlight-snapshotter.socket"
 ```
 
+Restart `containerd` service
+
+```shell
+sudo systemctl restart containerd
+```
 
 Verify the Starlight snapshotter plugin is functioning
 

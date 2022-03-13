@@ -1,0 +1,23 @@
+[Unit]
+Description=Starlight snapshotter GRPC service
+Documentation=https://github.com/mc256/starlight
+After=network.target local-fs.target
+
+[Service]
+ExecStart=/usr/bin/starlight-grpc
+
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
