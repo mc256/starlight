@@ -74,7 +74,10 @@ ctr task start $MY_RUNTIME
 ```
 
 <br> After finished running the container several times, then we can report all the traces to the proxy, using:
-<br>```ctr-starlight report --server $MY_STARLIGHT_PROXY```
+
+```shell
+ctr-starlight report --server $MY_STARLIGHT_PROXY
+```
 
 ---
 
@@ -98,7 +101,7 @@ sudo systemctl start starlight
 7) Start the container using Starlight
 ```shell
 ctr-starlight pull redis:6.2.1-starlight && \
-mkdir /tmp/test-redis-data
+mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
 	--env-file ./demo/config/all.env \
@@ -113,7 +116,7 @@ ctr task start $MY_RUNTIME
 8) Update the container using Starlight
 ```shell
 ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
-mkdir /tmp/test-redis-data
+mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
 	--env-file ./demo/config/all.env \

@@ -114,3 +114,6 @@ sudo ctr plugin ls | grep starlight
 # io.containerd.snapshotter.v1    starlight                -              ok
 ```
 
+---
+
+For more information, please see `ctr-starlight --help` and `starlight-grpc --help`
