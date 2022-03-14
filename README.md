@@ -72,7 +72,7 @@ so you don't need to store every layer twice.
 In addition, the proxy needs some metadata about the list of files in the container to compute the delta bundle for deployment.
 <br>The **Starlight CLI tool** features the image conversion, example:
 <br>```ctr-starlight convert $MY_REGISTRY/redis:6.2.1 $MY_REGISTRY/redis:6.2.1-starlight```
-
+<br>(`$MY_REGISTRY` will be the server that runs container registry, for example, `gcr.io`)
 
 5) Collect traces on the worker for container startup. 
 This entails starting the container on the worker while collecting file access traces 
@@ -90,12 +90,14 @@ sudo ctr-starlight create --optimize \
     $MY_RUNTIME && \
 ctr task start $MY_RUNTIME
 ```
+(`$MY_RUNTIME` can be any string)
 
 <br> After finished running the container several times, then we can report all the traces to the proxy, using:
 
 ```shell
 ctr-starlight report --server $MY_STARLIGHT_PROXY
 ```
+(`$MY_STARLIGHT_PROXY` will be the server that runs Starlight proxy, for example, `192.168.1.3`)
 
 ---
 
