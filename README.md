@@ -11,7 +11,7 @@ yet with practically no overhead.
 The image on the right compares time to download and start containers using containerd ("baseline"), [eStargz](https://github.com/containerd/stargz-snapshotter/blob/main/docs/estargz.md), Starlight, and the time it takes to download an optimized update package using wget. 
 The registry is in North Virginia.
 Top row shows time to deploy a container to an empty worker, and bottom row time to update the container to a later version.
-See our paper for more results.
+Raad our [NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin) for more results.
 
 ### Extend cloud practices to the edge and WAN
 Using containers to provision workers in high-latency or low-bandwidth environments can be tricky.
@@ -32,7 +32,7 @@ Starlight decouples the mechanism of container provisioning from container devel
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
-<br>[Find out how Starlight works by reading the paper or here ➡️](docs/starlight-workflow.md)
+<br>[See how Starlight works ➡️](docs/starlight-workflow.md) or [read our NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin).
 
 ## Architecture
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
@@ -144,11 +144,15 @@ ctr task start $MY_RUNTIME_2
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ```bibtex
-@inproceedings{starlight,
+@inproceedings {chen2022starlight,
 author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
-title = {Starlight: Fast Container Provisioning on the Edge and over the WAN },
-booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI '22)},
-year = {2022}
+title = {Starlight: Fast Container Provisioning on the Edge and over the {WAN}},
+booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI 22)},
+year = {2022},
+address = {Renton, WA},
+url = {https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin},
+publisher = {USENIX Association},
+month = apr,
 }
 ```
 
