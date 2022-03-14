@@ -23,12 +23,10 @@ decouples the mechanism of container provisioning from container development.
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
-<br>[Find out how Starlight works by reading the paper or here ➡️](docs/Starlight-workflow.md)
+<br>[Find out how Starlight works by reading the paper or here ➡️](docs/starlight-workflow.md)
 
 
 ## Architecture
-![starlight-architecture](docs/starlight-architecture.png)
-
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
 * A **proxy** server on the cloud side mediates between Starlight workers and any standard registry server.
 * On the worker side, a **command line tool** tells Starlight to PULL, CREATE, and START containers.
@@ -43,7 +41,7 @@ You need to:
 1) Set up a **Starlight proxy**, 
 ideally close to the **registry** server you are using. Configure the proxy server to point to the registry and run it.
 Starlight supports any standard registry.
-<br>[Find out how to install **Starlight proxy** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-proxy.md) 
+<br>[Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) 
 
 
 2) Set up the worker to be able to run Starlight. 
@@ -53,7 +51,7 @@ configuring containerd to use the plugin,
 and starting the Starlight snapshotter daemon
 (you also need to tell the snapshotter the address of the proxy server).
 <br>[Find out how to install **containerd** ➡️](https://containerd.io/downloads/)
-<br>[Find out how to install **Starlight snapshotter plugin** & **Starlight CLI tool** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-snapshotter-cli.md)
+<br>[Find out how to install **Starlight snapshotter plugin** & **Starlight CLI tool** ➡️](docs/starlight-snapshotter-cli.md)
 
 
 3) Convert the container image to the **Starlight format** container image.
