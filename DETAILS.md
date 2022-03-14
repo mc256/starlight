@@ -7,19 +7,17 @@
 The prebuild image is available in 
 
 ```url
+ghcr.io/mc256/starlight/proxy:latest
 registry.yuri.moe/starlight-proxy:latest
 ```
 
 Please first clone this project and go to the proxy demo folder
 ```shell
-git clone git@github.com:mc256/starlight.git
-cd ./starlight/demo/proxy
+git clone https://github.com/mc256/starlight.git
+cd ./starlight/demo/compose/proxy
 ```
 
-Update the registry address in `config.env` and then launch the proxy using `docker-compose up -d`
-
-
-
+In `config.env` and then launch the proxy using `docker-compose up -d`. The proxy listens on port 8090.
 
 ---
 
@@ -58,6 +56,7 @@ make && sudo make install
 ```shell
 starlight-grpc run --server $STARLIGHT_PROXY_ADDRESS --socket /run/starlight-grpc/starlight-snapshotter.socket
 ```
+or uses systemd service in `./demo/starlight.service`
 
 ---
 
