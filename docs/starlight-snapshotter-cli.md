@@ -26,7 +26,7 @@ sudo apt install build-essential containerd
 
 Enable `containerd`
 ```shell
-sudo systemctl enable containerd
+sudo systemctl enable containerd  && \
 sudo systemctl start containerd
 ```
 
@@ -38,7 +38,7 @@ sudo systemctl status containerd
 Install Go https://go.dev/doc/install ➡️
 
 ```shell
-wget https://go.dev/dl/go1.17.8.linux-amd64.tar.gz &&
+wget https://go.dev/dl/go1.17.8.linux-amd64.tar.gz && \
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.8.linux-amd64.tar.gz
 ```
 
@@ -58,7 +58,7 @@ go version
 
 Clone the Starlight repository
 ```shell
-git clone https://github.com/mc256/starlight.git &&
+git clone https://github.com/mc256/starlight.git && \
 cd starlight
 ```
 
@@ -83,7 +83,7 @@ sudo make install install-systemd-service
 
 Enable Starlight snapshotter service
 ```shell
-sudo systemctl enable starlight
+sudo systemctl enable starlight   && \
 sudo systemctl start starlight
 ```
 
