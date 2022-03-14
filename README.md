@@ -1,25 +1,34 @@
 # Starlight: Fast Container Provisioning
-Starlight speeds up deploying and updating containers on workers, 
+
+<img align="right" src="docs/provisioning-time-wan.png">
+
+Starlight is an accelerator for provisioning container-based applications.
+It speeds up deploying and updating containers on workers inside and outside the cloud, 
 while maintaining backwards compatibility with existing tools.
 It is so fast that containers can start faster than merely downloading an optimized data package, 
 yet with practically no overhead. 
 
-## Extend cloud practices further to the edge and WAN
+The image on the right compares time to download and start containers using containerd ("baseline"), [eStargz](https://github.com/containerd/stargz-snapshotter/blob/main/docs/estargz.md), Starlight, and the time it takes to download an optimized update package using wget. 
+The registry is in North Virginia.
+Top row shows time to deploy a container to an empty worker, and bottom row time to update the container to a later version.
+See our paper for more results.
+
+### Extend cloud practices to the edge and WAN
 Using containers to provision workers in high-latency or low-bandwidth environments can be tricky.
 The time it takes to deploy software and start a container increase dramatically with latency, 
 and increase at a higher rate than the equivalent time to simply download the data.
 Outside the datacenter, where round-trip times are in the order of tens or hundreds of milliseconds, 
 container provisioning can be several times slower than in the cloud, even when the network has reasonable bandwidth.
 
-### Why?
+### Why is container provisiong slow?
 The root cause for this slow provisioning time is the overall design of the provisioning pipeline: 
 it is pull-based, designed around the stack-of-layers abstraction container images, 
 and does not explicitly consider container updates.
 For example, updating a Java application to fix the Log4j vulnerability usually requires re-downloading the entire container image, even though the updated Log4j library only takes a fraction of that space. 
+This can make provisioning slower than it should be even inside cloud data centers.
 
-### How
-Starlight is an accelerator for provisioning container-based applications that 
-decouples the mechanism of container provisioning from container development.
+### How we address this?
+Starlight decouples the mechanism of container provisioning from container development.
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
@@ -139,8 +148,7 @@ If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
 title = {Starlight: Fast Container Provisioning on the Edge and over the WAN },
 booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI '22)},
-year = {2022},
-note = {To appear.}
+year = {2022}
 }
 ```
 
