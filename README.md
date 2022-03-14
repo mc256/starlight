@@ -23,10 +23,11 @@ decouples the mechanism of container provisioning from container development.
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
+<br>[Find out how Starlight works by reading the paper or here ➡️](docs/Starlight-workflow.md)
 
 
 ## Architecture
-![starlight-workflow](docs/starlight-workflow.png)
+![starlight-architecture](docs/starlight-architecture.png)
 
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
 * A **proxy** server on the cloud side mediates between Starlight workers and any standard registry server.
