@@ -16,4 +16,4 @@ In the background, the proxy issues a series of requests to the registry ⑦ to 
 Once the contents of the delta bundle has been computed, the proxy creates a **Starlight manifest** (SLM) -- the list of file metadata, container manifests, and other required metadata -- and sends it to the snapshotter ⑤,
 which notifies **containerd** that the `PULL` phase has finished successfully.
 
-Please read our NSDI '22 paper for more details.
+Please read our [NSDI '22 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin) for more details.
