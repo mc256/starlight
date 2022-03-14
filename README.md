@@ -1,30 +1,29 @@
 # Starlight: Fast Container Provisioning
-Starlight speeds up deploying and updating containers to workers, 
+Starlight speeds up deploying and updating containers on workers, 
 while maintaining backwards compatibility with existing tools.
-It is so fast that some containers start faster than merely downloading an optimized data package, 
+It is so fast that containers can start faster than merely downloading an optimized data package, 
 yet with practically no overhead. 
 
 ## Extend cloud practices further to the edge and WAN
-Using containers to provision workers in high latency environments is often tricky.
+Using containers to provision workers in high-latency or low-bandwidth environments can be tricky.
 The time it takes to deploy software and start a container increase dramatically with latency, 
 and increase at a higher rate than the equivalent time to simply download the data.
 Outside the datacenter, where round-trip times are in the order of tens or hundreds of milliseconds, 
 container provisioning can be several times slower than in the cloud, even when the network has reasonable bandwidth.
 
-## Why?
+### Why?
 The root cause for this slow provisioning time is the overall design of the provisioning pipeline: 
 it is pull-based, designed around the stack-of-layers abstraction container images, 
 and does not explicitly consider container updates.
 For example, updating a Java application to fix the Log4j vulnerability usually requires re-downloading the entire container image, even though the updated Log4j library only takes a fraction of that space. 
 
-## How
+### How
 Starlight is an accelerator for provisioning container-based applications that 
 decouples the mechanism of container provisioning from container development.
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
 <br>[Find out how Starlight works by reading the paper or here ➡️](docs/starlight-workflow.md)
-
 
 ## Architecture
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
