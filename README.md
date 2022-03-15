@@ -11,7 +11,7 @@ yet with practically no overhead.
 The image on the right compares time to download and start containers using containerd ("baseline"), [eStargz](https://github.com/containerd/stargz-snapshotter/blob/main/docs/estargz.md), Starlight, and the time it takes to download an optimized update package using wget. 
 The registry is in North Virginia.
 Top row shows time to deploy a container to an empty worker, and bottom row time to update the container to a later version.
-Raad our [NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin) for more results.
+Read our [NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin) for more results.
 
 ### Extend cloud practices to the edge and WAN
 Using containers to provision workers in high-latency or low-bandwidth environments can be tricky.
