@@ -61,7 +61,6 @@ and it needs some environment variables in `config.env` (details are in the next
 
 
 2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.
-(You may want to change `starlightregistry` to your container registry.)
 ```dotenv
 REGISTRY=http://starlightregistry:5000
 LOGLEVEL=info

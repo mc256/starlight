@@ -16,7 +16,7 @@ ENV LOGLEVEL=info
 RUN make build-starlight-proxy
 EXPOSE 8090
 
-CMD ["sh", "-c", "/go/src/app/.out/starlight-proxy $REGISTRY $LOGLEVEL"]
+CMD ["sh", "-c", "/go/src/app/out/starlight-proxy $REGISTRY $LOGLEVEL"]
 
 
 
