@@ -1,12 +1,12 @@
 version: "3"
 services:
   starlightproxy:
-    image: registry.yuri.moe/starlight-proxy:latest
+    image: ghcr.io/mc256/starlight/proxy:latest
     container_name: starlightproxy
     ports:
       - 8090:8090
     environment:
-      - REGISTRY=http://starlightregistry:5000
+      #- REGISTRY=http://starlightregistry:5000
       - LOGLEVEL=info
     volumes:
       - "./data:/go/src/app/data:rw"

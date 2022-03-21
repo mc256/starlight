@@ -11,8 +11,6 @@ Configure the proxy server to point to the registry and run it. Starlight suppor
 
 
 ---
-
-
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
 
 This is an all-in-one example in case you don't have full access to a container registry.
@@ -39,27 +37,28 @@ docker ps
 git clone https://github.com/mc256/starlight.git && \
 cd starlight/demo/compose/registry+proxy && \
 docker-compose up -d
+# Creating network "registryproxy_default" with the default driver
+# Creating starlightproxy    ... done
+# Creating starlightregistry ... done
 ```
 The Starlight proxy writes image metadata to `./data_proxy` folder, and
-the container registry writes images to `./data_registry`
+the container registry saves container images to `./data_registry`
 
 
 2. Verify the registry and proxy are running.
-
 ```shell
 curl http://localhost:8090/
-#
-curl http://localhost:5000/
-#
+# Starlight Proxy OK!
+curl http://localhost:5000/v2/
+# {}
 ```
 
 The Starlight proxy listens on port 8090. 
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
 
+3. Upload a few container images to the registry for testing
 
-
-4. Upload a few container images to the registry for testing
 ```shell
 docker pull redis:6.2.1 && \
 docker pull redis:6.2.2 && \
@@ -69,50 +68,59 @@ docker push localhost:5000/redis:6.2.1 && \
 docker push localhost:5000/redis:6.2.2
 ```
 
-5. 
+This step is optional but recommended. 
+You could upload other container images to the registry.
 
 
-
-
+---
 ## Method 2. Use Docker Compose (Starlight Only)
 
 The prebuilt Starlight proxy container image is available at  `ghcr.io/mc256/starlight/proxy:latest`.
 
+0. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
 
-0. Install Docker and Docker Compose  
-
-Install [Docker ➡️](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
-
-Install [Docker Compose ➡️](https://docs.docker.com/compose/install/) 
-
-To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
-
-1. 
-
-``
-
-
-The Starlight proxy listens on port 8090. 
-We should put a Nginx reverse proxy to handle SSL certificates or load balancing.
-But for simplicity, this part is ignored in this example.
-The Starlight proxy writes image metadata to `./data_proxy` folder.
-
-
-2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.
-(You may want to change `starlightregistry` to your container registry.)
-```dotenv
-REGISTRY=https://starlightregistry
-LOGLEVEL=info
-```
- 
-
-3. Launch the container 
+If using Ubuntu 20.04 LTS, you could install Docker and Docker Compose using the following commands: 
 ```shell
+sudo apt install docker-compose && \
+sudo usermod -aG docker $USER
+```
+After adding the current user to the `docker` group, you may need to log out and log in to take effect.
+To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
+```shell
+docker ps
+# CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+1. Clone this project 
+
+```shell
+git clone https://github.com/mc256/starlight.git && \
+```
+
+2. Set `REGISTRY` environment variable to your own container registry. 
+
+```shell
+echo "REGISTRY=http://starlightregistry:5000" >> ./starlight/demo/compose/proxy/.env
+```
+
+3. Launch the proxy
+```shell
+cd ./starlight/demo/compose/proxy && \
 docker-compose up -d
 ```
 
-Deployments with registry, Nginx reverse proxy and other examples are available in [`demo/compose`](https://github.com/mc256/starlight/tree/master/demo/compose) folder in this repository.
+The Starlight proxy writes image metadata to `./data_proxy` folder, and
+the container registry saves container images to `./data_registry`
 
+2. Verify the registry and proxy are running.
+```shell
+curl http://localhost:8090/
+# Starlight Proxy OK!
+```
+
+The Starlight proxy listens on port 8090. 
+We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
+But for simplicity, this part is ignored in this example.
 
 ## Method 3. Build from source
 
@@ -155,6 +163,11 @@ make build-starlight-proxy
 curl http://localhost:8090/
 # Starlight Proxy OK!
 ```
+
+
+
+
+
 
 ---
 ## Known Issues
