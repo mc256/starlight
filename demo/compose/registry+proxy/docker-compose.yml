@@ -1,0 +1,23 @@
+version: "3"
+services:
+  starlightproxy:
+    image: ghcr.io/mc256/starlight/proxy:latest
+    container_name: starlightproxy
+    ports:
+      - 8090:8090
+    environment:
+      - REGISTRY=http://starlightregistry:5000
+      - LOGLEVEL=info
+    volumes:
+      - "./data_proxy:/go/src/app/data:rw"
+    restart: always
+  starlightregistry:
+    image: registry:2
+    container_name: starlightregistry
+    ports:
+    - 5000:5000
+    environment:
+    - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
+    volumes:
+    - "./data_registry:/data:rw"
+    restart: always

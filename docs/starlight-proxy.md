@@ -16,63 +16,61 @@ Configure the proxy server to point to the registry and run it. Starlight suppor
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
 
 This is an all-in-one example in case you don't have full access to a container registry.
-We could use Docker Compose to deploy both the proxy and the registry on the same machine. 
+We could use Docker Compose to deploy both the proxy and the registry on the same machine.
 
-0. Install Docker and Docker Compose  
 
-Install [Docker ➡️](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+0. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
 
-Install [Docker Compose ➡️](https://docs.docker.com/compose/install/) 
-
+If using Ubuntu 20.04 LTS, you could install Docker and Docker Compose using the following commands: 
+```shell
+sudo apt install docker-compose && \
+sudo usermod -aG docker $USER
+```
+After adding the current user to the `docker` group, you may need to log out and log in to take effect.
 To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
+```shell
+docker ps
+# CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
 
-1. Create `docker-compose.yml` file in an empty folder
+1. Clone this project and launch the registry and proxy containers from `./demo/compose/registry+proxy`
 
-```yaml
-version: "3"
-services:
-  starlightproxy:
-    image: ghcr.io/mc256/starlight/proxy:latest
-    container_name: starlightproxy
-    ports:
-      - 80:8090
-    env_file:
-      - config.env
-    volumes:
-      - "./data:/go/src/app/data:rw"
-    restart: always
-  starlightregistry:
-    image: registry:2
-    container_name: starlightregistry
-    ports:
-    - 5000:5000
-    environment:
-    - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
-    volumes:
-    - "./data:/data:rw"
-    restart: always
+```shell
+git clone https://github.com/mc256/starlight.git && \
+cd starlight/demo/compose/registry+proxy && \
+docker-compose up -d
+```
+The Starlight proxy writes image metadata to `./data_proxy` folder, and
+the container registry writes images to `./data_registry`
+
+
+2. Verify the registry and proxy are running.
+
+```shell
+curl http://localhost:8090/
+#
+curl http://localhost:5000/
+#
 ```
 
 The Starlight proxy listens on port 8090. 
-We should put a Nginx reverse proxy to handle SSL certificates or load balancing.
+We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
-The Starlight proxy writes image metadata to `./data` folder, 
-and it needs some environment variables in `config.env` (details are in the next step).
 
 
-2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.
-```dotenv
-REGISTRY=http://starlightregistry:5000
-LOGLEVEL=info
-```
- 
 
-3. Launch the container 
+4. Upload a few container images to the registry for testing
 ```shell
-docker-compose up -d
+docker pull redis:6.2.1 && \
+docker pull redis:6.2.2 && \
+docker tag redis:6.2.1 localhost:5000/redis:6.2.1 && \
+docker tag redis:6.2.2 localhost:5000/redis:6.2.2 && \
+docker push localhost:5000/redis:6.2.1 && \
+docker push localhost:5000/redis:6.2.2
 ```
 
-Deployments with registry, Nginx reverse proxy and other examples are available in [`demo/compose`](https://github.com/mc256/starlight/tree/master/demo/compose) folder in this repository.
+5. 
+
 
 
 
@@ -89,28 +87,15 @@ Install [Docker Compose ➡️](https://docs.docker.com/compose/install/)
 
 To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
 
-1. Create `docker-compose.yml` file in an empty folder
+1. 
 
-```yaml
-version: "3"
-services:
-  starlightproxy:
-    image: ghcr.io/mc256/starlight/proxy:latest
-    container_name: starlightproxy
-    ports:
-      - 8090:8090
-    env_file:
-      - config.env
-    volumes:
-      - "./data:/go/src/app/data:rw"
-    restart: always
-```
+``
+
 
 The Starlight proxy listens on port 8090. 
 We should put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
-The Starlight proxy writes image metadata to `./data` folder, 
-and it needs some environment variables in `config.env` (details are in the next step).
+The Starlight proxy writes image metadata to `./data_proxy` folder.
 
 
 2. Create `config.env` file in the same folder. This configuration points the proxy to the registry.

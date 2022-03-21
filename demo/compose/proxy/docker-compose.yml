@@ -5,8 +5,9 @@ services:
     container_name: starlightproxy
     ports:
       - 8090:8090
-    env_file:
-      - config.env
+    environment:
+      - REGISTRY=http://starlightregistry:5000
+      - LOGLEVEL=info
     volumes:
       - "./data:/go/src/app/data:rw"
     restart: always
