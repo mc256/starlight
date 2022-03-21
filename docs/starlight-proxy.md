@@ -8,8 +8,6 @@ Configure the proxy server to point to the registry and run it. Starlight suppor
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight)
 
-
-
 ---
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
 
@@ -107,10 +105,10 @@ echo "REGISTRY=http://starlightregistry:5000" >> ./starlight/demo/compose/proxy/
 ```shell
 cd ./starlight/demo/compose/proxy && \
 docker-compose up -d
+# Creating starlightproxy ... done
 ```
 
-The Starlight proxy writes image metadata to `./data_proxy` folder, and
-the container registry saves container images to `./data_registry`
+The Starlight proxy writes image metadata to `./data_proxy` folder.
 
 2. Verify the registry and proxy are running.
 ```shell
@@ -122,23 +120,27 @@ The Starlight proxy listens on port 8090.
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
 
+---
 ## Method 3. Build from source
 
-
 0. Install Go https://go.dev/doc/install ➡️
-
 ```shell
 wget https://go.dev/dl/go1.17.8.linux-amd64.tar.gz &&
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.8.linux-amd64.tar.gz
 ```
 
 1. Add Go to the environment variable (You may want to change `.zshrc` or `.bashrc` file to permanently add this folder to the `PATH` environment variable)
-
 ```
 export PATH=$PATH:/usr/local/go/bin
 ```
 
-3. Install necessary tools to build this project
+2. Verify Go is available with `go version`
+```shell
+go version
+#go version go1.17.8 linux/amd64
+```
+
+4. Install necessary tools to build this project
 
 ```shell
 sudo apt update && \
@@ -158,15 +160,18 @@ cd starlight
 make build-starlight-proxy
 ```
 
-6. Verify the Starlight Proxy is working
+6. Run Starlight
+```shell
+cd ./out && \
+mkdir ./data && \
+./starlight-proxy http://myregistry:5000 &
+```
+
+7. Verify the Starlight Proxy is working
 ```shell
 curl http://localhost:8090/
 # Starlight Proxy OK!
 ```
-
-
-
-
 
 
 ---
