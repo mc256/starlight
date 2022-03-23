@@ -15,8 +15,8 @@ Read our [NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation
 
 ### Extend cloud practices to the edge and WAN
 Using containers to provision workers in high-latency or low-bandwidth environments can be tricky.
-The time it takes to deploy software and start a container increase dramatically with latency, 
-and increase at a higher rate than the equivalent time to simply download the data.
+The time it takes to deploy software and start a container increases dramatically with latency, 
+and increases at a higher rate than the equivalent time to simply download the data.
 Outside the datacenter, where round-trip times are in the order of tens or hundreds of milliseconds, 
 container provisioning can be several times slower than in the cloud, even when the network has reasonable bandwidth.
 
@@ -27,7 +27,7 @@ and does not explicitly consider container updates.
 For example, updating a Java application to fix the Log4j vulnerability usually requires re-downloading the entire container image, even though the updated Log4j library only takes a fraction of that space. 
 This can make provisioning slower than it should be even inside cloud data centers.
 
-### How we address this?
+### How do we address this?
 Starlight decouples the mechanism of container provisioning from container development.
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
