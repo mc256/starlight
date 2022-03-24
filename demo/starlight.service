@@ -1,7 +1,8 @@
 [Unit]
 Description=Starlight snapshotter GRPC service
 Documentation=https://github.com/mc256/starlight
-After=network.target local-fs.target
+After=network.target local-fs.target containerd.service
+Wants=containerd.service
 
 [Service]
 ExecStart=/usr/bin/starlight-grpc run STARLIGHT_PROXY
