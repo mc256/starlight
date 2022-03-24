@@ -68,7 +68,7 @@ make build-starlight-grpc build-ctr-starlight
 
 ### Step 3. Configure Starlight Snapshotter
 
-Install Starlight Snapshotter `systemd` service and CLI tool
+Install Starlight Snapshotter `systemd` service and CLI tool. 
 ```shell
 sudo make install install-systemd-service
 #Please enter Starlight Proxy address (example: proxy.mc256.dev:8090):proxy.mc256.dev:8090
