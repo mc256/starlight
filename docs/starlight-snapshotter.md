@@ -1,4 +1,4 @@
-# Starlight Snapshotter Plugin and CLI tool
+# Starlight Snapshotter Plugin
 
 This is the **step 2** to use Starlight:
 
@@ -8,16 +8,18 @@ installing **containerd** and the **Starlight snapshotter plugin**,
 configuring containerd to use the plugin, 
 and starting the Starlight snapshotter daemon
 (you also need to tell the snapshotter the address of the proxy server).
-<br>[Find out how to install **containerd** ➡️](https://containerd.io/downloads/)
-
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight)
 
 ---
 
 ### Step 1. Install Dependencies
+ 
+The worker machine is supposed to be far away (in latency) to the registry and proxy.
+Please do not install **containerd** and the **Starlight snapshotter plugin** on the same machine that runs the proxy or the registry. 
+We use Ubuntu 20.04 as an example. 
+The worker machine needs `build-essential` and `containerd`.
 
-We use Ubuntu 20.04 as an example. We will need `build-essential` and `containerd`.
 
 ```shell
 sudo apt update && sudo apt upgrade -y && \
@@ -33,17 +35,16 @@ sudo systemctl start containerd
 Verify `containerd` is running
 ```shell
 sudo systemctl status containerd
+#      Active: active
 ```
 
 Install Go https://go.dev/doc/install ➡️
-
 ```shell
 wget https://go.dev/dl/go1.17.8.linux-amd64.tar.gz && \
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.17.8.linux-amd64.tar.gz
 ```
 
 Add Go to the environment variable (You may want to change `.zshrc` or `.bashrc` file to permanently add this folder to the `PATH` environment variable)
-
 ```shell
 export PATH=$PATH:/usr/local/go/bin
 ```
@@ -51,17 +52,16 @@ export PATH=$PATH:/usr/local/go/bin
 Verify Go is available
 ```shell
 go version
+# go version go1.17.8 linux/amd64
 ```
 
 
 ### Step 2. Clone and Build
-
 Clone the Starlight repository
 ```shell
 git clone https://github.com/mc256/starlight.git && \
 cd starlight
 ```
-
 
 Build the snapshotter plugin and CLI tool
 ```shell

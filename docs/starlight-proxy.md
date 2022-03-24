@@ -6,7 +6,7 @@ This is the **step 1** to use Starlight:
 Set up a Starlight proxy, ideally close to the registry server you are using. 
 Configure the proxy server to point to the registry and run it. Starlight supports any standard registry.
 
-[⬅️ Back to README.md](https://github.com/mc256/starlight)
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
 ---
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
@@ -65,10 +65,9 @@ docker tag redis:6.2.2 localhost:5000/redis:6.2.2 && \
 docker push localhost:5000/redis:6.2.1 && \
 docker push localhost:5000/redis:6.2.2
 ```
+This step is optional, you could upload other container images to the registry.
 
-This step is optional but recommended. 
-You could upload other container images to the registry.
-
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
 
 ---
 ## Method 2. Use Docker Compose (Starlight Only)
@@ -119,6 +118,8 @@ curl http://localhost:8090/
 The Starlight proxy listens on port 8090. 
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
+
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
 ---
 ## Method 3. Build from source
@@ -173,6 +174,11 @@ curl http://localhost:8090/
 # Starlight Proxy OK!
 ```
 
+The Starlight proxy listens on port 8090. 
+We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
+But for simplicity, this part is ignored in this example.
+
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
 ---
 ## Known Issues
