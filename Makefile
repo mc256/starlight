@@ -4,6 +4,7 @@
 TARGETS=starlight-proxy starlight-grpc ctr-starlight
 
 .PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight install install-systemd-service
+.SILENT: install-systemd-service
 
 ######################################################################
 # Build
@@ -36,5 +37,11 @@ install:
 	install ./out/*-* /usr/bin
 
 install-systemd-service:
-	cp ./demo/starlight.service /lib/systemd/system/
-	systemctl daemon-reload
+	./demo/install.sh
+	#@printf "Please enter Starlight Proxy address (example: \033[92mproxy.mc256.dev:8090\033[0m):"
+	#@read proxy_address; \
+	#echo $$proxy_address; \
+	#service_file=`cat './demo/starlight.service'`; \
+	#echo `subst "STARLIGHT_PROXY",$(proxy_address),$(service_file)`; \
+	#cp ./demo/starlight.service /lib/systemd/system/
+	#systemctl daemon-reload

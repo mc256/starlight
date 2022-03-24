@@ -4,7 +4,7 @@ Documentation=https://github.com/mc256/starlight
 After=network.target local-fs.target
 
 [Service]
-ExecStart=/usr/bin/starlight-grpc run
+ExecStart=/usr/bin/starlight-grpc run STARLIGHT_PROXY
 
 Type=simple
 KillMode=process

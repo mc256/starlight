@@ -16,11 +16,10 @@ and starting the Starlight snapshotter daemon
 ### Step 1. Install Dependencies
  
 The worker machine is supposed to be far away (in latency) to the registry and proxy.
-Please do not install **containerd** and the **Starlight snapshotter plugin** on the same machine that runs the proxy or the registry. 
+Please install **containerd** and **Starlight snapshotter** on a new machine (or VM), not the same machine that runs the proxy or the registry. 
+
 We use Ubuntu 20.04 as an example. 
 The worker machine needs `build-essential` and `containerd`.
-
-
 ```shell
 sudo apt update && sudo apt upgrade -y && \
 sudo apt install build-essential containerd
@@ -55,7 +54,6 @@ go version
 # go version go1.17.8 linux/amd64
 ```
 
-
 ### Step 2. Clone and Build
 Clone the Starlight repository
 ```shell
@@ -68,6 +66,8 @@ Build the snapshotter plugin and CLI tool
 make build-starlight-grpc build-ctr-starlight
 ```
 
+### Step 3. Configure Starlight Snapshotter
+
 Edit `./demo/starlight.service` to use Starlight Proxy. 
 Find the line that starts with `ExecStart=` and add `--server=YOURDNSSERVER`
 If you are using HTTP, please also add `--plain-http`. 
@@ -76,7 +76,7 @@ Example:
 ExecStart=/usr/bin/starlight-grpc run  --plain-http --server=proxy.yuri.moe
 ```
 
-Install snapshotter service and CLI tool
+Install Starlight Snapshotter `systemd` service and CLI tool
 ```shell
 sudo make install install-systemd-service
 ```
@@ -93,7 +93,7 @@ sudo systemctl status starlight
 # it should be "active".
 ```
 
-### Step 3. Configure Snapshotter
+### Step 3. Configure `contaienrd`
 
 Add the following configuration to `/etc/containerd/config.toml`.
 ```toml
@@ -113,6 +113,9 @@ Verify the Starlight snapshotter plugin is functioning
 sudo ctr plugin ls | grep starlight 
 # io.containerd.snapshotter.v1    starlight                -              ok
 ```
+
+🙌 That's it. Please go back to the 
+
 
 ---
 
