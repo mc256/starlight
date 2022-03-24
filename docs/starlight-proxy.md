@@ -19,7 +19,9 @@ We could use Docker Compose to deploy both the proxy and the registry on the sam
 
 If using Ubuntu 20.04 LTS, you could install Docker and Docker Compose using the following commands: 
 ```shell
-sudo apt install docker-compose && \
+sudo apt update && \
+sudo apt upgrade -y && \
+sudo apt install -y docker-compose && \
 sudo usermod -aG docker $USER
 ```
 After adding the current user to the `docker` group, you may need to log out and log in to take effect.
@@ -65,7 +67,10 @@ docker tag redis:6.2.2 localhost:5000/redis:6.2.2 && \
 docker push localhost:5000/redis:6.2.1 && \
 docker push localhost:5000/redis:6.2.2
 ```
-This step is optional, you could upload other container images to the registry.
+
+You could upload other container images to the registry if you like.
+
+🙌 That's it. Please proceed to the **Step 2*.
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
 
@@ -78,7 +83,9 @@ The prebuilt Starlight proxy container image is available at  `ghcr.io/mc256/sta
 
 If using Ubuntu 20.04 LTS, you could install Docker and Docker Compose using the following commands: 
 ```shell
-sudo apt install docker-compose && \
+sudo apt update && \
+sudo apt upgrade -y && \
+sudo apt install -y docker-compose && \
 sudo usermod -aG docker $USER
 ```
 After adding the current user to the `docker` group, you may need to log out and log in to take effect.

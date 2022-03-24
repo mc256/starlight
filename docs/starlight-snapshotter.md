@@ -22,7 +22,7 @@ We use Ubuntu 20.04 as an example.
 The worker machine needs `build-essential` and `containerd`.
 ```shell
 sudo apt update && sudo apt upgrade -y && \
-sudo apt install build-essential containerd
+sudo apt install -y build-essential containerd
 ```
 
 Enable `containerd`
@@ -91,12 +91,15 @@ sudo systemctl status starlight
 
 ### Step 3. Configure `contaienrd`
 
-Add the following configuration to `/etc/containerd/config.toml`.
-```toml
+Add configuration to `/etc/containerd/config.toml`. 
+(If you have set other `proxy_plugins`, please manually edit the file)
+```shell
+cat <<EOT >> /etc/containerd/config.toml
 [proxy_plugins]
   [proxy_plugins.starlight]
     type = "snapshot"
     address = "/run/starlight-grpc/starlight-snapshotter.socket"
+EOT
 ```
 
 Restart `containerd` service
@@ -110,7 +113,9 @@ sudo ctr plugin ls | grep starlight
 # io.containerd.snapshotter.v1    starlight                -              ok
 ```
 
-🙌 That's it. Please go back to the 
+🙌 That's it. Please proceed to the **Step 3**.
+
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
 
 
 ---
