@@ -67,8 +67,11 @@ and then the layers stored in the registry.
 The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
 In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
 <br>The **Starlight CLI tool** features the image conversion, example:
-<br>```ctr-starlight convert $MY_REGISTRY/redis:6.2.1 $MY_REGISTRY/redis:6.2.1-starlight```
-<br>(`$MY_REGISTRY` will be the server that runs container registry, for example, `gcr.io`)
+```shell
+ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
+```
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$REGISTRY is your container registry (e.g. `172.18.2.3:5000`).<br> 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please remove `--insecure-source` or `--insecure-destination` if the registry uses HTTPS.
 
 4) Collect traces on the worker for container startup. 
    This entails starting the container on the worker while collecting file access traces that are sent to the proxy.

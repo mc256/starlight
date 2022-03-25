@@ -1,7 +1,7 @@
 # Starlight Proxy
 
 
-This is the **step 1** to use Starlight:
+This is the **Step 1** to use Starlight:
 
 Set up a Starlight proxy, ideally close to the registry server you are using. 
 Configure the proxy server to point to the registry and run it. Starlight supports any standard registry.

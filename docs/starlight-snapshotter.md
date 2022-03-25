@@ -1,6 +1,6 @@
 # Starlight Snapshotter Plugin
 
-This is the **step 2** to use Starlight:
+This is the **Step 2** to use Starlight:
 
 Set up the worker to be able to run Starlight. 
 This involves 
@@ -13,7 +13,7 @@ and starting the Starlight snapshotter daemon
 
 ---
 
-### Step 1. Install Dependencies
+### 1. Install Dependencies
  
 The worker machine is supposed to be far away (in latency) to the registry and proxy.
 Please install **containerd** and **Starlight snapshotter** on a new machine (or VM), not the same machine that runs the proxy or the registry. 
@@ -54,7 +54,7 @@ go version
 # go version go1.17.8 linux/amd64
 ```
 
-### Step 2. Clone and Build
+### 2. Clone and Build
 Clone the Starlight repository
 ```shell
 git clone https://github.com/mc256/starlight.git && \
@@ -66,9 +66,10 @@ Build the snapshotter plugin and CLI tool
 make build-starlight-grpc build-ctr-starlight
 ```
 
-### Step 3. Configure Starlight Snapshotter
+### 3. Configure Starlight Snapshotter
 
-Install Starlight Snapshotter `systemd` service and CLI tool. 
+Install Starlight Snapshotter `systemd` service and CLI tool.
+Please follow the prompt, enter the IP address / DNS of the Starlight Proxy server (in **Step 1**. [Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) )
 ```shell
 sudo make install install-systemd-service
 #Please enter Starlight Proxy address (example: proxy.mc256.dev:8090):proxy.mc256.dev:8090
@@ -89,12 +90,13 @@ sudo systemctl status starlight
 # it should be "active".
 ```
 
-### Step 3. Configure `contaienrd`
+### 4. Configure `contaienrd`
 
 Add configuration to `/etc/containerd/config.toml`. 
 (If you have set other `proxy_plugins`, please manually edit the file)
 ```shell
-cat <<EOT >> /etc/containerd/config.toml
+sudo mkdir /etc/containerd/ && \
+cat <<EOT | sudo tee -a /etc/containerd/config.toml > /dev/null
 [proxy_plugins]
   [proxy_plugins.starlight]
     type = "snapshot"
