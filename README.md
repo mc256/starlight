@@ -78,7 +78,7 @@ ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6
    
    The **Starlight CLI tool** features trace collection, example:
    ```shell
-   ctr-starlight pull redis:6.2.1-starlight && \
+   sudo ctr-starlight pull redis:6.2.1-starlight && \
    mkdir /tmp/test-redis-data && \
    sudo ctr-starlight create --optimize \
       	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
@@ -87,7 +87,7 @@ ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6
    	redis:6.2.1-starlight \
    	redis:6.2.1-starlight \
    	$MY_RUNTIME && \
-   ctr task start $MY_RUNTIME
+   sudo ctr task start $MY_RUNTIME
    ```
    (`$MY_RUNTIME` can be any string)
 
