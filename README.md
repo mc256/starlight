@@ -62,16 +62,21 @@ and starting the Starlight snapshotter daemon
 
 
 3) Convert the container image to the **Starlight format** container image.
-More specifically, the storage format of the compressed layers needs to be converted to the Starlight format 
-and then the layers stored in the registry. 
-The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
-In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
-<br>The **Starlight CLI tool** features the image conversion, example:
-```shell
-ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
-```
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$REGISTRY is your container registry (e.g. `172.18.2.3:5000`).<br> 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please remove `--insecure-source` or `--insecure-destination` if the registry uses HTTPS.
+   More specifically, the storage format of the compressed layers needs to be converted to the Starlight format and then the layers stored in the registry. 
+   The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
+   The **Starlight CLI tool** features the image conversion, example:
+   ```shell
+	ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
+   ```
+   `$REGISTRY` is your container registry (e.g. `172.18.2.3:5000`).
+   Please remove `--insecure-source` or `--insecure-destination` if the registry uses HTTPS.
+   
+   In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
+   ```shell
+   curl http://$STARLIGHTPROXY/prepare/redis:6.2.1-starlight
+   #Cached TOC: redis:6.2.1-starlight
+   ```
+   `$STARLIGHTPROXY` is the address of your Starlight Proxy (e.g. `172.18.2.3:8090`)
 
 4) Collect traces on the worker for container startup. 
    This entails starting the container on the worker while collecting file access traces that are sent to the proxy.
@@ -81,22 +86,21 @@ ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6
    sudo ctr-starlight pull redis:6.2.1-starlight && \
    mkdir /tmp/test-redis-data && \
    sudo ctr-starlight create --optimize \
-      	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-   	--env-file ./demo/config/all.env \
-   	--net-host \
-   	redis:6.2.1-starlight \
-   	redis:6.2.1-starlight \
-   	$MY_RUNTIME && \
+          --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+       --env-file ./demo/config/all.env \
+       --net-host \
+       redis:6.2.1-starlight \
+       redis:6.2.1-starlight \
+       $MY_RUNTIME && \
    sudo ctr task start $MY_RUNTIME
    ```
-   (`$MY_RUNTIME` can be any string)
+   `$MY_RUNTIME` can be any string.
 
    After finished running the container several times, then we can report all the traces to the proxy, using:
 
    ```shell
-   ctr-starlight report --server $MY_STARLIGHT_PROXY
+   ctr-starlight report --server $STARLIGHTPROXY
    ```
-   (`$MY_STARLIGHT_PROXY` will be the server that runs Starlight proxy, for example, `192.168.1.3`)
 
 5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
    ```shell
