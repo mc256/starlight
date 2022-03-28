@@ -131,7 +131,7 @@ sudo ctr-starlight create \
 	redis:6.2.1-starlight \
 	redis:6.2.1-starlight \
     $MY_RUNTIME && \
-ctr task start $MY_RUNTIME
+sudo ctr task start $MY_RUNTIME
 ```
 
 Update a container using Starlight
@@ -145,7 +145,7 @@ sudo ctr-starlight create \
 	redis:6.2.2-starlight \
 	redis:6.2.2-starlight \
     $MY_RUNTIME_2 && \
-ctr task start $MY_RUNTIME_2
+sudo ctr task start $MY_RUNTIME_2
 ```
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
