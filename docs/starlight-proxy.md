@@ -70,7 +70,7 @@ docker push localhost:5000/redis:6.2.2
 
 You could upload other container images to the registry if you like.
 
-🙌 That's it. Please proceed to the **Step 2*.
+🙌 That's it. Please proceed to the **Step 2**.
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
 
