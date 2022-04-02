@@ -66,10 +66,11 @@ and starting the Starlight snapshotter daemon
    The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
    The **Starlight CLI tool** features the image conversion, example:
    ```shell
-    ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
+    ctr-starlight convert \
+        --insecure-source --insecure-destination \
+        $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
    ```
    `$REGISTRY` is your container registry (e.g. `172.18.2.3:5000`).
-   Please remove `--insecure-source` or `--insecure-destination` if the registry uses HTTPS.
    
    In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
    ```shell
@@ -94,14 +95,19 @@ and starting the Starlight snapshotter daemon
        instance1 && \
    sudo ctr task start instance1
    ```
-   You may terminate the container using `Ctrl-C`. 
+   
+   You may terminate the container using `Ctrl-C`, and remove the container:
+   ```shell
+   sudo ctr container rm instance1
+   ```
+   Traces will be saved to `/tmp/starlight-optimizer` folder.
+   
    After finished running the container several times, then we can report all the traces to the proxy, using:
-
    ```shell
    ctr-starlight report --server $STARLIGHT_PROXY --plain-http
    ```
 
-6) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
+5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
    ```shell
    sudo systemctl stop containerd && \
    sudo systemctl stop starlight && \
@@ -129,8 +135,8 @@ sudo ctr-starlight create \
 	--net-host \
 	redis:6.2.1-starlight \
 	redis:6.2.1-starlight \
-    $MY_RUNTIME && \
-sudo ctr task start $MY_RUNTIME
+    instance3 && \
+sudo ctr task start instance3
 ```
 
 Update a container using Starlight
@@ -143,8 +149,8 @@ sudo ctr-starlight create \
 	--net-host \
 	redis:6.2.2-starlight \
 	redis:6.2.2-starlight \
-    $MY_RUNTIME_2 && \
-sudo ctr task start $MY_RUNTIME_2
+    instance4 && \
+sudo ctr task start instance4
 ```
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
