@@ -66,17 +66,17 @@ and starting the Starlight snapshotter daemon
    The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
    The **Starlight CLI tool** features the image conversion, example:
    ```shell
-	ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
+    ctr-starlight convert --insecure-source --insecure-destination $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
    ```
    `$REGISTRY` is your container registry (e.g. `172.18.2.3:5000`).
    Please remove `--insecure-source` or `--insecure-destination` if the registry uses HTTPS.
    
    In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
    ```shell
-   curl http://$STARLIGHTPROXY/prepare/redis:6.2.1-starlight
+   curl http://$STARLIGHT_PROXY/prepare/redis:6.2.1-starlight
    #Cached TOC: redis:6.2.1-starlight
    ```
-   `$STARLIGHTPROXY` is the address of your Starlight Proxy (e.g. `172.18.2.3:8090`)
+   `$STARLIGHT_PROXY` is the address of your Starlight Proxy (e.g. `172.18.2.3:8090`)
 
 4) Collect traces on the worker for container startup. 
    This entails starting the container on the worker while collecting file access traces that are sent to the proxy.
@@ -91,18 +91,17 @@ and starting the Starlight snapshotter daemon
        --net-host \
        redis:6.2.1-starlight \
        redis:6.2.1-starlight \
-       $MY_RUNTIME && \
-   sudo ctr task start $MY_RUNTIME
+       instance1 && \
+   sudo ctr task start instance1
    ```
-   `$MY_RUNTIME` can be any string.
-
+   You may terminate the container using `Ctrl-C`. 
    After finished running the container several times, then we can report all the traces to the proxy, using:
 
    ```shell
-   ctr-starlight report --server $STARLIGHTPROXY
+   ctr-starlight report --server $STARLIGHT_PROXY --plain-http
    ```
 
-5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
+6) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
    ```shell
    sudo systemctl stop containerd && \
    sudo systemctl stop starlight && \

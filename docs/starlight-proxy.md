@@ -24,7 +24,7 @@ sudo apt upgrade -y && \
 sudo apt install -y docker-compose && \
 sudo usermod -aG docker $USER
 ```
-After adding the current user to the `docker` group, you may need to log out and log in to take effect.
+After adding the current user to the `docker` group, you may _need to log out and log in_ to take effect.
 To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
 ```shell
 docker ps
@@ -56,6 +56,7 @@ curl http://localhost:5000/v2/
 The Starlight proxy listens on port 8090. 
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
+Please add port 8090 and 5000 to the firewall whitelist, the worker has to access these ports.
 
 3. Upload a few container images to the registry for testing
 
@@ -70,7 +71,13 @@ docker push localhost:5000/redis:6.2.2
 
 You could upload other container images to the registry if you like.
 
-🙌 That's it. Please proceed to the **Step 2**.
+🙌 That's it. Please obtain the IP address of the server and proceed to the **Step 2**.
+
+```shell
+# update the IP address keep this for future use. 
+export STARLIGHT_PROXY=<ip address of your server>:8090
+export REGISTRY=<ip address of your server>:5000
+```
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
 

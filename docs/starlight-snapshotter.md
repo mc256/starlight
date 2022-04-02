@@ -68,11 +68,25 @@ make build-starlight-grpc build-ctr-starlight
 
 ### 3. Configure Starlight Snapshotter
 
+You need to find out the IP address / DNS of the Starlight Proxy server (in **Step 1**. [Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) )
+
+```shell
+# This is an example
+export STARLIGHT_PROXY=172.31.23.228:8090
+export REGISTRY=172.31.23.228:5000
+```
+
+Verify that the Starlight proxy is accessible from the worker. 
+```shell
+curl http://$STARLIGHT_PROXY
+# Starlight Proxy OK!
+```
+
 Install Starlight Snapshotter `systemd` service and CLI tool.
-Please follow the prompt, enter the IP address / DNS of the Starlight Proxy server (in **Step 1**. [Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) )
+Please follow the prompt, enter 
 ```shell
 sudo make install install-systemd-service
-#Please enter Starlight Proxy address (example: proxy.mc256.dev:8090):proxy.mc256.dev:8090
+#Please enter Starlight Proxy address (example: proxy.mc256.dev:8090):172.18.1.3:8090
 #Enable HTTPS Certificate (requires load balancer like Nginx) (y/N):n
 #Created systemd service file (/lib/systemd/system/starlight.service)
 #Reloaded systemd daemon
