@@ -1,7 +1,9 @@
 # TL;DR All-in-one Quick Start Guide
 
-To finish this guide, you will need two machines far away from each other. 
-One acts as the Cloud, and one acts as the Edge. You will need to identify the IP address of the Cloud server.
+To finish this guide, you will need TWO machines (or VMs) far away from each other. 
+One acts as the Cloud, and the other acts as the Edge. You will need to identify the IP address of the Cloud server.
+
+The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 20.04 LTS.
 
 
 ## The "Cloud"
