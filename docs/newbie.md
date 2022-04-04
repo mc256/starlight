@@ -238,7 +238,7 @@ sudo ctr-starlight create --optimize \
    --net-host \
    redis:6.2.2-starlight \
    redis:6.2.2-starlight \
-   instance1 && \
+   instance2 && \
 sudo ctr task start instance2
 ```
 
@@ -278,7 +278,6 @@ sudo ctr task start instance3
 Update a container using Starlight
 ```shell
 sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
-mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
 	--env-file ./demo/config/all.env \

@@ -136,7 +136,6 @@ sudo ctr task start instance3
 Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:6.2.2`)
 ```shell
 sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
-mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
 	--env-file ./demo/config/all.env \
@@ -146,6 +145,9 @@ sudo ctr-starlight create \
     instance4 && \
 sudo ctr task start instance4
 ```
+
+For more information, please check out `ctr-starlight --help` and `starlight-grpc --help`
+
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ```bibtex
