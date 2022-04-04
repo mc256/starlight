@@ -1,4 +1,4 @@
-# All in one guide for newbie
+# TL;DR All-in-one Quick Start Guide
 
 To finish this guide, you will need two machines far away from each other. 
 One acts as the Cloud, and one acts as the Edge. You will need to identify the IP address of the Cloud server.
@@ -17,7 +17,7 @@ sudo apt upgrade -y && \
 sudo apt install -y docker-compose && \
 sudo usermod -aG docker $USER
 ```
-After adding the current user to the `docker` group, you may _need to log out and log in_ to take effect.
+After adding the current user to the `docker` group, you (may) **need to log out and log in** to take effect.
 To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
 ```shell
 docker ps
@@ -75,6 +75,8 @@ export REGISTRY=<ip address of your server>:5000
 
 ## The "Edge"
 
+Please get another machine (or VM), you will need to set up a container worker with Starlight Snapshotter plugin.
+
 ### 1. Install Dependencies
 
 The worker machine needs `build-essential` and `containerd`.
@@ -126,7 +128,7 @@ make build-starlight-grpc build-ctr-starlight
 
 ### 3. Configure Starlight Snapshotter
 
-You need to find out the IP address / DNS of the Starlight Proxy server.
+Find out the IP address / DNS of the Starlight Proxy server and set these two environment variables (Don't Copy-Paste!)
 ```shell
 # This is an example
 export STARLIGHT_PROXY=172.18.1.3:8090
@@ -140,7 +142,7 @@ curl http://$STARLIGHT_PROXY
 ```
 
 Install Starlight Snapshotter `systemd` service and CLI tool.
-Please follow the prompt, enter 
+Please follow the prompt, enter (need the IP Address of the first machine!)
 ```shell
 sudo make install install-systemd-service
 #Please enter Starlight Proxy address (example: proxy.mc256.dev:8090):172.18.1.3:8090
