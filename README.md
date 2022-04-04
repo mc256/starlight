@@ -133,7 +133,7 @@ sudo ctr-starlight create \
 sudo ctr task start instance3
 ```
 
-Update a container using Starlight
+Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:6.2.2`)
 ```shell
 sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
 mkdir /tmp/test-redis-data && \

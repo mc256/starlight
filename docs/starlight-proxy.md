@@ -133,6 +133,14 @@ The Starlight proxy listens on port 8090.
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
 
+🙌 That's it. Please obtain the IP address of the server and proceed to the **Step 2**.
+
+```shell
+# update the IP address keep this for future use. 
+export STARLIGHT_PROXY=<ip address of your server>:8090
+export REGISTRY=<ip address of your server>:5000
+```
+
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
 ---
@@ -191,6 +199,14 @@ curl http://localhost:8090/
 The Starlight proxy listens on port 8090. 
 We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
+
+🙌 That's it. Please obtain the IP address of the server and proceed to the **Step 2**.
+
+```shell
+# update the IP address keep this for future use. 
+export STARLIGHT_PROXY=<ip address of your server>:8090
+export REGISTRY=<ip address of your server>:5000
+```
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
