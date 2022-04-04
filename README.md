@@ -109,13 +109,7 @@ and starting the Starlight snapshotter daemon
 
 5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
    ```shell
-   sudo systemctl stop containerd && \
-   sudo systemctl stop starlight && \
-   sudo rm -rf /var/lib/starlight-grpc && \
-   sudo rm -rf /var/lib/containerd && \
-   sudo rm -rf /tmp/test-redis-data && \
-   sudo systemctl start containerd && \
-   sudo systemctl start starlight 
+   sudo ./demo/reset.sh
    ```
 
 🙌 That's it! You can now deploy the container to as many Starlight workers as you want, and it should be fast!
@@ -127,7 +121,7 @@ The good news is that they should be quick, a few minutes for each container.
 
 Start a container using Starlight
 ```shell
-ctr-starlight pull redis:6.2.1-starlight && \
+sudo ctr-starlight pull redis:6.2.1-starlight && \
 mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
@@ -141,7 +135,7 @@ sudo ctr task start instance3
 
 Update a container using Starlight
 ```shell
-ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
+sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
 mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create \
 	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
