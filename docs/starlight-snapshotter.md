@@ -18,7 +18,6 @@ and starting the Starlight snapshotter daemon
 The worker machine is supposed to be far away (in latency) to the registry and proxy.
 Please install **containerd** and **Starlight snapshotter** on a new machine (or VM), not the same machine that runs the proxy or the registry. 
 
-We use Ubuntu 20.04 as an example. 
 The worker machine needs `build-essential` and `containerd`.
 ```shell
 sudo apt update && sudo apt upgrade -y && \
@@ -72,8 +71,8 @@ You need to find out the IP address / DNS of the Starlight Proxy server (in **St
 
 ```shell
 # This is an example
-export STARLIGHT_PROXY=172.31.23.228:8090
-export REGISTRY=172.31.23.228:5000
+export STARLIGHT_PROXY=172.18.1.3:8090
+export REGISTRY=172.18.1.3:5000
 ```
 
 Verify that the Starlight proxy is accessible from the worker. 
