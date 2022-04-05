@@ -8,7 +8,8 @@ The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 2
 
 ## The "Cloud"
 
-In this machine you will need to set up the Starlight Proxy and a standard container registry.
+In this machine you will need to set up the Starlight Proxy and a standard container registry. 
+If you are using AWS EC2, please add port 8090 and port 5000 to the Security Group whitelist when you create the VM.
 
 0. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
 
