@@ -67,6 +67,24 @@ docker push localhost:5000/redis:6.2.2
 
 You could upload other container images to the registry if you like.
 
+4. Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
+
+```shell
+cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
+net.core.wmem_max=125829120
+net.core.rmem_max=125829120
+net.ipv4.tcp_rmem= 10240 87380 125829120
+net.ipv4.tcp_wmem= 10240 87380 125829120
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_no_metrics_save = 1
+net.core.netdev_max_backlog = 10000
+EOT
+sudo sysctl -p
+```
+
+
 🙌 That's it. Please obtain the IP address of this machine and run the following commands on the Edge server.
 
 ```shell
@@ -117,7 +135,26 @@ go version
 # go version go1.17.8 linux/amd64
 ```
 
-### 2. Clone and Build
+### 2. Tune the network
+
+Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
+
+```shell
+cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
+net.core.wmem_max=125829120
+net.core.rmem_max=125829120
+net.ipv4.tcp_rmem= 10240 87380 125829120
+net.ipv4.tcp_wmem= 10240 87380 125829120
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_no_metrics_save = 1
+net.core.netdev_max_backlog = 10000
+EOT
+sudo sysctl -p
+```
+
+### 3. Clone and Build
 Clone the Starlight repository
 ```shell
 git clone https://github.com/mc256/starlight.git && \
@@ -129,7 +166,7 @@ Build the snapshotter plugin and CLI tool
 make build-starlight-grpc build-ctr-starlight
 ```
 
-### 3. Configure Starlight Snapshotter
+### 4. Configure Starlight Snapshotter
 
 Find out the IP address / DNS of the Starlight Proxy server and set these two environment variables (Don't Copy-Paste!)
 ```shell
@@ -166,7 +203,7 @@ sudo systemctl status starlight
 # it should be "active".
 ```
 
-### 4. Configure `contaienrd`
+### 5. Configure `contaienrd`
 
 Add configuration to `/etc/containerd/config.toml`. 
 (If you have set other `proxy_plugins`, please manually edit the file)
@@ -191,7 +228,7 @@ sudo ctr plugin ls | grep starlight
 # io.containerd.snapshotter.v1    starlight                -              ok
 ```
 
-### 5. Convert Container Image
+### 6. Convert Container Image
 
 Convert the container image to the **Starlight format** container image.
 ```shell
@@ -213,7 +250,7 @@ In addition, the proxy needs some metadata about the list of files in the contai
 
 
 
-### 6. Optimize Container Image
+### 7. Optimize Container Image
 
 Collect traces on the worker for container startup.
 ```shell
@@ -258,13 +295,13 @@ ctr-starlight report --server $STARLIGHT_PROXY --plain-http
 ```
 
 
-### 7. Clear all the cache and reset the environment
+### 8. Clear all the cache and reset the environment
 ```shell
 sudo ./demo/reset.sh
 ```
 
 
-### 8. Deploying and update container
+### 9. Deploying and update container
 
 Start a container using Starlight
 ```shell
