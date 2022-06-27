@@ -4,7 +4,7 @@ ARG RUNC_VERSION=v1.0.0-rc93
 #############
 # Proxy
 #############
-FROM golang:1.15 AS starlight-proxy
+FROM golang:1.18-alpine AS starlight-proxy
 
 WORKDIR /go/src/app
 COPY . .
