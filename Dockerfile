@@ -22,5 +22,5 @@ FROM alpine:3.12
 COPY --from=0 /go/src/app/out/starlight-proxy /bin/starlight-proxy
 
 WORKDIR /bin
-CMD ["sh", "-c", "/bin/starlight-proxy $REGISTRY $LOGLEVEL"]
+CMD ["/bin/starlight-proxy", "$REGISTRY", "$LOGLEVEL"]
 
