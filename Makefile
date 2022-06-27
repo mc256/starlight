@@ -13,6 +13,7 @@ build: build-starlight-proxy build-starlight-grpc build-ctr-starlight
 
 build-starlight-proxy:
 	-mkdir ./out 2>/dev/null | true
+	go mod tidy
 	go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
 
 build-starlight-grpc:

@@ -4,7 +4,7 @@ ARG RUNC_VERSION=v1.0.0-rc93
 #############
 # Proxy
 #############
-FROM golang:1.18 AS starlight-proxy
+FROM amd64/golang:1.18 AS starlight-proxy
 
 WORKDIR /go/src/app
 COPY . .
@@ -13,14 +13,8 @@ ENV GO111MODULE=on
 ENV REGISTRY=registry2
 ENV LOGLEVEL=info
 
-RUN make build-starlight-proxy
+RUN make build-starlight-proxy && mkdir ./data
 EXPOSE 8090
 
-#############
-FROM alpine:3.12
-
-COPY --from=0 /go/src/app/out/starlight-proxy /bin/starlight-proxy
-
-WORKDIR /bin
-CMD ["/bin/starlight-proxy", "$REGISTRY", "$LOGLEVEL"]
+CMD ["sh", "-c", "/go/src/app/out/starlight-proxy ${REGISTRY} ${LOGLEVEL}"]
 
