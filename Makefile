@@ -45,3 +45,6 @@ install-systemd-service:
 	#echo `subst "STARLIGHT_PROXY",$(proxy_address),$(service_file)`; \
 	#cp ./demo/starlight.service /lib/systemd/system/
 	#systemctl daemon-reload
+
+docker-image:
+	docker build
