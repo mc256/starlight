@@ -187,7 +187,7 @@ make build-starlight-proxy
 ```shell
 cd ./out && \
 mkdir ./data && \
-./starlight-proxy http://myregistry:5000 &
+./starlight-proxy --registry=http://myregistry:5000 &
 ```
 
 7. Verify the Starlight Proxy is working
