@@ -50,7 +50,7 @@ You need to:
 
 1) Set up a **Starlight proxy**, 
 ideally close to the **registry** server you are using. Configure the proxy server to point to the registry and run it.
-Starlight supports any standard registry.
+Starlight supports any standard registry. (It can be deployed to k8s using ***Helm***)
 <br>[Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) 
 
 

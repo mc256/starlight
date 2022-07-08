@@ -21,26 +21,82 @@ package main
 import (
 	"fmt"
 	"github.com/mc256/starlight/proxy"
+	"github.com/mc256/starlight/util"
+	"github.com/urfave/cli/v2"
 	"os"
 	"sync"
 )
 
-func main() {
-	if len(os.Args) != 2 && len(os.Args) != 3 {
-		fmt.Printf("Usage: %s RegistryURL [Log Level]\n", os.Args[0])
-		return
+func init() {
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Println(c.App.Name, c.App.Version)
 	}
+}
+
+func main() {
+	app := New()
+	if err := app.Run(os.Args); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "starlight-proxy: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func New() *cli.App {
+	app := cli.NewApp()
+
+	app.Name = "starlight-proxy"
+	app.Version = util.Version
+	app.Usage = `Starlight Proxy accelerates container deployments`
+	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
+
+	app.EnableBashCompletion = true
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:  "registry",
+			Usage: "Registry Address",
+			EnvVars: []string{
+				"REGISTRY",
+			},
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:        "log-level",
+			DefaultText: "info",
+			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
+			EnvVars: []string{
+				"LOGLEVEL",
+			},
+			Required: false,
+		},
+	}
+	app.Commands = append([]*cli.Command{
+		util.VersionCommand(),
+	})
+	app.Action = DefaultAction
+
+	return app
+
+}
+
+func DefaultAction(context *cli.Context) error {
 
 	logLevel := "info"
-	if len(os.Args) == 3 {
-		logLevel = os.Args[2]
+	if l := context.String("log-level"); l != "" {
+		logLevel = l
+	}
+
+	var registry string
+	if registry = context.String("registry"); registry == "" {
+		fmt.Println("registry cannot be empty!")
+		return nil
 	}
 
 	httpServerExitDone := &sync.WaitGroup{}
 	httpServerExitDone.Add(1)
 
-	_ = proxy.NewServer(os.Args[1], logLevel, httpServerExitDone)
+	_ = proxy.NewServer(registry, logLevel, httpServerExitDone)
 
 	wait := make(chan interface{})
 	<-wait
+	return nil
 }
