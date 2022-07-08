@@ -1,0 +1,87 @@
+# Starlight Proxy + Registry
+nameOverride: ""
+fullnameOverride: ""
+
+# Image pull information
+proxyImage:
+  repository: "ghcr.io/mc256/starlight/proxy"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+registryImage:
+  enabled: true # If use other container registry, please specify `registryAddress`
+  repository: "registry"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+
+imagePullSecrets: []
+
+# Starlight Proxy Default Environment Variables
+registryAddress: null
+logLevel: null
+
+# Service
+service:
+  type: LoadBalancer
+  port: 80
+
+# Ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: 
+    # kubernetes.io/tls-acme: "true"
+    # set to the largest layer size for uploading container image
+    nginx.ingress.kubernetes.io/proxy-body-size: 512m
+  hosts:
+    - host: starlight.lan
+      paths:
+        - path: /v2
+          pathType: Prefix
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Resource limits
+resources:
+  limits:
+    cpu: 4
+    memory: 4096Mi
+  requests:
+    cpu: 1
+    memory: 1024Mi
+
+# Pin to master node
+tolerations:
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
+
+
+########################################################################
+# Other Configurations
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+
+nodeSelector: {}

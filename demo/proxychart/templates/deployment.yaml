@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "proxychart.fullname" . }}
+  labels:
+    {{- include "proxychart.labels" . | nindent 4 }}
+    kubernetes.io/cluster-service: "true"
+spec:
+  selector:
+    matchLabels:
+      {{- include "proxychart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "proxychart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "proxychart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: starlight-proxy
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.proxyImage.repository }}:{{ .Values.proxyImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.proxyImage.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          env:
+            - name: REGISTRY
+              value: {{ .Values.registryAddress | quote | default "http://localhost:5000" }}
+            - name: LOGLEVEL
+              value: {{ .Values.logLevel | quote | default "info" }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: starlight-container-registry
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registryImage.repository }}:{{ .Values.registryImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.registryImage.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /v2/
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

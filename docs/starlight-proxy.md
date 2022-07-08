@@ -9,6 +9,17 @@ Configure the proxy server to point to the registry and run it. Starlight suppor
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
 
 ---
+## Method 0. Use Helm (Recommended)
+
+```shell
+git clone https://github.com/mc256/starlight.git
+helm install starlight-proxy ./starlight/demo/proxychart
+```
+
+For detailed configuration, please check `./starlight/demo/proxychart/values.yaml`
+
+
+
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
 
 This is an all-in-one example in case you don't have full access to a container registry.
