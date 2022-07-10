@@ -16,9 +16,12 @@ You have enabled container registry.
 {{- if .Values.ingress.enabled }}
 Get the application URL by running these commands:
   {{- range $host := .Values.ingress.hosts }}
-  Starlight Proxy:    http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}
+  Starlight Proxy       : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}
     {{- if $.Values.registry.enabled }}
-  Container Registry: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/v2
+  Container Registry    : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/v2
+    {{- end }}
+    {{- if $.Values.registryUi.enabled }}
+  Container Registry UI : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/ui
     {{- end }}
   {{- end }}
 

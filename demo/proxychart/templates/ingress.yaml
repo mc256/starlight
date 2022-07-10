@@ -20,6 +20,9 @@ metadata:
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
+    {{- if $.Values.registryUi.enabled}}
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    {{- end }}
   {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
@@ -41,7 +44,7 @@ spec:
       http:
         paths:
           {{- if $.Values.registry.enabled }}
-          - path: /v2
+          - path: /()(v2.*)
             pathType: Prefix
             backend:
               service:
@@ -49,6 +52,29 @@ spec:
                 port:
                   number: 5000
           {{- end }}
+          {{- if $.Values.registryUi.enabled}}
+          - path: /ui(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: 8080
+          - path: /()(fonts.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: 8080
+          - path: /()(docker-registry-ui.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: 8080
+          {{- end}}
           - path: /
             pathType: Prefix
             backend:

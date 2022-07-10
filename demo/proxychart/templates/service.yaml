@@ -11,9 +11,17 @@ spec:
       targetPort: 8090
       protocol: TCP
       name: proxy-http
+    {{- if .Values.registry.enabled}}
     - port: 5000
       targetPort: 5000
       protocol: TCP
       name: registry-http
+    {{- end}}
+    {{- if .Values.registryUi.enabled}}
+    - port: 8080
+      targetPort: 80
+      protocol: TCP
+      name: registry-ui-http
+    {{- end}}
   selector:
     {{- include "proxychart.selectorLabels" . | nindent 4 }}
