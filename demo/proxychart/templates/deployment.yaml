@@ -36,6 +36,7 @@ spec:
               containerPort: 8090
               protocol: TCP
           livenessProbe:
+            periodSeconds: 60
             httpGet:
               path: /
               port: http
@@ -66,6 +67,7 @@ spec:
               containerPort: 5000
               protocol: TCP
           livenessProbe:
+            periodSeconds: 60
             httpGet:
               path: /v2/
               port: http
@@ -81,6 +83,35 @@ spec:
             - mountPath: /data/
               name: registry-data
           {{- end}}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.registryUi.enabled }}
+        - name: starlight-container-registry-ui
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registryUi.repository }}:{{ .Values.registryUi.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.registryUi.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            periodSeconds: 60
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          env:
+            - name: SINGLE_REGISTRY
+              value: "true"
+            - name: REGISTRY_URL
+              value: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ index .Values.ingress.hosts 0}}
+            - name: DELETE_IMAGES
+              value: "true"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
         {{- end }}

@@ -26,6 +26,12 @@ registry:
     accessModes: [ReadWriteOnce]
     size: 20Gi
 
+registryUi:
+  enabled: true
+  repository: "joxit/docker-registry-ui"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
 
 imagePullSecrets: []
 
