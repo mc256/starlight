@@ -12,4 +12,11 @@ spec:
       image: busybox
       command: ['wget']
       args: ['{{ include "proxychart.fullname" . }}:{{ .Values.service.port }}']
+      resources:
+        limits:
+          cpu: 0.5
+          memory: 128Mi
+        requests:
+          cpu: 0.5
+          memory: 128Mi
   restartPolicy: Never

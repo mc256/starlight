@@ -29,8 +29,8 @@ spec:
         - name: starlight-proxy
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.proxyImage.repository }}:{{ .Values.proxyImage.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.proxyImage.pullPolicy }}
+          image: "{{ .Values.starlightProxy.repository }}:{{ .Values.starlightProxy.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.starlightProxy.pullPolicy }}
           ports:
             - name: http
               containerPort: 8090
@@ -48,13 +48,19 @@ spec:
               value: {{ .Values.registryAddress | quote | default "http://localhost:5000" }}
             - name: LOGLEVEL
               value: {{ .Values.logLevel | quote | default "info" }}
+          {{- if .Values.starlightProxy.persistence.enabled}}
+          volumeMounts:
+            - mountPath: /go/src/app/out/data/
+              name: proxy-data
+          {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.registry.enabled }}
         - name: starlight-container-registry
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.registryImage.repository }}:{{ .Values.registryImage.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.registryImage.pullPolicy }}
+          image: "{{ .Values.registry.repository }}:{{ .Values.registry.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.registry.pullPolicy }}
           ports:
             - name: http
               containerPort: 5000
@@ -67,8 +73,38 @@ spec:
             httpGet:
               path: /v2/
               port: http
+          env:
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /data
+          {{- if .Values.registry.persistence.enabled}}
+          volumeMounts:
+            - mountPath: /data/
+              name: registry-data
+          {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+      {{- if or .Values.starlightProxy.persistence.enabled .Values.registry.persistence.enabled}}
+      volumes:
+        {{- if .Values.starlightProxy.persistence.enabled}}
+        - name: proxy-data
+          persistentVolumeClaim:
+            {{- if .Values.starlightProxy.persistence.existingClaim}}
+            claimName: {{ .Values.starlightProxy.persistence.existingClaim }}
+            {{- else}}
+            claimName: {{ include "proxychart.name" . }}-proxy-pvc
+            {{- end}}  
+        {{- end}}
+        {{- if .Values.registry.persistence.enabled}}
+        - name: registry-data
+          persistentVolumeClaim:
+            {{- if .Values.registry.persistence.existingClaim}}
+            claimName: {{ .Values.registry.persistence.existingClaim }}
+            {{- else}}
+            claimName: {{ include "proxychart.name" . }}-registry-pvc
+            {{- end}}  
+        {{- end}}
+      {{- end}}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

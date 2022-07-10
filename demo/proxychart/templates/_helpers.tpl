@@ -2,7 +2,7 @@
 Expand the name of the chart.
 */}}
 {{- define "proxychart.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- default .Chart.Name .Values.nameOverride | trunc 48 | trimSuffix "-" }}
 {{- end }}
 
 {{/*

@@ -1,0 +1,47 @@
+{{- if .Values.starlightProxy.persistence.enabled -}}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "proxychart.name" . }}-proxy-pvc
+  labels:
+    {{- include "proxychart.labels" . | nindent 4 }}
+  annotations:
+  {{- if .Values.starlightProxy.persistence.storageClass }}
+    volume.beta.kubernetes.io/storage-class: {{ .Values.starlightProxy.persistence.storageClass | quote }}
+  {{- else }}
+    volume.alpha.kubernetes.io/storage-class: default
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.starlightProxy.persistence.accessModes }}
+    - {{ . }}
+    {{- end }}  
+  resources:
+    requests:
+      storage: {{ .Values.starlightProxy.persistence.size | quote }}
+{{- end -}}
+{{- if and .Values.starlightProxy.persistence.enabled .Values.registry.persistence.enabled}}
+---
+{{- end}}
+{{- if .Values.registry.persistence.enabled -}}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "proxychart.name" . }}-registry-pvc
+  labels:
+    {{- include "proxychart.labels" . | nindent 4 }}
+  annotations:
+  {{- if .Values.registry.persistence.storageClass }}
+    volume.beta.kubernetes.io/storage-class: {{ .Values.registry.persistence.storageClass | quote }}
+  {{- else }}
+    volume.alpha.kubernetes.io/storage-class: default
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.registry.persistence.accessModes }}
+    - {{ . }}
+    {{- end }}  
+  resources:
+    requests:
+      storage: {{ .Values.registry.persistence.size | quote }}
+{{- end -}}
