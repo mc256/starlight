@@ -3,16 +3,28 @@ nameOverride: ""
 fullnameOverride: ""
 
 # Image pull information
-proxyImage:
+starlightProxy:
   repository: "ghcr.io/mc256/starlight/proxy"
   pullPolicy: IfNotPresent
   tag: "latest"
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 2Gi
 
-registryImage:
+registry:
   enabled: true # If use other container registry, please specify `registryAddress`
   repository: "registry"
   pullPolicy: IfNotPresent
   tag: "latest"
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
 
 
 imagePullSecrets: []
@@ -34,13 +46,8 @@ ingress:
     # kubernetes.io/tls-acme: "true"
     # set to the largest layer size for uploading container image
     nginx.ingress.kubernetes.io/proxy-body-size: 512m
-  hosts:
-    - host: starlight.lan
-      paths:
-        - path: /v2
-          pathType: Prefix
-        - path: /
-          pathType: Prefix
+  # Set it to your domain name(s)
+  hosts: [ starlight.lan ]
   tls: []
 
 # Resource limits
@@ -82,6 +89,5 @@ securityContext: {}
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
-
 
 nodeSelector: {}
