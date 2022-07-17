@@ -3,7 +3,7 @@
 ## TL;DR
 
 ```shell
-helm install my-starlight-proxy oci://registry.yuri.moe/starlight-proxy-chart/proxychart --version 0.1.0
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.0
 ```
 
 ## Prerequisites
@@ -34,14 +34,14 @@ kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storagec
 To install the chart with the app name `my-starlight-proxy`:
 
 ```shell
-helm install my-starlight-proxy oci://registry.yuri.moe/starlight-proxy-chart/proxychart --version 0.1.0
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.0
 ```
 
 
 You may want to set a few parameter for example the domain name for the ingress, for example set the domain name for ingress to `mydomain.local`:
 
 ```shell
-helm install my-starlight-proxy oci://registry.yuri.moe/starlight-proxy-chart/proxychart --version 0.1.0 \
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.0 \
 --set "ingress.hosts={mydomain.local}"
 ```
 
