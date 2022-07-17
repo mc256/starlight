@@ -1,0 +1,43 @@
+
+name: Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+      - feature_helm
+
+jobs:
+  release:
+    # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
+    # see: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.8.1
+      - name: Chart | Push
+        uses: appany/helm-oci-chart-releaser@v0.3.0
+        with:
+          name: starlight-proxy-chart
+          repository: mc256/starlight/proxy-chart:0.1.0
+          tag: 0.1.0
+          path: demo/chart
+          registry: ghcr.io
+          registry_username: ${{ github.repository_owner }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
