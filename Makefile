@@ -2,8 +2,10 @@
 # Build
 ######################################################################
 TARGETS=starlight-proxy starlight-grpc ctr-starlight
+COMMONENVVAR=GOOS=$(shell uname -s | tr A-Z a-z)
+BUILDENVVAR=CGO_ENABLED=0
 
-.PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight install install-systemd-service
+.PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight install install-systemd-service build-starlight-proxy-for-alpine
 .SILENT: install-systemd-service
 
 ######################################################################
@@ -23,6 +25,13 @@ build-starlight-grpc:
 build-ctr-starlight:
 	-mkdir ./out 2>/dev/null | true
 	go build -o ./out/ctr-starlight ./cmd/ctr-starlight/main.go
+
+
+build-starlight-proxy-for-alpine:
+	-mkdir ./out 2>/dev/null | true
+	go mod vendor
+	go mod tidy
+	$(COMMONENVVAR) $(BUILDENVVAR) go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
 
 ######################################################################
 # Clean
