@@ -1,5 +1,8 @@
 # Starlight: Fast Container Provisioning
 
+[![Docker Image](https://github.com/mc256/starlight/actions/workflows/docker-image.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
+[![Helm Chart](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
+
 <img align="right" src="docs/provisioning-time-wan.png">
 
 Starlight is an accelerator for provisioning container-based applications.

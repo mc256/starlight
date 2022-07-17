@@ -1,4 +1,4 @@
-name: Release Charts
+name: Helm Chart
 
 on:
   push:
@@ -32,10 +32,10 @@ jobs:
       - name: Chart | Push
         uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
-          name: starlight/proxychart
+          name: starlight/proxy-helm-chart
           repository: mc256
           tag: 0.1.0
           path: demo/chart
           registry: ghcr.io
-          registry_username: ${{ secrets.REGISTRY_USERNAME }}
-          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry_username: ${{ github.repository_owner }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
