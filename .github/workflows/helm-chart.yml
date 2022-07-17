@@ -32,16 +32,12 @@ jobs:
         uses: azure/setup-helm@v1
         with:
           version: v3.8.1
-      - name: Helm | Login
+      - name: Helm | Publish
         shell: bash
         run: |-
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.repository_owner }} --password-stdin ghcr.io && \
           helm package ./demo/chart --version 0.1.0 && \
-          helm push starlight-proxy-chart-0.1.0.tgz oci://ghcr.io/mc256/starlight/
-        env:
-          HELM_EXPERIMENTAL_OCI: '1'
-      - name: Helm | Logout
-        shell: bash
-        run: helm registry logout ghcr.io
+          helm push starlight-proxy-chart-0.1.0.tgz oci://ghcr.io/mc256/starlight/ && \
+          helm registry logout ghcr.io
         env:
           HELM_EXPERIMENTAL_OCI: '1'
