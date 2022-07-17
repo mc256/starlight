@@ -1,4 +1,4 @@
-name: Publish Docker image (release)
+name: Docker Image
 on:
   push:
     branches:
@@ -6,6 +6,7 @@ on:
       - release
       - 'build/*'
       - feature_documentation
+      - feature_helm
 jobs:
   push_to_registry:
     name: Push Docker image to GitHub Packages
@@ -19,17 +20,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Login to Private Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: registry.yuri.moe
-          username: github
-          password: ${{ secrets.REGISTRY_PASSWORD }}
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            registry.yuri.moe/starlight-proxy:latest
             ghcr.io/mc256/starlight/proxy:latest

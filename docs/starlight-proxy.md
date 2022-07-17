@@ -16,8 +16,7 @@ git clone https://github.com/mc256/starlight.git
 helm install starlight-proxy ./starlight/demo/proxychart
 ```
 
-For detailed configuration, please check `./starlight/demo/proxychart/values.yaml`
-
+You may need to customize the chart. Helm chart configuration are [available here](https://github.com/mc256/starlight/blob/master/docs/helm.md).
 
 
 ## Method 1. Use Docker Compose to deploy Starlight Proxy + Container Registry (Recommended)
