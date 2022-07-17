@@ -4,8 +4,7 @@ name: Helm Chart
 on:
   push:
     branches:
-      - main
-      - feature_helm
+      - master
 
 jobs:
   release:
