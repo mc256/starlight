@@ -26,12 +26,16 @@ Get the application URL by running these commands:
   {{- end }}
 
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "proxychart.fullname" . }}'
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "starlight-proxy-chart.fullname" . }}'
            
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "proxychart.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  echo http://$SERVICE_IP:{{ .Values.service.port }}
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "starlight-proxy-chart.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  
+  echo http://$SERVICE_IP
+  echo $SERVICE_IP
 
-  The maximum upload size of the Nginx ingress has set to {{ index .Values.ingress.annotations "nginx.ingress.kubernetes.io/proxy-body-size" }}.
+  Please point your domain to $SERVICE_IP in your hosts file or DNS server.
+
+The maximum upload size of the Nginx ingress has set to {{ index .Values.ingress.annotations "nginx.ingress.kubernetes.io/proxy-body-size" }}.
 {{- else }}
 You have not enabled ingress.
 {{- end }}
