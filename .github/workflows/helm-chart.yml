@@ -31,13 +31,23 @@ jobs:
         uses: azure/setup-helm@v1
         with:
           version: v3.8.1
-      - name: Chart | Push
-        uses: appany/helm-oci-chart-releaser@v0.3.0
-        with:
-          name: starlight-proxy-chart
-          repository: mc256/starlight/starlight-proxy-chart
-          tag: 0.1.0
-          path: demo/chart
-          registry: ghcr.io
-          registry_username: ${{ github.repository_owner }}
-          registry_password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Helm | Login
+        shell: bash
+        run: echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.repository_owner }} --password-stdin ghcr.io
+        env:
+          HELM_EXPERIMENTAL_OCI: '1'
+      - name: Helm | Package
+        shell: bash
+        run: helm package ./demo/chart --version 0.1.0
+        env:
+          HELM_EXPERIMENTAL_OCI: '1'
+      - name: Helm | Push
+        shell: bash
+        run: helm push starlight-proxy-chart-0.1.0.tgz oci://ghcr.io/mc256/starlight/starlight-proxy-chart
+        env:
+          HELM_EXPERIMENTAL_OCI: '1'
+      - name: Helm | Logout
+        shell: bash
+        run: helm registry logout ghcr.io
+        env:
+          HELM_EXPERIMENTAL_OCI: '1'
