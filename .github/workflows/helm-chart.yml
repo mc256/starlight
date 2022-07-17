@@ -35,7 +35,7 @@ jobs:
         uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
           name: starlight-proxy-chart
-          repository: mc256/starlight
+          repository: mc256/starlight/starlight-proxy-chart
           tag: 0.1.0
           path: demo/chart
           registry: ghcr.io
