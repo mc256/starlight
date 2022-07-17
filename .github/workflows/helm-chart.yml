@@ -29,9 +29,13 @@ jobs:
         with:
           version: v3.8.1
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.4.0
+      - name: Chart | Push
+        uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
-          charts_dir: /demo/chart
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          name: starlight/proxychart
+          repository: mc256
+          tag: 0.1.0
+          path: demo/chart
+          registry: ghcr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
