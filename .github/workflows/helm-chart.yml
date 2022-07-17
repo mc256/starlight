@@ -32,7 +32,7 @@ jobs:
       - name: Chart | Push
         uses: appany/helm-oci-chart-releaser@v0.3.0
         with:
-          name: starlight/proxy-helm-chart
+          name: starlight/starlight-proxy-chart
           repository: mc256
           tag: 0.1.0
           path: demo/chart

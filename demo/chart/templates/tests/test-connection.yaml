@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "proxychart.fullname" . }}-test-connection"
+  name: "{{ include "starlight-proxy-chart.fullname" . }}-test-connection"
   labels:
-    {{- include "proxychart.labels" . | nindent 4 }}
+    {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
 spec:
@@ -11,7 +11,7 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "proxychart.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "starlight-proxy-chart.fullname" . }}:{{ .Values.service.port }}']
       resources:
         limits:
           cpu: 0.5

@@ -2,9 +2,9 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ include "proxychart.name" . }}-proxy-pvc
+  name: {{ include "starlight-proxy-chart.name" . }}-proxy-pvc
   labels:
-    {{- include "proxychart.labels" . | nindent 4 }}
+    {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
   annotations:
   {{- if .Values.starlightProxy.persistence.storageClass }}
     volume.beta.kubernetes.io/storage-class: {{ .Values.starlightProxy.persistence.storageClass | quote }}
@@ -27,9 +27,9 @@ spec:
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ include "proxychart.name" . }}-registry-pvc
+  name: {{ include "starlight-proxy-chart.name" . }}-registry-pvc
   labels:
-    {{- include "proxychart.labels" . | nindent 4 }}
+    {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
   annotations:
   {{- if .Values.registry.persistence.storageClass }}
     volume.beta.kubernetes.io/storage-class: {{ .Values.registry.persistence.storageClass | quote }}

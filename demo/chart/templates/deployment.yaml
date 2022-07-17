@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "proxychart.fullname" . }}
+  name: {{ include "starlight-proxy-chart.fullname" . }}
   labels:
-    {{- include "proxychart.labels" . | nindent 4 }}
+    {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
     kubernetes.io/cluster-service: "true"
 spec:
   selector:
     matchLabels:
-      {{- include "proxychart.selectorLabels" . | nindent 6 }}
+      {{- include "starlight-proxy-chart.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,13 +16,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "proxychart.selectorLabels" . | nindent 8 }}
+        {{- include "starlight-proxy-chart.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "proxychart.serviceAccountName" . }}
+      serviceAccountName: {{ include "starlight-proxy-chart.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -123,7 +123,7 @@ spec:
             {{- if .Values.starlightProxy.persistence.existingClaim}}
             claimName: {{ .Values.starlightProxy.persistence.existingClaim }}
             {{- else}}
-            claimName: {{ include "proxychart.name" . }}-proxy-pvc
+            claimName: {{ include "starlight-proxy-chart.name" . }}-proxy-pvc
             {{- end}}  
         {{- end}}
         {{- if .Values.registry.persistence.enabled}}
@@ -132,7 +132,7 @@ spec:
             {{- if .Values.registry.persistence.existingClaim}}
             claimName: {{ .Values.registry.persistence.existingClaim }}
             {{- else}}
-            claimName: {{ include "proxychart.name" . }}-registry-pvc
+            claimName: {{ include "starlight-proxy-chart.name" . }}-registry-pvc
             {{- end}}  
         {{- end}}
       {{- end}}

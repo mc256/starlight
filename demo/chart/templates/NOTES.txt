@@ -26,9 +26,9 @@ Get the application URL by running these commands:
   {{- end }}
 
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "proxychart.fullname" . }}'
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "starlight-proxy-chart.fullname" . }}'
            
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "proxychart.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "starlight-proxy-chart.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   
   echo http://$SERVICE_IP
   echo $SERVICE_IP
