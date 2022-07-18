@@ -51,13 +51,17 @@ build-helm-package:
 push-helm-package:
 	helm push /tmp/starlight-proxy-chart-$(VERSION).tgz oci://ghcr.io/mc256/starlight/
 
+.PHONY: change-version-number
+change-version-number:
+	sed -i 's/var Version = "0.0.0"/var Version = "$(VERSIONNUMBER)-$(COMPILEDATE)"/g' ./util/version.go
+
 .PHONY: generate-changelog
 generate-changelog: 
 	mkdir -p ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/ 2>/dev/null | true
 	sh -c ./demo/deb-package/generate-changelog.sh > ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/changelog
 
 .PHONY: create-deb-package
-create-deb-package: build-starlight-grpc build-ctr-starlight generate-changelog
+create-deb-package: change-version-number build-starlight-grpc build-ctr-starlight generate-changelog
 	mkdir -p ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/ 2>/dev/null | true
 	cp -r ./demo/deb-package/debian ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/
 	mkdir -p ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/starlight-snapshotter/usr/bin/ 2>/dev/null | true
