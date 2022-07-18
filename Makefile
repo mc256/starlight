@@ -10,6 +10,7 @@ COMPILEDATE=$(shell date +%Y%m%d)
 
 
 .PHONY: build clean build-starlight-proxy build-starlight-grpc build-ctr-starlight
+
 .SILENT: install-systemd-service
 
 ######################################################################
