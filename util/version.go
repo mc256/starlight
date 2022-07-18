@@ -20,10 +20,11 @@ package util
 
 import (
 	"fmt"
+
 	"github.com/urfave/cli/v2"
 )
 
-var Version = "0.9.0"
+var Version = "0.0.0"
 
 func VersionAction(context *cli.Context) error {
 	fmt.Printf("starlight version %s", Version)
