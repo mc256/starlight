@@ -1,8 +1,5 @@
 Dockerfile
-_*
-.*
-demo
-docs
-design
 out
-vendor/
+vendor
+sandbox
+
