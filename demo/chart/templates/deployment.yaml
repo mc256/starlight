@@ -51,7 +51,7 @@ spec:
               value: {{ .Values.logLevel | quote | default "info" }}
           {{- if .Values.starlightProxy.persistence.enabled}}
           volumeMounts:
-            - mountPath: /go/src/app/out/data/
+            - mountPath: /opt/data/
               name: proxy-data
           {{- end}}
           resources:

@@ -1,6 +1,7 @@
 #shell script (excluding some local test cases)
 *.sh
 !config/*.sh
+!deb-package/*.sh
 temp.sh
 !convert*
 

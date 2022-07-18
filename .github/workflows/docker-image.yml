@@ -3,27 +3,39 @@ on:
   push:
     branches:
       - master
-      - release
-      - 'build/*'
-      - feature_documentation
+      - feature_container_*
+    tags:
+      - 'v*.*.*'
       
 jobs:
-  push_to_registry:
+  release:
     name: Push Docker image to GitHub Packages
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ghcr.io/mc256/starlight/proxy
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/mc256/starlight/proxy:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

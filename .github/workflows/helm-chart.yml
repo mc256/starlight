@@ -4,19 +4,23 @@ name: Helm Chart
 on:
   push:
     branches:
-      - main
-      - feature_helm
+      - feature_helm_*
+    tags:
+      - 'v*.*.*'
 
 jobs:
   release:
     # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
     # see: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
     permissions:
-      contents: write
+      packages: write
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
@@ -31,16 +35,11 @@ jobs:
         uses: azure/setup-helm@v1
         with:
           version: v3.8.1
-      - name: Helm | Login
+      - name: Helm Chart
         shell: bash
         run: |-
-          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.repository_owner }} --password-stdin ghcr.io && \
-          helm package ./demo/chart --version 0.1.0 && \
-          helm push starlight-proxy-chart-0.1.0.tgz oci://ghcr.io/mc256/starlight/
-        env:
-          HELM_EXPERIMENTAL_OCI: '1'
-      - name: Helm | Logout
-        shell: bash
-        run: helm registry logout ghcr.io
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.repository_owner }} --password-stdin ghcr.io
+          make build-helm-package push-helm-package
+          helm registry logout ghcr.io
         env:
           HELM_EXPERIMENTAL_OCI: '1'
