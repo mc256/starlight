@@ -2,11 +2,9 @@ name: Docker Image
 on:
   push:
     branches:
-      - master
       - feature_container_*
     tags:
       - 'v*.*.*'
-      
 jobs:
   release:
     name: Push Docker image to GitHub Packages

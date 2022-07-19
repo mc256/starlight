@@ -13,6 +13,71 @@ and starting the Starlight snapshotter daemon
 
 ---
 
+## Method 1. Install Pre-built Package (Recommended)
+
+Pre-build deb package is available for Ubuntu 22.04 or newer.
+
+### 1. Install Starlight Snapshotter
+
+Download `.deb` package from the [release page](https://github.com/mc256/starlight/releases).
+
+```shell
+export SL_VERSION=0.1.0
+wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starlight-snapshotter_${SL_VERSION}_amd64.deb"
+sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_amd64.deb"
+```
+
+Update systemd service file `/lib/systemd/system/starlight-snapshotter.service`. 
+- Change `starlight.lan` to the address of the Starlight Proxy.
+- remove `--plain-http` if the Starlight Proxy is behind a HTTPS reverse proxy.
+```
+ExecStart=/usr/bin/starlight-grpc run --plain-http starlight.lan
+```
+
+Reload systemd service
+```shell
+sudo systemctl daemon-reload
+sudo systemctl restart starlight-snapshotter
+```
+
+### 2. Configure `contaienrd`
+
+Add configuration to `/etc/containerd/config.toml`. 
+(If you have set other `proxy_plugins`, please manually edit the file)
+```shell
+sudo mkdir /etc/containerd/ && \
+cat <<EOT | sudo tee -a /etc/containerd/config.toml > /dev/null
+[proxy_plugins]
+  [proxy_plugins.starlight]
+    type = "snapshot"
+    address = "/run/starlight-grpc/starlight-snapshotter.socket"
+EOT
+```
+
+Restart `containerd` service
+```shell
+sudo systemctl restart containerd
+```
+
+Verify the Starlight snapshotter plugin is functioning
+```shell
+sudo ctr plugin ls | grep starlight 
+# io.containerd.snapshotter.v1    starlight                -              ok
+```
+
+
+🙌 That's it. Please proceed to the **Step 3**.
+
+[⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started) 
+
+
+
+---
+
+
+
+## Method 2. Build from source
+
 ### 1. Install Dependencies
  
 The worker machine is supposed to be far away (in latency) to the registry and proxy.
@@ -127,6 +192,7 @@ Verify the Starlight snapshotter plugin is functioning
 sudo ctr plugin ls | grep starlight 
 # io.containerd.snapshotter.v1    starlight                -              ok
 ```
+
 
 🙌 That's it. Please proceed to the **Step 3**.
 
