@@ -46,7 +46,7 @@ Starlight is implemented on top of **containerd**. It it comprised of cloud and 
 
 ## Getting Started
 
-[TL;DR?](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
+[TL;DR?](docs/newbie.md)
 
 Suppose you have a container on a [OCI compatible **registry**](https://github.com/distribution/distribution) that you want to deploy.
 You need to:
