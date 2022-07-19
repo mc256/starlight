@@ -3,7 +3,7 @@
 [![Docker Image](https://github.com/mc256/starlight/actions/workflows/docker-image.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
 [![Helm Chart](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
 
-<img align="right" src="docs/provisioning-time-wan.png">
+<img align="right" src="https://github.com/mc256/starlight/blob/master/docs/provisioning-time-wan.png">
 
 Starlight is an accelerator for provisioning container-based applications.
 It speeds up deploying and updating containers on workers inside and outside the cloud, 
@@ -35,7 +35,7 @@ Starlight decouples the mechanism of container provisioning from container devel
 Starlight maintains the convenient stack-of-layers structure of container images, 
 but uses a different representation when deploying them over the network.
 The development and operational pipelines remain unchanged.
-<br>[See how Starlight works ➡️](docs/starlight-workflow.md) or [read our NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin).
+<br>[See how Starlight works ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-workflow.md) or [read our NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin).
 
 ## Architecture
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
@@ -54,7 +54,7 @@ You need to:
 1) Set up a **Starlight proxy**, 
 ideally close to the **registry** server you are using. Configure the proxy server to point to the registry and run it.
 Starlight supports any standard registry. (It can be deployed to k8s using ***Helm***)
-<br>[Find out how to install **Starlight proxy** ➡️](docs/starlight-proxy.md) 
+<br>[Find out how to install **Starlight proxy** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-proxy.md) 
 
 
 2) Set up the worker to be able to run Starlight. 
@@ -63,7 +63,7 @@ installing **containerd** and the **Starlight snapshotter plugin**,
 configuring containerd to use the plugin, 
 and starting the Starlight snapshotter daemon
 (you also need to tell the snapshotter the address of the proxy server).
-<br>[Find out how to install **containerd** & **Starlight snapshotter plugin** ➡️](docs/starlight-snapshotter.md)
+<br>[Find out how to install **containerd** & **Starlight snapshotter plugin** ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-snapshotter.md)
 
 
 3) Convert the container image to the **Starlight format** container image.
