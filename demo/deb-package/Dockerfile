@@ -1,5 +1,4 @@
-#FROM amd64/ubuntu:22.04
-FROM ubuntu:22.04
+FROM debian:stable
 
 WORKDIR /go/src/app
 
