@@ -1,0 +1,28 @@
+name: Debian Package
+on:
+  push:
+    branches:
+      - feature_debian_*
+    tags:
+      - 'v*.*.*'
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Build deb package
+        run: |
+          sudo apt update -y
+          sudo apt upgrade -y
+          sudo apt install net-tools
+          docker run --privileged --rm tonistiigi/binfmt --install all
+          docker build -t helper:latest  -f ./.github/.helper/Dockerfile ./.github/.helper/
+          docker run -d --hostname helper --expose 8080 --env AUTH=$BUILDAUTH --name helper -v "$(pwd)"/sandbox:/app/upload:rw helper:latest
+          export UPLOAD_URL=http://`docker inspect helper | grep "IPAddress" | grep -o -E '[0-9.]+' | head -n 1`:8080/
+          make docker-buildx-multi-arch
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./sandbox/*.deb

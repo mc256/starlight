@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - feature_container_*
-      - feature_multi_arch
     tags:
       - 'v*.*.*'
 jobs:
