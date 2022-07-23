@@ -15,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
 RUN apt update -y && apt upgrade -y 
-RUN apt install -y tzdata curl wget dpkg-dev gpg build-essential debhelper
+RUN apt install -y tzdata curl wget git dpkg-dev gpg build-essential debhelper
 
 RUN wget -q https://go.dev/dl/go1.18.4.linux-$ARCH.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-$ARCH.tar.gz 
 COPY . .
