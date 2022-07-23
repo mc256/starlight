@@ -2,6 +2,7 @@
 
 [![Docker Image](https://github.com/mc256/starlight/actions/workflows/docker-image.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
 [![Helm Chart](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
+[![Debian Package](https://github.com/mc256/starlight/actions/workflows/debian-package.yml/badge.svg)](https://github.com/mc256/starlight/actions/workflows/debian-package.yml)
 
 <img align="right" src="docs/provisioning-time-wan.png">
 
