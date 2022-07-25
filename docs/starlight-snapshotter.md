@@ -15,16 +15,17 @@ and starting the Starlight snapshotter daemon
 
 ## Method 1. Install Pre-built Package (Recommended)
 
-Pre-build deb package is available for Ubuntu 22.04 or newer.
+Pre-build deb package is available for `amd64`, `armhf`, and `arm64`.
 
 ### 1. Install Starlight Snapshotter
 
-Download `.deb` package from the [release page](https://github.com/mc256/starlight/releases).
+Download and install the `.deb` package from the [release page](https://github.com/mc256/starlight/releases).
 
 ```shell
+export ARCH=amd64
 export SL_VERSION=0.1.0
-wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starlight-snapshotter_${SL_VERSION}_amd64.deb"
-sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_amd64.deb"
+wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
+sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 ```
 
 Update systemd service file `/lib/systemd/system/starlight-snapshotter.service`. 
