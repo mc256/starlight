@@ -23,7 +23,7 @@ Download and install the `.deb` package from the [release page](https://github.c
 
 ```shell
 export ARCH=amd64
-export SL_VERSION=0.1.0
+export SL_VERSION=0.1.1
 wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 ```

@@ -12,8 +12,7 @@ Configure the proxy server to point to the registry and run it. Starlight suppor
 ## Method 0. Use Helm (Recommended)
 
 ```shell
-git clone https://github.com/mc256/starlight.git
-helm install starlight-proxy ./starlight/demo/proxychart
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.1
 ```
 
 You may need to customize the chart. Helm chart configuration are [available here](https://github.com/mc256/starlight/blob/master/docs/helm.md).
