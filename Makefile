@@ -45,11 +45,11 @@ build-starlight-proxy-for-alpine:
 
 .PHONY: build-helm-package
 build-helm-package:
-	helm package ./demo/chart --version $(VERSION) -d /tmp
+	helm package ./demo/chart --version $(VERSIONNUMBER) -d /tmp
 
 .PHONY: push-helm-package
 push-helm-package:
-	helm push /tmp/starlight-proxy-chart-$(VERSION).tgz oci://ghcr.io/mc256/starlight/
+	helm push /tmp/starlight-proxy-chart-$(VERSIONNUMBER).tgz oci://ghcr.io/mc256/starlight/
 
 .PHONY: change-version-number
 change-version-number:
