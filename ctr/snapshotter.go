@@ -50,23 +50,19 @@ type snOptFunc func() snapshots.Opt
 type SnapshotterService struct {
 	ctx     context.Context
 	sn      snapshots.Snapshotter
-	unique  string
+	id      string
 	noGcOpt snOptFunc
 }
 
 // PrepareDeltaImage gets
 func (s *SnapshotterService) PrepareDeltaImage(fromImages, toImages string) error {
-	// sort image orders
-	fromImages = util.SortImageArrayString(fromImages)
-	toImages = util.SortImageArrayString(toImages)
-
 	var target, source string
 	if fromImages == "" {
 		source = ""
 	} else {
 		source = fmt.Sprintf("accelerated(%s)-XXXXXX", fromImages) // committed - name
 	}
-	target = fmt.Sprintf("target(%s)-%s", toImages, s.unique) // active - key
+	target = fmt.Sprintf("target(%s)-%s", toImages, s.id) // active - key
 
 	// check whether accelerated image exists
 	accelerated := fmt.Sprintf("accelerated(%s)-XXXXXX", toImages)
@@ -93,7 +89,7 @@ func (s *SnapshotterService) PrepareContainerSnapshot(name, tag, acceleratedImag
 	arrAcc := strings.Split(acceleratedImages, ",")
 	sort.Strings(arrAcc)
 	acceleratedImages = strings.Join(arrAcc, ",")
-	committed := fmt.Sprintf("worker-%s-%s-%06d-%s", name, tag, rand.Intn(1000000), s.unique)
+	committed := fmt.Sprintf("worker-%s-%s-%06d-%s", name, tag, rand.Intn(1000000), s.id)
 	accelerated := fmt.Sprintf("accelerated(%s)-XXXXXX", acceleratedImages)
 
 	labels := map[string]string{
@@ -125,9 +121,9 @@ func (s *SnapshotterService) CommitWorker(sn string) error {
 func NewSnapshotterService(ctx context.Context, client *containerd.Client) (sn *SnapshotterService) {
 	rand.Seed(time.Now().UnixNano())
 	sn = &SnapshotterService{
-		ctx:    ctx,
-		sn:     client.SnapshotService("starlight"),
-		unique: fmt.Sprintf("%06d", rand.Intn(100000)),
+		ctx: ctx,
+		sn:  client.SnapshotService("starlight"),
+		id:  fmt.Sprintf("%06d", rand.Intn(100000)),
 		noGcOpt: func() snapshots.Opt {
 			return snapshots.WithLabels(map[string]string{
 				"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
@@ -136,7 +132,7 @@ func NewSnapshotterService(ctx context.Context, client *containerd.Client) (sn *
 	}
 
 	log.G(ctx).WithFields(logrus.Fields{
-		"unique": sn.unique,
+		"id": sn.id,
 	}).Info("sn service created")
 	return
 }
