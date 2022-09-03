@@ -60,13 +60,13 @@ func Command() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "optimize-group",
-				Usage:    "label of this workflow",
+				Usage:    "find the hot-est set of files in this container image",
 				Value:    "",
 				Aliases:  []string{"app", "workload"},
 				Required: false,
 			},
 		},
-		ArgsUsage: "[FromImages] ToImages",
+		ArgsUsage: "[FromImage] ToImage",
 	}
 	return &cmd
 }

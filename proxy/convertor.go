@@ -168,8 +168,7 @@ func (c *Convertor) toStarlightLayer(idx int, layer goreg.Layer, addendums *[]mu
 		Layer: sll,
 		Annotations: map[string]string{
 			util.StarlightTOCDigestAnnotation: tocDigest.String(),
-			// should we consider compatable with estargz
-			util.TOCJSONDigestAnnotation: tocDigest.String(),
+			util.TOCJSONDigestAnnotation:      tocDigest.String(),
 		},
 	}
 

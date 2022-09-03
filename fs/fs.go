@@ -169,7 +169,7 @@ func (n *StarlightFsNode) Readdir(ctx context.Context) (fs.DirStream, syscall.Er
 					return
 				}
 				cl = append(cl, fuse.DirEntry{
-					Mode: st.Mode,
+					Mode: FileMode(st.Mode),
 					Name: key,
 					Ino:  st.Ino,
 				})
@@ -288,7 +288,7 @@ func (n *StarlightFsNode) Link(ctx context.Context, target fs.InodeEmbedder, nam
 	out.FromStat(&stat)
 
 	child.stable.Ino = stat.Ino
-	child.stable.Mode = stat.Mode
+	child.stable.Mode = FileMode(stat.Mode)
 
 	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
 	n.Ent.AddChild(name, child)
@@ -401,7 +401,7 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 					return nil, 0, errno
 				}
 				p := n.Ent.GetRwLayerPath()
-				_, err := syscall.Creat(p, 0)
+				_, err := Creat(p, 0)
 				if err != nil {
 					return nil, 0, fs.ToErrno(err)
 				}
@@ -739,7 +739,7 @@ func (n *StarlightFsNode) Symlink(ctx context.Context, target, name string, out 
 	out.FromStat(&stat)
 
 	child.stable.Ino = stat.Ino
-	child.stable.Mode = stat.Mode
+	child.stable.Mode = FileMode(stat.Mode)
 
 	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
 	n.Ent.AddChild(name, child)
@@ -809,7 +809,7 @@ func (n *StarlightFsNode) Mkdir(ctx context.Context, name string, mode uint32, o
 	out.FromStat(&stat)
 
 	child.stable.Ino = stat.Ino
-	child.stable.Mode = stat.Mode
+	child.stable.Mode = FileMode(stat.Mode)
 	child.parent = n.Ent
 
 	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
@@ -898,7 +898,7 @@ func (n *StarlightFsNode) Create(ctx context.Context, name string, flags uint32,
 	}
 
 	child.stable.Ino = stat.Ino
-	child.stable.Mode = stat.Mode
+	child.stable.Mode = FileMode(stat.Mode)
 
 	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())
 	n.Ent.AddChild(name, child)
@@ -1191,7 +1191,7 @@ func (n *StarlightFsNode) Mknod(ctx context.Context, name string, mode, rdev uin
 	out.FromStat(&stat)
 
 	child.stable.Ino = stat.Ino
-	child.stable.Mode = stat.Mode
+	child.stable.Mode = FileMode(stat.Mode)
 	child.parent = n.Ent
 
 	ch := n.NewInode(ctx, &StarlightFsNode{Ent: child}, *child.GetStableAttr())

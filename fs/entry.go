@@ -178,15 +178,7 @@ func (fe *FsEntry) GetAttrFromEntry(out *fuse.Attr) syscall.Errno {
 	} else if fe.Type == "symlink" {
 		out.Size = uint64(len(fe.LinkName))
 	}
-
-	out.Blksize = uint32(fe.ChunkSize)
-	if fe.ChunkSize == 0 {
-		out.Blksize = 4096
-	}
-	out.Blocks = out.Size / uint64(out.Blksize)
-	if out.Size%uint64(out.Blksize) > 0 {
-		out.Blocks++
-	}
+	fe.SetBlockSize(out)
 	mtime := fe.ModTime()
 	out.SetTimes(&mtime, &mtime, &mtime)
 	out.Mode = fe.stable.Mode
@@ -196,8 +188,6 @@ func (fe *FsEntry) GetAttrFromEntry(out *fuse.Attr) syscall.Errno {
 	if out.Nlink == 0 {
 		out.Nlink = 1 // zero "NumLink" means one.
 	}
-	out.Padding = 0
-
 	return 0
 }
 
@@ -281,7 +271,8 @@ func (fe *FsEntry) GetFileMode() uint32 {
 }
 
 func (fe *FsEntry) promoteRegularFile() syscall.Errno {
-	dest, err := syscall.Creat(fe.GetRwLayerPath(), fe.GetFileMode())
+	dest, err := Creat(fe.GetRwLayerPath(), fe.GetFileMode())
+
 	if err != nil {
 		return fuseFs.ToErrno(err)
 	}
@@ -350,7 +341,7 @@ func (fe *FsEntry) Promote() syscall.Errno {
 	st := &syscall.Stat_t{}
 	_ = fe.GetAttrFromFs(st)
 	fe.stable.Ino = st.Ino
-	fe.stable.Mode = st.Mode
+	fe.stable.Mode = FileMode(st.Mode)
 	return 0
 }
 

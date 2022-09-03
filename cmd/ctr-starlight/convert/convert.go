@@ -48,6 +48,7 @@ func Action(c *cli.Context) error {
 	util.ConfigLoggerWithLevel(c.String("log-level"))
 	ctx := namespaces.WithNamespace(context.Background(), ns)
 
+	// source
 	srcOptions := []name.Option{}
 	if srcInsecure {
 		srcOptions = append(srcOptions, name.Insecure)
@@ -57,6 +58,7 @@ func Action(c *cli.Context) error {
 		dstOptions = append(dstOptions, name.Insecure)
 	}
 
+	// config
 	convertor, err := proxy.NewConvertor(srcImg, slImg, srcOptions, dstOptions)
 	if err != nil {
 		log.G(ctx).WithError(err).Error("fail to create the convertor")
@@ -67,6 +69,7 @@ func Action(c *cli.Context) error {
 		"to":   convertor.GetDst(),
 	}).Info("convert container image to Starlight format")
 
+	// Convert
 	err = convertor.ToStarlightImage()
 	if err != nil {
 		log.G(ctx).WithError(err).Error("fail to convert the container image")
