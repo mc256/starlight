@@ -21,6 +21,10 @@ package convert
 import (
 	"context"
 	"errors"
+	"github.com/containerd/containerd/platforms"
+	"github.com/google/go-containerregistry/pkg/authn"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -42,6 +46,7 @@ func Action(c *cli.Context) error {
 
 	srcInsecure := c.Bool("insecure-source")
 	dstInsecure := c.Bool("insecure-destination")
+	platform := c.String("platform")
 
 	// logger
 	ns := c.String("namespace")
@@ -58,10 +63,24 @@ func Action(c *cli.Context) error {
 		dstOptions = append(dstOptions, name.Insecure)
 	}
 
+	// platform
+	remoteOptions := []remote.Option{remote.WithAuthFromKeychain(authn.DefaultKeychain)}
+	if platform != "" {
+		if p, err := platforms.Parse(platform); err != nil {
+			remoteOptions = append(remoteOptions, remote.WithPlatform(v1.Platform{
+				Architecture: p.Architecture,
+				OS:           p.OS,
+				OSVersion:    p.OSVersion,
+				OSFeatures:   p.OSFeatures,
+				Variant:      p.Variant,
+			}))
+		}
+	}
+
 	// config
-	convertor, err := proxy.NewConvertor(srcImg, slImg, srcOptions, dstOptions)
+	convertor, err := proxy.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions)
 	if err != nil {
-		log.G(ctx).WithError(err).Error("fail to create the convertor")
+		log.G(ctx).WithError(err).Error("illegal image reference")
 		return nil
 	}
 	log.G(ctx).WithFields(logrus.Fields{
@@ -83,7 +102,7 @@ func Action(c *cli.Context) error {
 func Command() *cli.Command {
 	cmd := cli.Command{
 		Name:  "convert",
-		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image",
+		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image format",
 		Action: func(c *cli.Context) error {
 			return Action(c)
 		},

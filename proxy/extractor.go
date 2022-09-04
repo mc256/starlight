@@ -38,14 +38,14 @@ import (
 )
 
 const (
-	ImageArchitecture    = "amd64"
-	ImageOS              = "linux"
-	MediaTypeImage       = "application/vnd.oci.image.index.v1+json"
-	MediaTypeDockerImage = "application/vnd.docker.distribution.manifest.v2+json"
-)
+	DefaultImageArchitecture = "amd64"
+	DefaultImageOS           = "linux"
+	MediaTypeImage           = "application/vnd.oci.image.index.v1+json"
+	// app->image->tag->manifest->layers->toc->tocEntry
 
-// app->image->tag->manifest->layers->toc->tocEntry
-// app(w platform) -> tag -> layers -> toc -> tocEntry
+	MediaTypeDockerImage = "application/vnd.docker.distribution.manifest.v2+json"
+	// app(w platform) -> tag -> layers -> toc -> tocEntry
+)
 
 func getToc(ctx context.Context, repo distribution.Repository, imageName, imageTag string, tagBucket, blobBucket *bolt.Bucket, mani distribution.Manifest, maniDigest digest.Digest) error {
 	mv2 := mani.(*manifest2.DeserializedManifest).Manifest
@@ -191,8 +191,8 @@ func CacheToc(ctx context.Context, db *bolt.DB, imageName, imageTag, registry st
 		// check manifest list
 		matched := false
 		for _, m := range maniList.Manifests {
-			if ImageArchitecture != m.Platform.Architecture ||
-				ImageOS != m.Platform.OS {
+			if DefaultImageArchitecture != m.Platform.Architecture ||
+				DefaultImageOS != m.Platform.OS {
 				continue
 			}
 			matched = true

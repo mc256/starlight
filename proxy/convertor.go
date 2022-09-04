@@ -2,14 +2,18 @@ package proxy
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
+	"github.com/containerd/containerd/log"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"sync"
+	"time"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	goreg "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
@@ -18,7 +22,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 )
 
 type StarlightLayer struct {
@@ -94,11 +97,16 @@ func NewStarlightLayer(f *os.File, stargzWriter *util.Writer) (goreg.Layer, erro
 type Convertor struct {
 	// There might be multiple `images` associate with an `index`,
 	// but we only implement image conversion here.
-	src, dst name.Reference
+	src, dst   name.Reference
+	ctx        context.Context
+	optsRemote []remote.Option
 }
 
-func NewConvertor(src, dst string, optsSrc, dstSrc []name.Option) (c *Convertor, err error) {
-	c = &Convertor{}
+func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.Option, optsRemote []remote.Option) (c *Convertor, err error) {
+	c = &Convertor{
+		ctx:        ctx,
+		optsRemote: optsRemote,
+	}
 	if c.src, err = name.ParseReference(src, optsSrc...); err != nil {
 		return nil, err
 	}
@@ -117,7 +125,8 @@ func (c *Convertor) GetDst() string {
 }
 
 func (c *Convertor) readImage() (goreg.Image, error) {
-	desc, err := remote.Get(c.src, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Debug("fetching container image")
+	desc, err := remote.Get(c.src, c.optsRemote...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +134,25 @@ func (c *Convertor) readImage() (goreg.Image, error) {
 }
 
 func (c *Convertor) writeImage(image goreg.Image) error {
-	return remote.Write(c.dst, image, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Debug("uploading converted container image")
+	return remote.Write(c.dst, image, c.optsRemote...)
 }
 
-func (c *Convertor) toStarlightLayer(idx int, layer goreg.Layer, addendums *[]mutate.Addendum, mtx *sync.Mutex) error {
+func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
+	addendums []mutate.Addendum, mtx *sync.Mutex, history goreg.History) error {
+
+	if history.EmptyLayer {
+		mtx.Lock()
+		defer mtx.Unlock()
+		addendums[idx] = mutate.Addendum{
+			Layer:       nil,
+			History:     history,
+			Annotations: nil,
+		}
+		return nil
+	}
+	layer := layers[layerIdx]
+
 	// Temporary File for the Starlight Layer
 	d, err := layer.Digest()
 	if err != nil {
@@ -139,36 +163,41 @@ func (c *Convertor) toStarlightLayer(idx int, layer goreg.Layer, addendums *[]mu
 	if err != nil {
 		return err
 	}
+
 	l, err := layer.Uncompressed()
+	log.G(c.ctx).WithFields(logrus.Fields{"layer": d}).Debug("decompressed layer")
+
 	if err != nil {
 		return err
 	}
-
 	// modified version of stargz writer
-	stargzWriter := util.NewWriterLevel(f, gzip.BestCompression)
+	w := util.NewWriterLevel(f, gzip.BestCompression)
 	// TODO: we could change the chunk size here but let's keep it as 4KB
-	if err := stargzWriter.AppendTar(l); err != nil {
+	if err := w.AppendTar(l); err != nil {
 		return err
 	}
-	tocDigest, err := stargzWriter.Close()
+	tocDigest, err := w.Close()
 	if err != nil {
 		return err
 	}
 
 	// create starlight layer
-	sll, err := NewStarlightLayer(f, stargzWriter)
+	sll, err := NewStarlightLayer(f, w)
 	if err != nil {
 		return err
 	}
+	log.G(c.ctx).WithFields(logrus.Fields{"layer": d}).Debug("converted layer")
 
 	// add layer to the image
 	mtx.Lock()
 	defer mtx.Unlock()
-	(*addendums)[idx] = mutate.Addendum{
-		Layer: sll,
+	addendums[idx] = mutate.Addendum{
+		Layer:   sll,
+		History: history,
 		Annotations: map[string]string{
-			util.StarlightTOCDigestAnnotation: tocDigest.String(),
-			util.TOCJSONDigestAnnotation:      tocDigest.String(),
+			util.StarlightTOCDigestAnnotation:       tocDigest.String(),
+			util.StarlightTOCCreationTimeAnnotation: time.Now().Format(time.RFC3339Nano),
+			util.TOCJSONDigestAnnotation:            tocDigest.String(),
 		},
 	}
 
@@ -176,37 +205,60 @@ func (c *Convertor) toStarlightLayer(idx int, layer goreg.Layer, addendums *[]mu
 }
 
 func (c *Convertor) ToStarlightImage() (err error) {
+	// image
 	var img goreg.Image
 	if img, err = c.readImage(); err != nil {
 		return err
 	}
+
+	// config
+	cfg, err := img.ConfigFile()
+	history := cfg.History
+	if err != nil {
+		return err
+	}
+	addendum := make([]mutate.Addendum, len(history))
+
+	// layer
 	var layers []goreg.Layer
 	if layers, err = img.Layers(); err != nil {
 		return err
 	}
-	addendum := make([]mutate.Addendum, len(layers))
+	layerMap := make([]int, len(history))
+	count := 0
+	for i, h := range history {
+		if h.EmptyLayer {
+			layerMap[i] = -1
+		} else {
+			layerMap[i] = count
+			count += 1
+		}
+	}
+
 	var addendumMux sync.Mutex
 	var egrp errgroup.Group
-	for idx, layer := range layers {
-		idx, layer := idx, layer
+
+	for i, h := range history {
+		i, h := i, h
 		egrp.Go(func() error {
-			return c.toStarlightLayer(idx, layer, &addendum, &addendumMux)
+			return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
 		})
 	}
+
 	if err := egrp.Wait(); err != nil {
 		return errors.Wrapf(err, "failed to convert the image to Starlight format")
 	}
 
-	// Copy image configuration file
-	srcCfg, err := img.ConfigFile()
 	if err != nil {
 		return err
 	}
+
 	// Clean up things that will be changed
-	srcCfg.RootFS.DiffIDs = []goreg.Hash{}
-	srcCfg.History = []goreg.History{}
+	cfg.RootFS.DiffIDs = []goreg.Hash{}
+	cfg.History = []goreg.History{}
+
 	// Set the configuration file to
-	configuredImage, err := mutate.ConfigFile(empty.Image, srcCfg)
+	configuredImage, err := mutate.ConfigFile(empty.Image, cfg)
 	if err != nil {
 		return err
 	}
@@ -218,5 +270,4 @@ func (c *Convertor) ToStarlightImage() (err error) {
 	}
 
 	return c.writeImage(slImg)
-
 }

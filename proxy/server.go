@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
@@ -36,8 +37,8 @@ import (
 )
 
 type transition struct {
-	tagFrom []*util.ImageRef
-	tagTo   []*util.ImageRef
+	from name.Reference
+	to   name.Reference
 }
 
 type StarlightProxyServer struct {
@@ -53,35 +54,38 @@ type StarlightProxyServer struct {
 
 func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
 	// Parse Image Reference
-	t := &transition{
-		tagFrom: make([]*util.ImageRef, 0),
-		tagTo:   make([]*util.ImageRef, 0),
-	}
-
 	var err error
+	t := &transition{from: nil, to: nil}
 	if from != "_" {
-		if t.tagFrom, err = util.NewImageRef(from); err != nil {
-			return err
+		t.from, err = name.ParseReference(from, name.WithDefaultRegistry(a.containerRegistry))
+		if err != nil {
+			return fmt.Errorf("failed to parse source image: %v", err)
 		}
 	}
-	if t.tagTo, err = util.NewImageRef(to); err != nil {
-		return err
+	t.to, err = name.ParseReference(to, name.WithDefaultRegistry(a.containerRegistry))
+	if err != nil {
+		return fmt.Errorf("failed to parse distination image: %v", err)
 	}
 
 	// Load Optimized Merged Image Collections
-	var cTo, cFrom *Collection
+	/*
+		var cTo, cFrom *Collection
 
-	if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
-		return err
-	}
-	if len(t.tagFrom) != 0 {
-		if cFrom, err = LoadCollection(a.ctx, a.database, t.tagFrom); err != nil {
+		if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
 			return err
 		}
-		cTo.Minus(cFrom)
-	}
+		if len(t.tagFrom) != 0 {
+			if cFrom, err = LoadCollection(a.ctx, a.database, t.tagFrom); err != nil {
+				return err
+			}
+			cTo.Minus(cFrom)
+		}
 
-	deltaBundle := cTo.ComposeDeltaBundle()
+		deltaBundle := cTo.ComposeDeltaBundle()
+	*/
+	collection := Collection{}
+	deltaBundle := collection.ComposeDeltaBundle()
+	//////
 
 	buf := bytes.NewBuffer(make([]byte, 0))
 	wg := &sync.WaitGroup{}

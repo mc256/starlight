@@ -30,5 +30,6 @@ const (
 	ProxyDbName       = "toc.db"
 	DataPath          = "data/"
 
-	StarlightTOCDigestAnnotation = "containerd.io/snapshot/remote/starlight/toc.digest"
+	StarlightTOCDigestAnnotation       = "containerd.io/snapshot/remote/starlight/toc.digest"
+	StarlightTOCCreationTimeAnnotation = "containerd.io/snapshot/remote/starlight/toc.timestamp"
 )

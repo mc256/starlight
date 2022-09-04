@@ -2,30 +2,25 @@ package proxy
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
-	"io"
-	"strings"
-	"testing"
-
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/mc256/starlight/test"
+	"io"
+	"testing"
 )
 
 const (
-	TestImageName   = "redis"
-	TestImageSrcTag = "6.0"
-	TestImageDstTag = "6.0-sl-test"
+	srcRef = "harbor.yuri.moe/public/mariadb:10.9.2"
+	dstRef = "harbor.yuri.moe/public/mariadb:10.9.2a"
 )
 
 func TestConvertorConstructor(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+	ctx := context.Background()
 
-	// we don't need the protocol here whether it is http or https or not
-	// it needs to be set in the options.
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,12 +29,9 @@ func TestConvertorConstructor(t *testing.T) {
 }
 
 func TestReadImage(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+	ctx := context.Background()
 
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,12 +42,9 @@ func TestReadImage(t *testing.T) {
 }
 
 func TestReadImage2(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+	ctx := context.Background()
 
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,12 +61,9 @@ func TestReadImage2(t *testing.T) {
 }
 
 func TestReadImageLayers(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+	ctx := context.Background()
 
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,30 +99,14 @@ func TestReadImageLayers(t *testing.T) {
 }
 
 func TestToStarlightImage(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+	ctx := context.Background()
 
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{name.Insecure})
+	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{
+		remote.WithAuthFromKeychain(authn.DefaultKeychain),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = c.ToStarlightImage()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return
-}
-
-func TestToStarlightImage2(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
-
-	srcRef := fmt.Sprintf("%s/%s:%s", strings.TrimPrefix(containerRegistry, "http://"), TestImageName, TestImageSrcTag)
-	dstRef := fmt.Sprintf("%s/%s:%s", "registry.yuri.moe", TestImageName, TestImageDstTag)
-
-	c, err := NewConvertor(srcRef, dstRef, []name.Option{name.Insecure}, []name.Option{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -60,6 +60,11 @@ func New() *cli.App {
 			Required: true,
 		},
 		&cli.StringFlag{
+			Name:     "postgresql",
+			Usage:    "use PostgreSQL database backend for storing TOCs",
+			Required: false,
+		},
+		&cli.StringFlag{
 			Name:        "log-level",
 			DefaultText: "info",
 			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",

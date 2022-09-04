@@ -37,8 +37,8 @@ var (
 			Required: false,
 		},
 		&cli.StringFlag{
-			Name:     "dockerconfigjson",
-			Usage:    "credentials to pull image from a private container registry",
+			Name:     "platform",
+			Usage:    "multi-build container image platforms",
 			Value:    "",
 			Required: false,
 		},
