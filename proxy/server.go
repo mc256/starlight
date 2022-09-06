@@ -231,8 +231,8 @@ func (a *StarlightProxyServer) starlight(w http.ResponseWriter, req *http.Reques
 
 	if req.Method == http.MethodGet && strings.HasPrefix(command, "delta-image") {
 		// Get Delta Image
-		f, t := q.Get("from"), q.Get("to")
-		fmt.Println(f, t)
+		//f, t := q.Get("from"), q.Get("to")
+
 		a.error(w, req, "not implemented yet!")
 		return
 	}
