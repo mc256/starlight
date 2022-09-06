@@ -18,6 +18,8 @@
 
 package util
 
+import "os"
+
 const (
 	ImageNameLabel     = "containerd.io/snapshot/remote/starlight/imageName.label"
 	ImageTagLabel      = "containerd.io/snapshot/remote/starlight/imageTag.label"
@@ -32,4 +34,15 @@ const (
 
 	StarlightTOCDigestAnnotation       = "containerd.io/snapshot/remote/starlight/toc.digest"
 	StarlightTOCCreationTimeAnnotation = "containerd.io/snapshot/remote/starlight/toc.timestamp"
+
+	production = false
 )
+
+func GetEtcConfigPath() string {
+	if production {
+		return "/etc/starlight/"
+	} else {
+		p, _ := os.Getwd()
+		return p + "/sandbox/etc/starlight/"
+	}
+}

@@ -19,18 +19,13 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/fs"
-	"github.com/mc256/starlight/merger"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -41,17 +36,28 @@ type transition struct {
 	to   name.Reference
 }
 
-type StarlightProxyServer struct {
-	http.Server
+type ApiResponse struct {
+	Status string `json:"status"`
+	Code   int    `json:"code"`
 
-	ctx      context.Context
-	database *bolt.DB
+	// Common Response
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
 
-	containerRegistry string
-
-	builder *DeltaBundleBuilder
+	// Extractor Response Information
+	Extractor *ExtractorResult `json:"extractor,omitempty"`
 }
 
+type StarlightProxyServer struct {
+	http.Server
+	ctx context.Context
+
+	// new variables
+	db     *Database
+	config *ProxyConfiguration
+}
+
+/*
 func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
 	// Parse Image Reference
 	var err error
@@ -68,7 +74,7 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 	}
 
 	// Load Optimized Merged Image Collections
-	/*
+
 		var cTo, cFrom *Collection
 
 		if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
@@ -82,7 +88,7 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 		}
 
 		deltaBundle := cTo.ComposeDeltaBundle()
-	*/
+
 	collection := Collection{}
 	deltaBundle := collection.ComposeDeltaBundle()
 	//////
@@ -179,78 +185,147 @@ func (a *StarlightProxyServer) postReport(w http.ResponseWriter, req *http.Reque
 	return nil
 }
 
-func (a *StarlightProxyServer) getDefault(w http.ResponseWriter, req *http.Request) {
-	_, _ = fmt.Fprint(w, "Starlight Proxy OK!\n")
+*/
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (a *StarlightProxyServer) root(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("root")
+
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusOK)
+
+	r := ApiResponse{
+		Status:  "OK",
+		Code:    http.StatusOK,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
 }
 
-func (a *StarlightProxyServer) rootFunc(w http.ResponseWriter, req *http.Request) {
-	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
-	remoteAddr := req.RemoteAddr
+func (a *StarlightProxyServer) scanner(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("harbor scanner")
 
+	// TODO: implement api hooks
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusNotImplemented)
+
+	r := ApiResponse{
+		Status:  "Not Implemented",
+		Code:    http.StatusNotImplemented,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
+}
+
+func (a *StarlightProxyServer) starlight(w http.ResponseWriter, req *http.Request) {
+	command := strings.Trim(strings.TrimPrefix(req.RequestURI, "/starlight"), "/")
+	q := req.URL.Query()
+	log.G(a.ctx).WithFields(logrus.Fields{"command": command, "ip": a.getIpAddress(req)}).Info("request received")
+
+	if req.Method == http.MethodGet && strings.HasPrefix(command, "delta-image") {
+		// Get Delta Image
+		f, t := q.Get("from"), q.Get("to")
+		fmt.Println(f, t)
+		a.error(w, req, "not implemented yet!")
+		return
+	}
+	if req.Method == http.MethodPut && strings.HasPrefix(command, "prepare") {
+		// Cache ToC
+		i := q.Get("image")
+		if r, e := SaveToC(a, i); e != nil {
+			log.G(a.ctx).WithError(e).Error("failed to cache ToC")
+			a.error(w, req, e.Error())
+		} else {
+			log.G(a.ctx).WithField("container", i).Info("cached ToC")
+			a.respond(w, req, r)
+		}
+		return
+	}
+	if req.Method == http.MethodPost && strings.HasPrefix(command, "report") {
+		// Report FS traces
+		i := q.Get("image")
+		fmt.Println(i)
+		a.error(w, req, "not implemented yet!")
+		return
+	}
+
+	a.error(w, req, "missing parameter")
+}
+
+func (a *StarlightProxyServer) error(w http.ResponseWriter, req *http.Request, reason string) {
+	a.respond(w, req, &ApiResponse{
+		Status: "Bad Request",
+		Code:   http.StatusBadRequest,
+		Error:  reason,
+	})
+}
+
+func (a *StarlightProxyServer) respond(w http.ResponseWriter, req *http.Request, res *ApiResponse) {
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(res.Code)
+	b, _ := json.Marshal(res)
+	_, _ = w.Write(b)
+}
+
+func (a *StarlightProxyServer) healthCheck(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("health check")
+
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusOK)
+
+	r := ApiResponse{
+		Status:  "OK",
+		Code:    http.StatusOK,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
+}
+
+func (a *StarlightProxyServer) getIpAddress(req *http.Request) string {
+	remoteAddr := req.RemoteAddr
 	if realIp := req.Header.Get("X-Real-IP"); realIp != "" {
 		remoteAddr = realIp
 	}
-	log.G(a.ctx).WithFields(logrus.Fields{
-		"remote": remoteAddr,
-		"params": params,
-	}).Info("request received")
-	var err error
-	switch {
-	case len(params) == 4 && params[0] == "from" && params[2] == "to":
-		err = a.getDeltaImage(w, req, strings.TrimSpace(params[1]), strings.TrimSpace(params[3]))
-		break
-	case len(params) == 2 && params[0] == "prepare":
-		err = a.getPrepared(w, req, params[1])
-		break
-	case len(params) == 1 && params[0] == "report":
-		err = a.postReport(w, req)
-		break
-	default:
-		a.getDefault(w, req)
-	}
-	if err != nil {
-		header := w.Header()
-		header.Set("Content-Type", "text/plain")
-		header.Set("Starlight-Version", util.Version)
-		w.WriteHeader(http.StatusInternalServerError)
-
-		_, _ = fmt.Fprintf(w, "Opoos! Something went wrong: \n\n%s\n", err)
-	} else {
-		log.G(a.ctx).WithFields(logrus.Fields{
-			"remote": remoteAddr,
-			"params": params,
-		}).Info("request sent")
-	}
+	return remoteAddr
 }
 
-func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyServer {
-	ctx := util.ConfigLoggerWithLevel(logLevel)
-
-	log.G(ctx).WithFields(logrus.Fields{
-		"registry":  registry,
-		"log-level": logLevel,
-	}).Info("Starlight Proxy")
-
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
-	if err != nil {
-		log.G(ctx).WithError(err).Error("open database error")
-		return nil
-	}
+func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration) *StarlightProxyServer {
 
 	server := &StarlightProxyServer{
+		ctx: ctx,
 		Server: http.Server{
-			Addr: ":8090",
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
 		},
-		database:          db,
-		ctx:               ctx,
-		containerRegistry: registry,
-		builder:           NewBuilder(ctx, registry),
+		config: cfg,
 	}
-	http.HandleFunc("/", server.rootFunc)
+
+	// connect database
+	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
+	} else {
+		server.db = db
+	}
+
+	http.HandleFunc("/scanner/", server.scanner)
+	http.HandleFunc("/starlight/", server.starlight)
+	http.HandleFunc("/health-check", server.healthCheck)
+	http.HandleFunc("/", server.root)
 
 	go func() {
 		defer wg.Done()
-		defer server.database.Close()
+		defer server.db.Close()
 
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.G(ctx).WithField("error", err).Error("server exit with error")

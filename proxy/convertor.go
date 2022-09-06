@@ -236,16 +236,16 @@ func (c *Convertor) ToStarlightImage() (err error) {
 	}
 
 	var addendumMux sync.Mutex
-	var egrp errgroup.Group
+	var errGrp errgroup.Group
 
 	for i, h := range history {
 		i, h := i, h
-		egrp.Go(func() error {
+		errGrp.Go(func() error {
 			return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
 		})
 	}
 
-	if err := egrp.Wait(); err != nil {
+	if err := errGrp.Wait(); err != nil {
 		return errors.Wrapf(err, "failed to convert the image to Starlight format")
 	}
 

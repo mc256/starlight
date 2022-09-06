@@ -201,7 +201,7 @@ func TestCollection_RemoveMergedApp(t *testing.T) {
 	}
 
 	fso5, err := LoadCollection(ctx, db, []*util.ImageRef{
-		{ImageName: "mariadb", ImageTag: "10.4-starlight"}, 
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"},
 		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
 	})
 	if err != nil {
@@ -287,7 +287,7 @@ func TestCollection_GetClientFsTemplates(t *testing.T) {
 	}
 
 	fso1, err := LoadCollection(ctx, db, []*util.ImageRef{
-		{ImageName: "mariadb", ImageTag: "10.4-starlight"}, 
+		{ImageName: "mariadb", ImageTag: "10.4-starlight"},
 		{ImageName: "wordpress", ImageTag: "5.7-apache-starlight"},
 	})
 	if err != nil {

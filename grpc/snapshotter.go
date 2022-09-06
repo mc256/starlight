@@ -301,6 +301,7 @@ func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _p
 				optimize,
 				optimizeGroup,
 			)
+
 			if err != nil {
 				return nil, err
 			}

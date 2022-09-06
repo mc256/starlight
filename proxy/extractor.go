@@ -20,236 +20,80 @@ package proxy
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
+	"fmt"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/mc256/starlight/util"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
-
-	"github.com/containerd/containerd/log"
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/manifestlist"
-	manifest2 "github.com/docker/distribution/manifest/schema2"
-	"github.com/docker/distribution/reference"
-	regClient "github.com/docker/distribution/registry/client"
-	"github.com/mc256/starlight/util"
-	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
+	"path"
 )
 
-const (
-	DefaultImageArchitecture = "amd64"
-	DefaultImageOS           = "linux"
-	MediaTypeImage           = "application/vnd.oci.image.index.v1+json"
-	// app->image->tag->manifest->layers->toc->tocEntry
-
-	MediaTypeDockerImage = "application/vnd.docker.distribution.manifest.v2+json"
-	// app(w platform) -> tag -> layers -> toc -> tocEntry
-)
-
-func getToc(ctx context.Context, repo distribution.Repository, imageName, imageTag string, tagBucket, blobBucket *bolt.Bucket, mani distribution.Manifest, maniDigest digest.Digest) error {
-	mv2 := mani.(*manifest2.DeserializedManifest).Manifest
-
-	// Manifset
-	if err := tagBucket.Put([]byte("manifest"), []byte(maniDigest.String())); err != nil {
-		return err
-	}
-
-	// Count
-	if err := tagBucket.Put([]byte("count"), util.Int32ToB(uint32(len(mv2.Layers)))); err != nil {
-		return err
-	}
-
-	//  Config
-	if buf, err := repo.Blobs(ctx).Get(ctx, mv2.Config.Digest); err != nil {
-		return err
-	} else if err = tagBucket.Put([]byte("config"), buf); err != nil {
-		return err
-	}
-
-	log.G(ctx).WithFields(logrus.Fields{
-		"name":      imageName,
-		"tag":       imageTag,
-		"mediaType": mv2.MediaType,
-	}).Info("found image manifest")
-
-	// Layers
-	for i, layer := range mv2.Layers {
-		// Get Layer
-		log.G(ctx).WithFields(logrus.Fields{
-			"type":   layer.MediaType,
-			"digest": layer.Digest,
-			"size":   layer.Size,
-			"order":  i,
-		}).Debug("found layer")
-		err := tagBucket.Put(util.Int32ToB(uint32(i)), []byte(layer.Digest.String()))
-		if err != nil {
-			return err
-		}
-
-		// BLOBs
-		buf, err := repo.Blobs(ctx).Get(ctx, layer.Digest)
-		if err != nil {
-			return err
-		}
-		reader := bytes.NewReader(buf)
-		sr := io.NewSectionReader(reader, 0, reader.Size())
-		layerFile, err := util.OpenStargz(sr)
-		if err != nil {
-			return err
-		}
-
-		// Get TOC
-		tocMap, chunks, _ := layerFile.GetTOC()
-		layerId := util.TraceableBlobDigest{
-			Digest:    layer.Digest,
-			ImageName: imageName,
-		}
-
-		log.G(ctx).WithFields(logrus.Fields{
-			"layerId": layerId,
-		}).Debug("save layer")
-		layerBucket, err := blobBucket.CreateBucketIfNotExists([]byte(layerId.String()))
-		if err != nil {
-			return err
-		}
-
-		// Save TOC
-		err = SaveLayer(layerBucket, tocMap, chunks)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+type ExtractorResult struct {
+	Serial int `json:"serial"`
 }
 
-func CacheToc(ctx context.Context, db *bolt.DB, imageName, imageTag, registry string) error {
-	// database
-	tx, err := db.Begin(true)
+func SaveImage(s *StarlightProxyServer, ref name.Reference, img *v1.Image) (int, error) {
+	n := ref.Context().RepositoryStr()
+	if ref.Context().RegistryStr() != s.config.DefaultRegistry {
+		n = path.Join(ref.Context().RegistryStr(), n)
+	}
+	tag := ref.Identifier()
+	hash, err := (*img).Digest()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	defer tx.Rollback()
-
-	imageStore, err := tx.CreateBucketIfNotExists([]byte("image"))
+	config, err := (*img).ConfigFile()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	blobBucket, err := tx.CreateBucketIfNotExists([]byte("blob"))
+	manifest, err := (*img).Manifest()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	// parse image name and tag
-	named, err := reference.Parse(imageName)
-	if err != nil {
-		return err
-	}
-
-	// image repository
-	repo, err := regClient.NewRepository(named.(reference.Named), registry, http.DefaultTransport)
-	if err != nil {
-		return err
-	}
-	imageBucket, err := imageStore.CreateBucketIfNotExists([]byte(imageName))
-	if err != nil {
-		return err
-	}
-
-	// get image tag
-	ti, err := repo.Tags(ctx).Get(ctx, imageTag)
-	if err != nil {
-		return err
-	}
-
-	tagBucket, err := imageBucket.CreateBucketIfNotExists([]byte(imageTag))
-	if err != nil {
-		return err
-	}
-
-	// check image type
-	if ti.MediaType == MediaTypeImage {
-		// list of manifests
-
-		manSvc, err := repo.Manifests(ctx)
-		if err != nil {
-			return err
-		}
-
-		// manifest list
-		maniListRaw, err := manSvc.Get(ctx, "", distribution.WithTag(imageTag))
-		if err != nil {
-			return err
-		}
-		maniList := maniListRaw.(*manifestlist.DeserializedManifestList).ManifestList
-
-		log.G(ctx).WithFields(logrus.Fields{
-			"name": imageName,
-			"tag":  imageTag,
-		}).Info("found image manifest list")
-
-		// check manifest list
-		matched := false
-		for _, m := range maniList.Manifests {
-			if DefaultImageArchitecture != m.Platform.Architecture ||
-				DefaultImageOS != m.Platform.OS {
-				continue
-			}
-			matched = true
-
-			mani, err := manSvc.Get(ctx, m.Digest, []distribution.ManifestServiceOption{}...)
-			if err != nil {
-				log.G(ctx).Error(err)
-				continue
-			}
-
-			if err = getToc(ctx, repo, imageName, imageTag, tagBucket, blobBucket, mani, m.Digest); err != nil {
-				return err
-			}
-			break
-
-		}
-		if !matched {
-			return util.ErrImagePlatform
-		}
-
-	} else if ti.MediaType == MediaTypeDockerImage {
-		// single manifest
-		// manifest service
-		manSvc, err := repo.Manifests(ctx)
-		if err != nil {
-			return err
-		}
-
-		// manifest list
-		mani, err := manSvc.Get(ctx, ti.Digest, distribution.WithTag(imageTag))
-		if err != nil {
-			return err
-		}
-
-		if err = getToc(ctx, repo, imageName, imageTag, tagBucket, blobBucket, mani, ti.Digest); err != nil {
-			return err
-		}
-
-	} else {
-		log.G(ctx).WithFields(logrus.Fields{
-			"repo": imageName,
-			"tag":  imageTag,
-			"type": ti.MediaType,
-		}).Warn("unknown image type")
-		return util.ErrImageMediaType
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
-
+	return s.db.InsertImage(n, tag, hash.String(), config, manifest)
 }
 
-// InitField save the TOC to the bucket
-func SaveLayer(bucket *bolt.Bucket, entryMap map[string]*util.TOCEntry, chunks map[string][]*util.TOCEntry) error {
+func SaveLayer(s *StarlightProxyServer, imageSerial, idx int, layer v1.Layer) error {
+	size, err := layer.Size()
+	if err != nil {
+		return err
+	}
+	digest, err := layer.Digest()
+	if err != nil {
+		return err
+	}
+
+	layerRef, err := s.db.InsertLayer(size, imageSerial, idx, digest.String())
+	if err != nil {
+		return err
+	}
+
+	src, err := layer.Compressed()
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	_, err = io.Copy(buf, src)
+	if err != nil {
+		return err
+	}
+
+	reader := bytes.NewReader(buf.Bytes())
+	sr := io.NewSectionReader(reader, 0, reader.Size())
+	layerFile, err := util.OpenStargz(sr)
+	if err != nil {
+		return err
+	}
+
+	// Get TOC
+	entryMap, chunks, _ := layerFile.GetTOC()
 
 	// entries map
 	entBuffer := make(map[string]*util.TraceableEntry)
@@ -264,17 +108,63 @@ func SaveLayer(bucket *bolt.Bucket, entryMap map[string]*util.TOCEntry, chunks m
 	// chunks
 	for k, v := range chunks {
 		extEntry := entBuffer[k]
-		//fmt.Println(k)
 		for _, c := range v {
 			extEntry.Chunks = append(extEntry.Chunks, c)
-			//fmt.Printf("%d %d %d\n", c.ChunkOffset, c.ChunkSize, c.CompressedSize)
 		}
 	}
 
-	for k, v := range entBuffer {
-		b, _ := json.Marshal(v)
-		_ = bucket.Put([]byte(k), b)
+	return s.db.InsertFiles(layerRef, entBuffer)
+}
+
+func SaveToC(s *StarlightProxyServer, image string) (*ApiResponse, error) {
+	if image == "" {
+		return nil, fmt.Errorf("image cannot be nil")
 	}
 
-	return nil
+	ref, err := name.ParseReference(image,
+		name.WithDefaultRegistry(s.config.DefaultRegistry), name.WithDefaultTag("latest-starlight"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	if err != nil {
+		return nil, err
+	}
+
+	img, err := desc.Image()
+	if err != nil {
+		return nil, err
+	}
+
+	serial, err := SaveImage(s, ref, &img)
+	if err != nil {
+		return nil, err
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		return nil, err
+	}
+
+	var errGrp errgroup.Group
+	for idx, layer := range layers {
+		idx, layer := idx, layer
+
+		errGrp.Go(func() error {
+			return SaveLayer(s, serial, idx, layer)
+		})
+	}
+
+	if err := errGrp.Wait(); err != nil {
+		return nil, errors.Wrapf(err, "failed to cache ToC")
+	}
+
+	return &ApiResponse{
+		Status:    "OK",
+		Code:      http.StatusOK,
+		Message:   "cached ToC",
+		Extractor: &ExtractorResult{Serial: serial},
+	}, nil
 }

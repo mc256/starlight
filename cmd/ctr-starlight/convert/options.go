@@ -42,5 +42,11 @@ var (
 			Value:    "",
 			Required: false,
 		},
+		&cli.StringFlag{
+			Name:     "notify-starlight-proxy",
+			Usage:    "update the ToC store in the Starlight Proxy. URL of proxy api server.",
+			Value:    "",
+			Required: false,
+		},
 	}
 )
