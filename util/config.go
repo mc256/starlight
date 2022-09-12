@@ -18,7 +18,10 @@
 
 package util
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 const (
 	ImageNameLabel     = "containerd.io/snapshot/remote/starlight/imageName.label"
@@ -35,14 +38,43 @@ const (
 	StarlightTOCDigestAnnotation       = "containerd.io/snapshot/remote/starlight/toc.digest"
 	StarlightTOCCreationTimeAnnotation = "containerd.io/snapshot/remote/starlight/toc.timestamp"
 
+	// Switch to false in `Makefile` when build for production environment
 	production = false
+
+	ProjectIdentifier = "module github.com/mc256/starlight"
 )
 
+// FindProjectRoot returns the root directory of the Git project if exists.
+// otherwise, it returns os.Getwd().
+// To identify whether a directory is a root directory, it check the `go.mod` file
+// please making sure the first line of the go mode file is:
+// ```
+// module github.com/mc256/starlight
+// ```
+func FindProjectRoot() string {
+	r, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	p := r
+
+	for p != "/" && len(p) != 0 {
+		f, _ := os.OpenFile(filepath.Join(p, "go.mod"), os.O_RDONLY, 0644)
+		b := make([]byte, len(ProjectIdentifier))
+		_, _ = f.Read(b)
+		if string(b) == ProjectIdentifier {
+			return p
+		}
+		p = filepath.Join(p, "../")
+	}
+	return r
+}
+
+// GetEtcConfigPath return a path to the configuration json
 func GetEtcConfigPath() string {
 	if production {
 		return "/etc/starlight/"
 	} else {
-		p, _ := os.Getwd()
-		return p + "/sandbox/etc/starlight/"
+		return filepath.Join(FindProjectRoot(), "sandbox", "etc", "starlight")
 	}
 }

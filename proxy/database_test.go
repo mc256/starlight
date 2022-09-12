@@ -6,15 +6,24 @@
 package proxy
 
 import (
-	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"fmt"
 	"testing"
 )
 
-func TestInsertImage(t *testing.T) {
-	cfg := GetConfig()
-	db, err := NewDatabase(cfg.PostgresConnectionString)
+var (
+	db *Database
+)
+
+func TestMain(m *testing.M) {
+	cfg := LoadConfig()
+	var err error
+	db, err = NewDatabase(cfg.PostgresConnectionString)
 	if err != nil {
-		t.Error(err)
+		fmt.Printf("failed to connect to database %v\n", err)
 	}
-	_, _ = db.InsertImage("testimg", "3.2.3", "123123qwe", &v1.ConfigFile{}, &v1.Manifest{})
+	m.Run()
+}
+
+func TestGetImage(t *testing.T) {
+
 }

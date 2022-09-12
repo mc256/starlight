@@ -32,9 +32,12 @@ type ProxyConfiguration struct {
 	// goharbor hook
 	EnableHarborScanner bool   `json:"harbor"`
 	HarborApiKey        string `json:"harbor_apikey"`
+
+	// layer cache timeout (second)
+	CacheTimeout int `json:"cache_timeout"`
 }
 
-func GetConfig() (c *ProxyConfiguration) {
+func LoadConfig() (c *ProxyConfiguration) {
 	c = newConfig()
 
 	etcPath := util.GetEtcConfigPath()
@@ -97,5 +100,6 @@ func newConfig() *ProxyConfiguration {
 		DefaultRegistry:          "127.0.0.1:9000",
 		EnableHarborScanner:      false,
 		HarborApiKey:             uuid.New().String(),
+		CacheTimeout:             3600,
 	}
 }

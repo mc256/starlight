@@ -44,7 +44,7 @@ func main() {
 
 func New() *cli.App {
 	app := cli.NewApp()
-	cfg := proxy.GetConfig()
+	cfg := proxy.LoadConfig()
 
 	app.Name = "starlight-proxy"
 	app.Version = util.Version

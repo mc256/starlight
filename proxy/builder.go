@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"github.com/google/go-containerregistry/pkg/name"
 	"io"
 	"net/http"
 	"path"
@@ -34,6 +35,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+////////////////////////////////////////////////
 type DeltaBundleBuilder struct {
 	ctx      context.Context
 	registry string
@@ -171,7 +173,7 @@ func (ib *DeltaBundleBuilder) fetchLayer(imageName, digest string, wg *sync.Wait
 	}()
 }
 
-func NewBuilder(ctx context.Context, registry string) *DeltaBundleBuilder {
+func NewDeltaBundleBuilder(ctx context.Context, registry string) *DeltaBundleBuilder {
 	ib := &DeltaBundleBuilder{
 		ctx:              ctx,
 		registry:         registry,
@@ -181,4 +183,56 @@ func NewBuilder(ctx context.Context, registry string) *DeltaBundleBuilder {
 	}
 
 	return ib
+}
+
+////////////////////////////////////////////////
+
+type Builder struct {
+	server         *StarlightProxyServer
+	layers         []*StarlightLayerCache
+	fromRef, toRef name.Reference
+}
+
+func (b *Builder) WriteHeader() error {
+	return nil
+}
+
+func (b *Builder) WriteBody() error {
+	return nil
+}
+
+func (b *Builder) fetchLayers() error {
+	if b.fromRef != nil {
+
+	}
+
+	return nil
+}
+
+func NewBuilder(server *StarlightProxyServer, from, to string) (b *Builder, err error) {
+
+	b = &Builder{}
+	if from != "" {
+		b.fromRef, err = name.ParseReference(from,
+			name.WithDefaultRegistry(server.config.DefaultRegistry),
+			name.WithDefaultTag("latest-starlight"),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	b.toRef, err = name.ParseReference(to,
+		name.WithDefaultRegistry(server.config.DefaultRegistry),
+		name.WithDefaultTag("latest-starlight"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = b.fetchLayers()
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }

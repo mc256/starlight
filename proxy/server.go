@@ -26,9 +26,11 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type transition struct {
@@ -44,17 +46,27 @@ type ApiResponse struct {
 	Message string `json:"message,omitempty"`
 	Error   string `json:"error,omitempty"`
 
-	// Extractor Response Information
-	Extractor *ExtractorResult `json:"extractor,omitempty"`
+	// Responses Information
+	Extractor *Extractor `json:"extractor,omitempty"`
 }
 
 type StarlightProxyServer struct {
 	http.Server
 	ctx context.Context
 
-	// new variables
 	db     *Database
 	config *ProxyConfiguration
+
+	cache map[string]*StarlightLayerCache
+}
+
+type StarlightLayerCache struct {
+	*io.SectionReader
+
+	Mutex      sync.Mutex
+	UseCounter int
+	LastUsed   time.Time
+	digest     string
 }
 
 /*
@@ -123,32 +135,6 @@ func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Re
 	return nil
 }
 
-func (a *StarlightProxyServer) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
-	arr := strings.Split(strings.Trim(image, ""), ":")
-	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
-		return util.ErrWrongImageFormat
-	}
-
-	err := CacheToc(a.ctx, a.database, arr[0], arr[1], a.containerRegistry)
-	if err != nil {
-		return err
-	}
-
-	ob := merger.NewOverlayBuilder(a.ctx, a.database)
-	if err = ob.AddImage(arr[0], arr[1]); err != nil {
-		return err
-	}
-	if err = ob.SaveMergedImage(); err != nil {
-		return err
-	}
-
-	header := w.Header()
-	header.Set("Content-Type", "text/plain")
-	header.Set("Starlight-Version", util.Version)
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "Cached TOC: %s\n", image)
-	return nil
-}
 
 func (a *StarlightProxyServer) postReport(w http.ResponseWriter, req *http.Request) error {
 	header := w.Header()
@@ -231,23 +217,43 @@ func (a *StarlightProxyServer) starlight(w http.ResponseWriter, req *http.Reques
 
 	if req.Method == http.MethodGet && strings.HasPrefix(command, "delta-image") {
 		// Get Delta Image
-		//f, t := q.Get("from"), q.Get("to")
+		f, t := q.Get("from"), q.Get("to")
 
-		a.error(w, req, "not implemented yet!")
-		return
-	}
-	if req.Method == http.MethodPut && strings.HasPrefix(command, "prepare") {
-		// Cache ToC
-		i := q.Get("image")
-		if r, e := SaveToC(a, i); e != nil {
-			log.G(a.ctx).WithError(e).Error("failed to cache ToC")
-			a.error(w, req, e.Error())
-		} else {
-			log.G(a.ctx).WithField("container", i).Info("cached ToC")
-			a.respond(w, req, r)
+		b, err := NewBuilder(a, f, t)
+		if err != nil {
+			a.error(w, req, err.Error())
+		}
+
+		if err = b.WriteHeader(); err != nil {
+			a.error(w, req, err.Error())
+		}
+		if err = b.WriteBody(); err != nil {
+			a.error(w, req, err.Error())
 		}
 		return
 	}
+
+	if req.Method == http.MethodPut && strings.HasPrefix(command, "prepare") {
+		// Cache ToC
+		i := q.Get("image")
+
+		extractor, err := NewExtractor(a, i)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+			a.error(w, req, err.Error())
+		}
+
+		res, err := extractor.SaveToC()
+		if err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+			a.error(w, req, err.Error())
+		}
+
+		log.G(a.ctx).WithField("container", i).Info("cached ToC")
+		a.respond(w, req, res)
+		return
+	}
+
 	if req.Method == http.MethodPost && strings.HasPrefix(command, "report") {
 		// Report FS traces
 		i := q.Get("image")
@@ -301,6 +307,17 @@ func (a *StarlightProxyServer) getIpAddress(req *http.Request) string {
 	return remoteAddr
 }
 
+func (a *StarlightProxyServer) cacheTimeoutValidator() {
+	for k, v := range a.cache {
+		v.Mutex.Lock()
+		if v.UseCounter <= 0 && time.Now().Add(time.Duration(a.config.CacheTimeout)*time.Second).Before(v.LastUsed) {
+			delete(a.cache, k)
+		}
+		v.Mutex.Unlock()
+	}
+	time.Sleep(time.Second)
+}
+
 func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration) *StarlightProxyServer {
 
 	server := &StarlightProxyServer{
@@ -329,6 +346,12 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration)
 
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.G(ctx).WithField("error", err).Error("server exit with error")
+		}
+	}()
+
+	go func() {
+		for {
+			server.cacheTimeoutValidator()
 		}
 	}()
 

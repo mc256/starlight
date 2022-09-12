@@ -77,7 +77,7 @@ func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	// --------------------------------------------------------------
 	// Build Collection
 
-	builder := NewBuilder(ctx, ContainerRegistry)
+	builder := NewDeltaBundleBuilder(ctx, ContainerRegistry)
 	out := bytes.NewBuffer([]byte{})
 
 	wg := &sync.WaitGroup{}
@@ -126,7 +126,7 @@ func TestDeltaBundleBuilder_WriteBodyPre(t *testing.T) {
 	// --------------------------------------------------------------
 	// Build Collection
 
-	builder := NewBuilder(ctx, ContainerRegistry)
+	builder := NewDeltaBundleBuilder(ctx, ContainerRegistry)
 
 	f, err := os.OpenFile("./data/deltabundle-old.img", os.O_RDWR|os.O_CREATE, 0644)
 	defer f.Close()
@@ -189,7 +189,7 @@ func TestDeltaBundleBuilder_WriteBody(t *testing.T) {
 	// --------------------------------------------------------------
 	// Build Collection
 
-	builder := NewBuilder(ctx, ContainerRegistry)
+	builder := NewDeltaBundleBuilder(ctx, ContainerRegistry)
 
 	f, err := os.OpenFile("./data/deltabundle.img", os.O_RDWR|os.O_CREATE, 0644)
 	defer f.Close()

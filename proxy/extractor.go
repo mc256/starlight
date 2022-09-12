@@ -32,52 +32,60 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
-	"path"
 )
 
-type ExtractorResult struct {
-	Serial int `json:"serial"`
+// Extractor extract ToC from starlight-formatted container image and save it to the databse
+type Extractor struct {
+	Serial     int    `json:"serial"`
+	Digest     string `json:"digest"`
+	Image      string `json:"requested-image"`
+	NLayers    int    `json:"nlayers"`
+	ParsedName string `json:"parsed-image-name"`
+	ParsedTag  string `json:"parsed-tag"`
+
+	server *StarlightProxyServer
+	ref    name.Reference
 }
 
 // SaveImage stores container image to database
-func SaveImage(s *StarlightProxyServer, ref name.Reference, img *v1.Image, nlayers int) (
-	serial int, imageName, tag, digest string, existing bool, err error) {
-	n := ref.Context().RepositoryStr()
-	if ref.Context().RegistryStr() != s.config.DefaultRegistry {
-		n = path.Join(ref.Context().RegistryStr(), n)
-	}
-	tag = ref.Identifier()
-	hash, err := (*img).Digest()
+func (ex *Extractor) saveImage(img *v1.Image) (
+	serial int, existing bool, err error,
+) {
+
+	d, err := (*img).Digest()
 	if err != nil {
 		return
 	}
+	ex.Digest = d.String()
+
 	config, err := (*img).ConfigFile()
 	if err != nil {
 		return
 	}
+
 	manifest, err := (*img).Manifest()
 	if err != nil {
 		return
 	}
 
-	serial, existing, err = s.db.InsertImage(n, hash.String(), config, manifest, nlayers)
+	serial, existing, err = ex.server.db.InsertImage(ex.ParsedName, ex.Digest, config, manifest, ex.NLayers)
 	if err != nil {
 		return
 	}
 
-	return serial, n, tag, hash.String(), existing, nil
+	return serial, existing, nil
 }
 
-func SetImageTag(s *StarlightProxyServer, imageName, imageTag string, imageSerial int) error {
-	return s.db.SetImageTag(imageName, imageTag, imageSerial)
+func (ex *Extractor) setImageTag() error {
+	return ex.server.db.SetImageTag(ex.ParsedName, ex.ParsedTag, ex.Serial)
 }
 
-func EnableImage(s *StarlightProxyServer, imageSerial int) error {
-	return s.db.SetImageReady(true, imageSerial)
+func (ex *Extractor) enableImage() error {
+	return ex.server.db.SetImageReady(true, ex.Serial)
 }
 
-func SaveLayer(s *StarlightProxyServer, imageSerial, idx int, layer v1.Layer) error {
-	txn, err := s.db.db.Begin()
+func (ex *Extractor) saveLayer(imageSerial, idx int, layer v1.Layer) error {
+	txn, err := ex.server.db.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -92,7 +100,7 @@ func SaveLayer(s *StarlightProxyServer, imageSerial, idx int, layer v1.Layer) er
 		return err
 	}
 
-	layerRef, existing, err := s.db.InsertLayer(txn, size, imageSerial, idx, digest.String())
+	layerRef, existing, err := ex.server.db.InsertLayer(txn, size, imageSerial, idx, digest.String())
 	if err != nil {
 		return err
 	}
@@ -137,7 +145,7 @@ func SaveLayer(s *StarlightProxyServer, imageSerial, idx int, layer v1.Layer) er
 			}
 		}
 
-		err = s.db.InsertFiles(txn, layerRef, entBuffer)
+		err = ex.server.db.InsertFiles(txn, layerRef, entBuffer)
 		if err != nil {
 			return err
 		}
@@ -147,35 +155,34 @@ func SaveLayer(s *StarlightProxyServer, imageSerial, idx int, layer v1.Layer) er
 
 }
 
-func SaveToC(s *StarlightProxyServer, image string) (*ApiResponse, error) {
-	if image == "" {
-		return nil, fmt.Errorf("image cannot be nil")
-	}
+// SaveToC save ToC to the backend database and return ApiResponse if success.
+// It does require the container registry is functioning correctly.
+func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 
-	ref, err := name.ParseReference(image,
-		name.WithDefaultRegistry(s.config.DefaultRegistry), name.WithDefaultTag("latest-starlight"),
-	)
+	// Manifest and Config
+	desc, err := remote.Get(ex.ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to cache ToC")
-	}
-
+	// Container image
 	img, err := desc.Image()
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
+	// Layers
 	layers, err := img.Layers()
+	ex.NLayers = len(layers)
 
-	serial, imageName, imageTag, imageHash, existing, err := SaveImage(s, ref, &img, len(layers))
+	// Insert into the "image" table
+	existing := false
+	ex.Serial, existing, err = ex.saveImage(&img)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
+	// Insert into the "layer" - "filesystem" - "file" tables
 	if !existing {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to cache ToC")
@@ -186,7 +193,7 @@ func SaveToC(s *StarlightProxyServer, image string) (*ApiResponse, error) {
 			idx, layer := idx, layer
 
 			errGrp.Go(func() error {
-				return SaveLayer(s, serial, idx, layer)
+				return ex.saveLayer(ex.Serial, idx, layer)
 			})
 		}
 
@@ -194,28 +201,54 @@ func SaveToC(s *StarlightProxyServer, image string) (*ApiResponse, error) {
 			return nil, errors.Wrapf(err, "failed to cache ToC")
 		}
 
-		if err = EnableImage(s, serial); err != nil {
+		if err = ex.enableImage(); err != nil {
 			return nil, errors.Wrapf(err, "failed to cache ToC")
 		}
-	} else if serial == 0 && err != nil {
+	} else if ex.Serial == 0 && err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	if err = SetImageTag(s, imageName, imageTag, serial); err != nil {
+	// Insert into the "tag" table (tag.imageId - image.id)
+	if err = ex.setImageTag(); err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	log.G(s.ctx).WithFields(logrus.Fields{
-		"image":  imageName,
-		"tag":    imageTag,
-		"hash":   imageHash,
-		"serial": serial,
+	log.G(ex.server.ctx).WithFields(logrus.Fields{
+		"image":  ex.ParsedName,
+		"tag":    ex.ParsedTag,
+		"hash":   ex.Digest,
+		"serial": ex.Serial,
 	}).Info("saved ToC")
 
 	return &ApiResponse{
 		Status:    "OK",
 		Code:      http.StatusOK,
 		Message:   "cached ToC",
-		Extractor: &ExtractorResult{Serial: serial},
+		Extractor: ex,
 	}, nil
+}
+
+func NewExtractor(s *StarlightProxyServer, image string) (r *Extractor, err error) {
+	r = &Extractor{
+		Serial:  0,
+		Digest:  "",
+		Image:   image,
+		ref:     nil,
+		NLayers: 0,
+		server:  s,
+	}
+
+	if image == "" {
+		return nil, fmt.Errorf("image cannot be nil")
+	}
+
+	r.ref, err = name.ParseReference(image,
+		name.WithDefaultRegistry(s.config.DefaultRegistry), name.WithDefaultTag("latest-starlight"),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to cache ToC")
+	}
+
+	r.ParsedName, r.ParsedTag = ParseImageReference(r.ref, r.server.config.DefaultRegistry)
+	return
 }

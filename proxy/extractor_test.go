@@ -1,78 +1,88 @@
 /*
-   Copyright The starlight Authors.
+   file created by Junlin Chen in 2022
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-   file created by maverick in 2021
 */
 
 package proxy
 
 import (
+	"context"
+	"fmt"
+	"github.com/containerd/containerd/log"
+	"net/http"
 	"testing"
-
-	"github.com/mc256/starlight/test"
-	"github.com/mc256/starlight/util"
 )
 
-// Before running these test cases, we need to prepare Starlight format container images in the registry.
-// These test cases are testing redis:6.0-starlight and redis:5.0-starlight
-// Please find relative instruction in .demo/convert-starlight.sh
+func TestNewExtractor(t *testing.T) {
+	ctx := context.Background()
+	cfg := LoadConfig()
+	server := &StarlightProxyServer{
+		ctx: ctx,
+		Server: http.Server{
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
+		},
+		config: cfg,
+	}
 
-func TestCacheToc1(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
-
-	ctx := util.ConfigLogger()
-	db, err := util.OpenDatabase(
-		ctx,
-		test.GetSandboxDirectory(t),
-		test.GetProxyDBName(),
-	)
+	ext, err := NewExtractor(server, "public/mariadb:10.9.2a")
 	if err != nil {
-		t.Fatal(err)
-		return
+		t.Error(err)
 	}
-	defer db.Close()
-
-	if err = CacheToc(ctx, db, "redis", "6.0-starlight", containerRegistry); err != nil {
-		t.Fatal(err)
-		return
-	}
+	fmt.Println(ext)
 }
 
-func TestCacheToc2(t *testing.T) {
-	containerRegistry := test.GetContainerRegistry(t)
+func TestExtractor_SaveToC(t *testing.T) {
+	ctx := context.Background()
+	cfg := LoadConfig()
+	server := &StarlightProxyServer{
+		ctx: ctx,
+		Server: http.Server{
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
+		},
+		config: cfg,
+	}
+	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
+	} else {
+		server.db = db
+	}
 
-	ctx := util.ConfigLogger()
-	db, err := util.OpenDatabase(
-		ctx,
-		test.GetSandboxDirectory(t),
-		test.GetProxyDBName(),
-	)
+	ext, err := NewExtractor(server, "public/mariadb:10.9.2a")
 	if err != nil {
-		t.Fatal(err)
-		return
+		t.Error(err)
 	}
-	defer db.Close()
+	fmt.Println(ext)
+	res, err := ext.SaveToC()
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(res)
+}
 
-	if err = CacheToc(ctx, db, "redis", "5.0-starlight", containerRegistry); err != nil {
-		t.Fatal(err)
-		return
+func TestExtractor_SaveToC2(t *testing.T) {
+	ctx := context.Background()
+	cfg := LoadConfig()
+	server := &StarlightProxyServer{
+		ctx: ctx,
+		Server: http.Server{
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
+		},
+		config: cfg,
+	}
+	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
+	} else {
+		server.db = db
 	}
 
-	if err = CacheToc(ctx, db, "redis", "6.0-starlight", containerRegistry); err != nil {
-		t.Fatal(err)
-		return
+	ext, err := NewExtractor(server, "public/mariadb:10.9.2b")
+	if err != nil {
+		t.Error(err)
 	}
-
+	fmt.Println(ext)
+	res, err := ext.SaveToC()
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(res)
 }

@@ -9,10 +9,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/mc256/starlight/util"
+	"path"
 	"time"
 )
 
@@ -62,16 +64,10 @@ func (d *Database) SetImageTag(imageName, tag string, serial int) error {
 		return err
 	}
 
-	if _, err = txn.Exec(
-		`DELETE FROM starlight.starlight.tag WHERE image = $1 AND "imageId" = $2`,
-		imageName, serial,
-	); err != nil {
-		return err
-	}
-
-	if _, err = txn.Exec(
-		`INSERT INTO starlight.starlight.tag (image, tag, "imageId")
-		VALUES ($1,$2,$3)`,
+	if _, err = txn.Exec(`
+		INSERT INTO starlight.starlight.tag (image, tag, "imageId") VALUES ($1,$2,$3) 
+		ON CONFLICT ON CONSTRAINT "primary"
+			DO UPDATE SET  "imageId"=$3`,
 		imageName, tag, serial,
 	); err != nil {
 		return err
@@ -200,10 +196,32 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int, entries map[string]*util.T
 		return err
 	}
 
-	err = txn.Commit()
-	if err != nil {
-		return err
+	return nil
+}
+
+func (d *Database) GetImage(image, identifier string) (serial int, err error) {
+	var (
+		id, nlayer       int64
+		config, manifest []byte
+	)
+
+	if err = d.db.QueryRow(`
+		SELECT id, config, manifest, nlayer FROM starlight.starlight.image
+		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
+		image, identifier).Scan(
+		&id, &config, &manifest, &nlayer,
+	); err != nil && err != sql.ErrNoRows {
+		return 0, err
 	}
 
-	return nil
+	return
+}
+
+func ParseImageReference(ref name.Reference, defaultRegistry string) (imageName, identifier string) {
+	imageName = ref.Context().RepositoryStr()
+	if ref.Context().RegistryStr() != defaultRegistry {
+		imageName = path.Join(ref.Context().RegistryStr(), imageName)
+	}
+	identifier = ref.Identifier()
+	return
 }
