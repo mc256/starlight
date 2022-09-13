@@ -16,7 +16,7 @@ import (
 func TestNewExtractor(t *testing.T) {
 	ctx := context.Background()
 	cfg := LoadConfig()
-	server := &StarlightProxyServer{
+	server := &Server{
 		ctx: ctx,
 		Server: http.Server{
 			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
@@ -34,7 +34,7 @@ func TestNewExtractor(t *testing.T) {
 func TestExtractor_SaveToC(t *testing.T) {
 	ctx := context.Background()
 	cfg := LoadConfig()
-	server := &StarlightProxyServer{
+	server := &Server{
 		ctx: ctx,
 		Server: http.Server{
 			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
@@ -62,7 +62,7 @@ func TestExtractor_SaveToC(t *testing.T) {
 func TestExtractor_SaveToC2(t *testing.T) {
 	ctx := context.Background()
 	cfg := LoadConfig()
-	server := &StarlightProxyServer{
+	server := &Server{
 		ctx: ctx,
 		Server: http.Server{
 			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),

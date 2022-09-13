@@ -5,7 +5,11 @@
 
 package fs
 
-import "github.com/hanwen/go-fuse/v2/fuse"
+import (
+	"syscall"
+
+	"github.com/hanwen/go-fuse/v2/fuse"
+)
 
 func (fe *FsEntry) SetBlockSize(out *fuse.Attr) {
 	out.Blksize = uint32(fe.ChunkSize)

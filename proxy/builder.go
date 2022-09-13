@@ -22,7 +22,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
 	"path"
@@ -35,7 +38,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-////////////////////////////////////////////////
+// DeltaBundleBuilder deprecated feature
 type DeltaBundleBuilder struct {
 	ctx      context.Context
 	registry string
@@ -186,11 +189,32 @@ func NewDeltaBundleBuilder(ctx context.Context, registry string) *DeltaBundleBui
 }
 
 ////////////////////////////////////////////////
+type ImageLayer struct {
+	stackIndex int64
+	size       int64
+	hash       string
+	digest     name.Digest
+}
+
+func (il ImageLayer) String() string {
+	return fmt.Sprintf("[%02d]%s-%d", il.stackIndex, il.hash, il.size)
+}
+
+type Image struct {
+	ref    name.Reference
+	Serial int64
+	Layers []*ImageLayer
+}
+
+func (i Image) String() string {
+	return fmt.Sprintf("%d->%v", i.Serial, i.Layers)
+}
 
 type Builder struct {
-	server         *StarlightProxyServer
-	layers         []*StarlightLayerCache
-	fromRef, toRef name.Reference
+	server *Server
+	layers []*LayerCache
+
+	From, To *Image
 }
 
 func (b *Builder) WriteHeader() error {
@@ -201,37 +225,107 @@ func (b *Builder) WriteBody() error {
 	return nil
 }
 
-func (b *Builder) fetchLayers() error {
-	if b.fromRef != nil {
+func (b *Builder) fetchLayers(cache *ImageLayer) error {
+	var (
+		c   *LayerCache
+		has bool
+	)
 
+	b.server.cacheMutex.Lock()
+	if c, has = b.server.cache[cache.hash]; has {
+		b.server.cacheMutex.Unlock()
+
+		sub := make(chan error)
+		c.Subscribe(&sub)
+		err := <-sub
+		if err != nil {
+			log.G(b.server.ctx).
+				WithField("layer", cache.String()).
+				Error(errors.Wrapf(err, "failed to load layer"))
+			return err
+		}
+		log.G(b.server.ctx).
+			WithField("layer", cache.String()).
+			WithField("shared", true).
+			Info("fetched layer")
+	} else {
+		c = NewLayerCache(cache)
+		b.server.cache[cache.hash] = c
+		b.server.cacheMutex.Unlock()
+
+		if err := c.Load(b.server); err != nil {
+			log.G(b.server.ctx).
+				WithField("layer", cache.String()).
+				Error(errors.Wrapf(err, "failed to load layer"))
+			return err
+		}
+		log.G(b.server.ctx).
+			WithField("layer", cache.String()).
+			WithField("shared", false).
+			Info("fetched layer")
 	}
 
 	return nil
 }
 
-func NewBuilder(server *StarlightProxyServer, from, to string) (b *Builder, err error) {
-
-	b = &Builder{}
-	if from != "" {
-		b.fromRef, err = name.ParseReference(from,
-			name.WithDefaultRegistry(server.config.DefaultRegistry),
-			name.WithDefaultTag("latest-starlight"),
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	b.toRef, err = name.ParseReference(to,
-		name.WithDefaultRegistry(server.config.DefaultRegistry),
+func (b *Builder) getImage(imageStr string) (img *Image, err error) {
+	img = &Image{}
+	img.ref, err = name.ParseReference(imageStr,
+		name.WithDefaultRegistry(b.server.config.DefaultRegistry),
 		name.WithDefaultTag("latest-starlight"),
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	err = b.fetchLayers()
+	refName, refTag := ParseImageReference(img.ref, b.server.config.DefaultRegistry)
+	img.Serial, err = b.server.db.GetImage(refName, refTag)
 	if err != nil {
 		return nil, err
+	}
+
+	// Load necessary layers
+	img.Layers, err = b.server.db.GetLayers(img.Serial)
+	if err != nil {
+		return nil, err
+	}
+	for _, layer := range img.Layers {
+		d := fmt.Sprintf("%s@%s", img.ref.Name(), layer.hash)
+		layer.digest, err = name.NewDigest(d)
+	}
+
+	return img, nil
+}
+
+func NewBuilder(server *Server, from, to string) (b *Builder, err error) {
+	b = &Builder{
+		server: server,
+	}
+	if from != "" {
+		if b.From, err = b.getImage(from); err != nil {
+			return nil, errors.Wrapf(err, "failed to obtain from image")
+		}
+	}
+
+	if b.To, err = b.getImage(to); err != nil {
+		return nil, errors.Wrapf(err, "failed to obtain to image")
+	}
+
+	allLayers := make([]*ImageLayer, 0)
+	if b.From != nil {
+		allLayers = append(allLayers, b.From.Layers...)
+	}
+	allLayers = append(allLayers, b.To.Layers...)
+
+	var errGrp errgroup.Group
+	for _, layer := range allLayers {
+		layer := layer
+		errGrp.Go(func() error {
+			return b.fetchLayers(layer)
+		})
+	}
+
+	if err := errGrp.Wait(); err != nil {
+		return nil, errors.Wrapf(err, "failed to load all compressed layer")
 	}
 
 	return b, nil

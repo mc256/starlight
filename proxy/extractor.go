@@ -34,22 +34,22 @@ import (
 	"net/http"
 )
 
-// Extractor extract ToC from starlight-formatted container image and save it to the databse
+// Extractor extract ToC from starlight-formatted container image and save it to the database
 type Extractor struct {
-	Serial     int    `json:"serial"`
+	Serial     int64  `json:"serial"`
 	Digest     string `json:"digest"`
 	Image      string `json:"requested-image"`
-	NLayers    int    `json:"nlayers"`
+	LayerCount int64  `json:"layer-count"`
 	ParsedName string `json:"parsed-image-name"`
 	ParsedTag  string `json:"parsed-tag"`
 
-	server *StarlightProxyServer
+	server *Server
 	ref    name.Reference
 }
 
 // SaveImage stores container image to database
 func (ex *Extractor) saveImage(img *v1.Image) (
-	serial int, existing bool, err error,
+	serial int64, existing bool, err error,
 ) {
 
 	d, err := (*img).Digest()
@@ -68,7 +68,7 @@ func (ex *Extractor) saveImage(img *v1.Image) (
 		return
 	}
 
-	serial, existing, err = ex.server.db.InsertImage(ex.ParsedName, ex.Digest, config, manifest, ex.NLayers)
+	serial, existing, err = ex.server.db.InsertImage(ex.ParsedName, ex.Digest, config, manifest, ex.LayerCount)
 	if err != nil {
 		return
 	}
@@ -84,7 +84,7 @@ func (ex *Extractor) enableImage() error {
 	return ex.server.db.SetImageReady(true, ex.Serial)
 }
 
-func (ex *Extractor) saveLayer(imageSerial, idx int, layer v1.Layer) error {
+func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 	txn, err := ex.server.db.db.Begin()
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 
 	// Layers
 	layers, err := img.Layers()
-	ex.NLayers = len(layers)
+	ex.LayerCount = int64(len(layers))
 
 	// Insert into the "image" table
 	existing := false
@@ -190,7 +190,7 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 
 		var errGrp errgroup.Group
 		for idx, layer := range layers {
-			idx, layer := idx, layer
+			idx, layer := int64(idx), layer
 
 			errGrp.Go(func() error {
 				return ex.saveLayer(ex.Serial, idx, layer)
@@ -228,14 +228,14 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 	}, nil
 }
 
-func NewExtractor(s *StarlightProxyServer, image string) (r *Extractor, err error) {
+func NewExtractor(s *Server, image string) (r *Extractor, err error) {
 	r = &Extractor{
-		Serial:  0,
-		Digest:  "",
-		Image:   image,
-		ref:     nil,
-		NLayers: 0,
-		server:  s,
+		Serial:     0,
+		Digest:     "",
+		Image:      image,
+		ref:        nil,
+		LayerCount: 0,
+		server:     s,
 	}
 
 	if image == "" {

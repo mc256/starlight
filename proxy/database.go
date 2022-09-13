@@ -14,6 +14,7 @@ import (
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/mc256/starlight/util"
+	"github.com/pkg/errors"
 	"path"
 	"time"
 )
@@ -38,7 +39,7 @@ func (d *Database) InitDatabase() {
 	// TODO: initialize database
 }
 
-func (d *Database) SetImageReady(ready bool, serial int) error {
+func (d *Database) SetImageReady(ready bool, serial int64) error {
 	var id int64
 	if ready {
 		if err := d.db.QueryRow(
@@ -58,7 +59,7 @@ func (d *Database) SetImageReady(ready bool, serial int) error {
 	return nil
 }
 
-func (d *Database) SetImageTag(imageName, tag string, serial int) error {
+func (d *Database) SetImageTag(imageName, tag string, serial int64) error {
 	txn, err := d.db.Begin()
 	if err != nil {
 		return err
@@ -81,7 +82,12 @@ func (d *Database) SetImageTag(imageName, tag string, serial int) error {
 	return nil
 }
 
-func (d *Database) InsertImage(image, hash string, config *v1.ConfigFile, manifest *v1.Manifest, nlayer int) (serial int, existing bool, err error) {
+func (d *Database) InsertImage(image, hash string,
+	config *v1.ConfigFile, manifest *v1.Manifest,
+	layerCount int64) (
+	serial int64, existing bool,
+	err error,
+) {
 	var (
 		ts *time.Time
 	)
@@ -112,7 +118,7 @@ func (d *Database) InsertImage(image, hash string, config *v1.ConfigFile, manife
 		VALUES ($1, $2, $3, $4, null, $5)
 		ON CONFLICT ON CONSTRAINT unique_image_hash DO NOTHING 
 		RETURNING id;`,
-		image, hash, c, m, nlayer,
+		image, hash, c, m, layerCount,
 	).Scan(&serial); err != nil {
 		return 0, false, err
 	}
@@ -121,8 +127,8 @@ func (d *Database) InsertImage(image, hash string, config *v1.ConfigFile, manife
 }
 
 func (d *Database) InsertLayer(
-	txn *sql.Tx, size int64, imageSerial, stackIndex int, layerDigest string) (
-	fsId int, existing bool, err error) {
+	txn *sql.Tx, size int64, imageSerial, stackIndex int64, layerDigest string) (
+	fsId int64, existing bool, err error) {
 
 	if err = d.db.QueryRow(`
 			SELECT id FROM starlight.starlight.filesystem
@@ -146,7 +152,7 @@ func (d *Database) InsertLayer(
 	}
 
 	// Update layer reference
-	var id int
+	var id int64
 	if err := txn.QueryRow(
 		`
 		INSERT INTO starlight.starlight.layer(size, image, "stackIndex", layer) 
@@ -163,7 +169,7 @@ func (d *Database) InsertLayer(
 	return fsId, false, nil
 }
 
-func (d *Database) InsertFiles(txn *sql.Tx, fsId int, entries map[string]*util.TraceableEntry) (err error) {
+func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*util.TraceableEntry) (err error) {
 	if _, err = txn.Exec(`DELETE FROM starlight.starlight.file WHERE fs=$1`, fsId); err != nil {
 		return err
 	}
@@ -199,22 +205,84 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int, entries map[string]*util.T
 	return nil
 }
 
-func (d *Database) GetImage(image, identifier string) (serial int, err error) {
-	var (
-		id, nlayer       int64
-		config, manifest []byte
-	)
-
+func (d *Database) GetImage(image, identifier string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
-		SELECT id, config, manifest, nlayer FROM starlight.starlight.image
-		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
-		image, identifier).Scan(
-		&id, &config, &manifest, &nlayer,
-	); err != nil && err != sql.ErrNoRows {
+		SELECT "imageId" FROM starlight.starlight.tag
+		WHERE image=$1 AND tag=
+		                   
+		                   $2 LIMIT 1`,
+		image, identifier).Scan(&serial); err != nil && err != sql.ErrNoRows {
 		return 0, err
+	} else if err == nil {
+		return serial, nil
 	}
 
-	return
+	if err = d.db.QueryRow(`
+		SELECT id FROM starlight.starlight.image
+		WHERE ready IS NOT NULL AND image=$1 AND hash='sha256:'||$2 LIMIT 1`,
+		image, identifier).Scan(&serial); err != nil {
+		return 0, err
+	}
+	return serial, nil
+}
+
+func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
+	rows, err := d.db.Query(`
+		SELECT "stackIndex", "digest", FIS."size"
+		FROM starlight.starlight.layer AS L
+		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+		WHERE image=$1
+		ORDER BY "stackIndex"`, imageSerial)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	r := make([]*ImageLayer, 0)
+	for rows.Next() {
+		layer := &ImageLayer{}
+		if err := rows.Scan(&layer.stackIndex, &layer.hash, &layer.size); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan file")
+		}
+		r = append(r, layer)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to load layers")
+	}
+	return r, nil
+}
+
+func (d *Database) GetFiles(imageSerial int) error {
+	rows, err := d.db.Query(`
+		SELECT 
+			L."stackIndex", 
+			FI.file, FI.hash, FI.size, FI.metadata 
+		FROM starlight.starlight.layer AS L
+		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+		RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+		WHERE image=$1
+		ORDER BY L."stackIndex" ASC`, imageSerial)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			stackIndex int64
+			file, hash string
+			size       int64
+			metadata   []byte
+		)
+		if err := rows.Scan(&stackIndex, &file, &hash, &size, &metadata); err != nil {
+			return errors.Wrapf(err, "failed to scan file")
+		}
+
+	}
+	if !rows.NextResultSet() {
+		return errors.Wrapf(err, "expected more result sets")
+	}
+	return nil
 }
 
 func ParseImageReference(ref name.Reference, defaultRegistry string) (imageName, identifier string) {

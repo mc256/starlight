@@ -163,4 +163,4 @@ install-systemd-service:
 	#systemctl daemon-reload
 
 docker-image:
-	docker build
+	docker build -t harbor.yuri.moe/public/starlight-proxy:latest -f Dockerfile .

@@ -19,25 +19,40 @@
 package proxy
 
 import (
-	"bytes"
-	"compress/gzip"
+	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"sync"
-	"testing"
-
 	"github.com/containerd/containerd/log"
-	"github.com/joho/godotenv"
-	"github.com/mc256/starlight/util"
+	"net/http"
+	"testing"
 )
 
-func init() {
-	if err := godotenv.Load("../.env"); err != nil {
-		fmt.Print("Failed to load environment variables from `.env` file. ")
+func TestNewBuilder(t *testing.T) {
+
+	ctx := context.Background()
+	cfg := LoadConfig()
+	server := &Server{
+		ctx: ctx,
+		Server: http.Server{
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
+		},
+		config: cfg,
+		cache:  make(map[string]*LayerCache),
 	}
+	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
+	} else {
+		server.db = db
+	}
+
+	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:35a01e19bf90bf187278c49e5efa04e89fc03a6f5ce5ce9245eb3d98bbc6d895")
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(b)
 }
+
+/*
 
 func TestDeltaBundleBuilder_WriteHeader(t *testing.T) {
 	const (
@@ -214,3 +229,6 @@ func TestDeltaBundleBuilder_WriteBody(t *testing.T) {
 		return
 	}
 }
+
+
+*/
