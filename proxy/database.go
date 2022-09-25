@@ -37,6 +37,7 @@ func NewDatabase(conStr string) (*Database, error) {
 
 func (d *Database) InitDatabase() {
 	// TODO: initialize database
+
 }
 
 func (d *Database) SetImageReady(ready bool, serial int64) error {
@@ -208,9 +209,7 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*util
 func (d *Database) GetImage(image, identifier string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
 		SELECT "imageId" FROM starlight.starlight.tag
-		WHERE image=$1 AND tag=
-		                   
-		                   $2 LIMIT 1`,
+		WHERE image=$1 AND tag=$2 LIMIT 1`,
 		image, identifier).Scan(&serial); err != nil && err != sql.ErrNoRows {
 		return 0, err
 	} else if err == nil {
@@ -233,6 +232,66 @@ func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
 		WHERE image=$1
 		ORDER BY "stackIndex"`, imageSerial)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	r := make([]*ImageLayer, 0)
+	for rows.Next() {
+		layer := &ImageLayer{}
+		if err := rows.Scan(&layer.stackIndex, &layer.hash, &layer.size); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan file")
+		}
+		r = append(r, layer)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to load layers")
+	}
+	return r, nil
+}
+
+// GetRoughDeduplicatedLayers returns the likely unique files
+// because it would be hard for the database to apply overlayfs correctly, so this deduplication
+// does not consider whiteout files.
+func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*ImageLayer, error) {
+	rows, err := d.db.Query(`
+		WITH
+		ALPHA AS (
+			SELECT 
+				L."stackIndex", 
+				FI.file, FI.hash, FI.size, FI.metadata 
+			FROM starlight.starlight.layer AS L
+			LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+			RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+			WHERE FI.hash!='' AND image=$1
+		),
+		BETA AS (
+			SELECT 
+				L."stackIndex", 
+			    FIS."digest" as "filesystemDigest", FIS."size" as "filesystemSize",
+				FI.file, FI.hash, FI.size, FI.metadata, FI.id
+			FROM starlight.starlight.layer AS L
+			LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+			RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+			WHERE FI.hash!='' AND image=$2
+		),
+		ALPHA_UNIQUE AS (
+			SELECT MIN("stackIndex") as "minLayer", "hash", "size" FROM ALPHA GROUP BY "hash", "size"
+		),
+		BETA_UNIQUE AS (
+			SELECT MIN("stackIndex") as "minLayer", "hash", "size" FROM BETA GROUP BY "hash", "size"
+		),
+		BETA_SOURCE AS (
+			SELECT * FROM BETA WHERE ("stackIndex", "hash", "size") in (
+				SELECT "minLayer", "hash", "size" FROM BETA_UNIQUE
+			)
+		)
+		SELECT DISTINCT "stackIndex", "filesystemDigest", "filesystemSize" from BETA_SOURCE
+		WHERE (BETA_SOURCE.hash, BETA_SOURCE.size) not in (
+			SELECT ALPHA_UNIQUE.hash, ALPHA_UNIQUE.size 
+			FROM ALPHA_UNIQUE
+		);`, fromSerial, toSerial)
 	if err != nil {
 		return nil, err
 	}

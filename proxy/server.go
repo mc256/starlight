@@ -19,19 +19,13 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/mc256/starlight/util"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -66,201 +60,25 @@ type Server struct {
 	cacheMutex sync.Mutex
 }
 
-type LayerCache struct {
-	buffer *bytes.Buffer
-
-	Mutex      sync.Mutex
-	Ready      bool
-	UseCounter int
-	LastUsed   time.Time
-
-	subscribers []*chan error
-
-	digest name.Digest
-	size   int64
+func (a *Server) getIpAddress(req *http.Request) string {
+	remoteAddr := req.RemoteAddr
+	if realIp := req.Header.Get("X-Real-IP"); realIp != "" {
+		remoteAddr = realIp
+	}
+	return remoteAddr
 }
 
-func (lc *LayerCache) String() string {
-	lc.Mutex.Lock()
-	defer lc.Mutex.Unlock()
-	return fmt.Sprintf("%s:%v:%02d:%s",
-		lc.digest, lc.Ready, lc.UseCounter, lc.LastUsed.Format(time.RFC3339Nano))
-}
-
-func (lc *LayerCache) SetReady(err error) {
-	lc.Mutex.Lock()
-	defer lc.Mutex.Unlock()
-	lc.Ready = true
-	lc.notify(err)
-}
-
-func (lc *LayerCache) notify(err error) {
-	for _, s := range lc.subscribers {
-		if err != nil {
-			*s <- err
+func (a *Server) cacheTimeoutValidator() {
+	for k, v := range a.cache {
+		v.Mutex.Lock()
+		// Delete Expired Cache
+		if v.UseCounter <= 0 && time.Now().Add(time.Duration(a.config.CacheTimeout)*time.Second).Before(v.LastUsed) {
+			delete(a.cache, k)
 		}
-		close(*s)
+		v.Mutex.Unlock()
 	}
+	time.Sleep(time.Second)
 }
-
-func (lc *LayerCache) Subscribe(errChan *chan error) {
-	lc.Mutex.Lock()
-	defer lc.Mutex.Unlock()
-	if lc.Ready {
-		close(*errChan)
-		return
-	}
-	lc.subscribers = append(lc.subscribers, errChan)
-}
-
-func (lc *LayerCache) Load(server *Server) (err error) {
-	defer lc.SetReady(err)
-
-	var l v1.Layer
-	l, err = remote.Layer(lc.digest, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-	if err != nil {
-		return err
-	}
-	var rc io.ReadCloser
-	rc, err = l.Compressed()
-	if err != nil {
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
-		return err
-	}
-
-	var n int64
-	n, err = io.Copy(lc.buffer, rc)
-	if err != nil {
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
-		return err
-	}
-	if n != lc.size {
-		err = fmt.Errorf("size unmatch expected %d, but got %d", lc.size, n)
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
-		return err
-	}
-
-	return nil
-}
-
-func NewLayerCache(layer *ImageLayer) *LayerCache {
-	return &LayerCache{
-		buffer: bytes.NewBuffer([]byte{}),
-		Mutex:  sync.Mutex{},
-		Ready:  false,
-
-		UseCounter: 0,
-		LastUsed:   time.Now(),
-		digest:     layer.digest,
-		size:       layer.size,
-	}
-}
-
-/*
-func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
-	// Parse Image Reference
-	var err error
-	t := &transition{from: nil, to: nil}
-	if from != "_" {
-		t.from, err = name.ParseReference(from, name.WithDefaultRegistry(a.containerRegistry))
-		if err != nil {
-			return fmt.Errorf("failed to parse source image: %v", err)
-		}
-	}
-	t.to, err = name.ParseReference(to, name.WithDefaultRegistry(a.containerRegistry))
-	if err != nil {
-		return fmt.Errorf("failed to parse distination image: %v", err)
-	}
-
-	// Load Optimized Merged Image Collections
-
-		var cTo, cFrom *Collection
-
-		if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
-			return err
-		}
-		if len(t.tagFrom) != 0 {
-			if cFrom, err = LoadCollection(a.ctx, a.database, t.tagFrom); err != nil {
-				return err
-			}
-			cTo.Minus(cFrom)
-		}
-
-		deltaBundle := cTo.ComposeDeltaBundle()
-
-	collection := Collection{}
-	deltaBundle := collection.ComposeDeltaBundle()
-	//////
-
-	buf := bytes.NewBuffer(make([]byte, 0))
-	wg := &sync.WaitGroup{}
-
-	headerSize, contentLength, err := a.builder.WriteHeader(buf, deltaBundle, wg, false)
-	if err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write header cache")
-		return nil
-	}
-
-	header := w.Header()
-	header.Set("Content-Type", "application/octet-stream")
-	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
-	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
-	header.Set("Starlight-Version", util.Version)
-	header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
-	w.WriteHeader(http.StatusOK)
-
-	if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
-		log.G(a.ctx).WithField("err", err).Error("write header error")
-		return nil
-	}
-
-	if err = a.builder.WriteBody(w, deltaBundle, wg); err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write body error")
-		return nil
-	}
-
-	return nil
-}
-
-
-func (a *StarlightProxyServer) postReport(w http.ResponseWriter, req *http.Request) error {
-	header := w.Header()
-	header.Set("Content-Type", "text/plain")
-	header.Set("Starlight-Version", util.Version)
-	w.WriteHeader(http.StatusOK)
-
-	buf, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return err
-	}
-
-	tc, err := fs.NewTraceCollectionFromBuffer(buf)
-	if err != nil {
-		log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
-		return err
-	}
-
-	for _, grp := range tc.Groups {
-		log.G(a.ctx).WithField("collection", grp.Images)
-		fso, err := LoadCollection(a.ctx, a.database, grp.Images)
-		if err != nil {
-			return err
-		}
-
-		fso.AddOptimizeTrace(grp)
-
-		if err := fso.SaveMergedApp(); err != nil {
-			return err
-		}
-		_, _ = fmt.Fprintf(w, "Optimized: %s \n", grp.Images)
-	}
-
-	return nil
-}
-
-*/
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (a *Server) root(w http.ResponseWriter, req *http.Request) {
 	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("root")
@@ -311,11 +129,11 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 			a.error(w, req, err.Error())
 		}
 
-		if err = b.WriteHeader(); err != nil {
-			a.error(w, req, err.Error())
+		if err = b.WriteHeader(w, req); err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to write delta image header")
 		}
-		if err = b.WriteBody(); err != nil {
-			a.error(w, req, err.Error())
+		if err = b.WriteBody(w, req); err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to write delta image body")
 		}
 		return
 	}
@@ -347,6 +165,31 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 		// Report FS traces
 		i := q.Get("image")
 		fmt.Println(i)
+
+		// tc, err := fs.NewTraceCollectionFromBuffer(buf)
+		/*
+					tc, err := fs.NewTraceCollectionFromBuffer(buf)
+			if err != nil {
+				log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
+				return err
+			}
+
+			for _, grp := range tc.Groups {
+				log.G(a.ctx).WithField("collection", grp.Images)
+				fso, err := LoadCollection(a.ctx, a.database, grp.Images)
+				if err != nil {
+					return err
+				}
+
+				fso.AddOptimizeTrace(grp)
+
+				if err := fso.SaveMergedApp(); err != nil {
+					return err
+				}
+				_, _ = fmt.Fprintf(w, "Optimized: %s \n", grp.Images)
+			}
+		*/
+
 		a.error(w, req, "not implemented yet!")
 		return
 	}
@@ -386,26 +229,6 @@ func (a *Server) healthCheck(w http.ResponseWriter, req *http.Request) {
 	}
 	b, _ := json.Marshal(r)
 	_, _ = w.Write(b)
-}
-
-func (a *Server) getIpAddress(req *http.Request) string {
-	remoteAddr := req.RemoteAddr
-	if realIp := req.Header.Get("X-Real-IP"); realIp != "" {
-		remoteAddr = realIp
-	}
-	return remoteAddr
-}
-
-func (a *Server) cacheTimeoutValidator() {
-	for k, v := range a.cache {
-		v.Mutex.Lock()
-		// Delete Expired Cache
-		if v.UseCounter <= 0 && time.Now().Add(time.Duration(a.config.CacheTimeout)*time.Second).Before(v.LastUsed) {
-			delete(a.cache, k)
-		}
-		v.Mutex.Unlock()
-	}
-	time.Sleep(time.Second)
 }
 
 func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration) *Server {
