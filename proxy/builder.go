@@ -40,6 +40,16 @@ func (il ImageLayer) String() string {
 	return fmt.Sprintf("[%02d]%s-%d", il.stackIndex, il.hash, il.size)
 }
 
+type RankedFile struct {
+	File
+	rank float64
+}
+
+type File struct {
+	util.TOCEntry
+	stack int64
+}
+
 type Image struct {
 	ref    name.Reference
 	Serial int64
@@ -55,6 +65,8 @@ type Builder struct {
 	layers []*LayerCache
 
 	Source, Destination *Image
+
+	manifest, config []byte
 }
 
 func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
@@ -169,7 +181,13 @@ func (b *Builder) getImage(imageStr string) (img *Image, err error) {
 		layer.digest, err = name.NewDigest(d)
 	}
 
+	// Get Manifests
+
 	return img, nil
+}
+
+func (b Builder) getManifestAndConfig(serial int64) (config, manifest []byte, err error) {
+	return b.server.db.GetManifestAndConfig(serial)
 }
 
 func (b *Builder) getRoughDeduplicatedLayers() (layers []*ImageLayer, err error) {
@@ -188,6 +206,8 @@ func NewBuilder(server *Server, src, dst string) (builder *Builder, err error) {
 	builder = &Builder{
 		server: server,
 	}
+
+	// Build
 	if src != "" {
 		if builder.Source, err = builder.getImage(src); err != nil {
 			return nil, errors.Wrapf(err, "failed to obtain src image")
@@ -217,6 +237,17 @@ func NewBuilder(server *Server, src, dst string) (builder *Builder, err error) {
 		})
 	}
 
+	errGrp.Go(func() error {
+		if c, m, err := builder.getManifestAndConfig(builder.Destination.Serial); err != nil {
+			return err
+		} else {
+			builder.config = c
+			builder.manifest = m
+			return nil
+		}
+	})
+
+	// Wait for all jobs to end
 	if err := errGrp.Wait(); err != nil {
 		return nil, errors.Wrapf(err, "failed to load all compressed layer")
 	}

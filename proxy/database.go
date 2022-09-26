@@ -15,6 +15,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
+	"math"
 	"path"
 	"time"
 )
@@ -225,6 +226,16 @@ func (d *Database) GetImage(image, identifier string) (serial int64, err error) 
 	return serial, nil
 }
 
+func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, err error) {
+	if err = d.db.QueryRow(`
+		SELECT config, manifest FROM starlight.starlight.image
+		WHERE id=$1 LIMIT 1`,
+		serial).Scan(&config, &manifest); err != nil {
+		return nil, nil, err
+	}
+	return config, manifest, nil
+}
+
 func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 	rows, err := d.db.Query(`
 		SELECT "stackIndex", "digest", FIS."size"
@@ -311,37 +322,88 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 	return r, nil
 }
 
-func (d *Database) GetFiles(imageSerial int) error {
+func (d *Database) GetFiles(imageSerial int) ([]*File, error) {
 	rows, err := d.db.Query(`
 		SELECT 
 			L."stackIndex", 
-			FI.file, FI.hash, FI.size, FI.metadata 
+			FI.metadata
 		FROM starlight.starlight.layer AS L
 		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
 		RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
 		WHERE image=$1
 		ORDER BY L."stackIndex" ASC`, imageSerial)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
+	fl := make([]*File, 0)
 	for rows.Next() {
 		var (
 			stackIndex int64
-			file, hash string
-			size       int64
 			metadata   []byte
+			toc        util.TOCEntry
 		)
-		if err := rows.Scan(&stackIndex, &file, &hash, &size, &metadata); err != nil {
-			return errors.Wrapf(err, "failed to scan file")
+		if err = rows.Scan(&stackIndex, &metadata); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan file")
+		}
+		if err = json.Unmarshal(metadata, &toc); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
+		}
+		fl = append(fl, &File{
+			TOCEntry: toc,
+			stack:    stackIndex,
+		})
+	}
+
+	return fl, nil
+}
+
+func (d *Database) GetFilesWithRanks(imageSerial int) ([]*RankedFile, error) {
+	rows, err := d.db.Query(`
+		SELECT 
+			L."stackIndex", 
+			(SELECT AVG(o) FROM UNNEST("order") o) as "avgRank", 
+			FI.metadata
+		FROM starlight.starlight.layer AS L
+		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+		RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+		WHERE image=$1
+		ORDER BY L."stackIndex" ASC`, imageSerial)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	fl := make([]*RankedFile, 0)
+	for rows.Next() {
+		var (
+			stackIndex int64
+			rank       sql.NullFloat64
+			metadata   []byte
+			toc        util.TOCEntry
+		)
+		if err = rows.Scan(&stackIndex, &rank, &metadata); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan file")
+		}
+		if err = json.Unmarshal(metadata, &toc); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
 		}
 
+		if rank.Valid {
+			fl = append(fl, &RankedFile{
+				File: File{toc, stackIndex},
+				rank: rank.Float64,
+			})
+		} else {
+			fl = append(fl, &RankedFile{
+				File: File{toc, stackIndex},
+				rank: math.MaxFloat64,
+			})
+		}
 	}
-	if !rows.NextResultSet() {
-		return errors.Wrapf(err, "expected more result sets")
-	}
-	return nil
+
+	return fl, nil
 }
 
 func ParseImageReference(ref name.Reference, defaultRegistry string) (imageName, identifier string) {

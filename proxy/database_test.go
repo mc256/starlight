@@ -24,6 +24,26 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestGetImage(t *testing.T) {
+func TestDatabase_GetFiles(t *testing.T) {
+	// TOCEntry to
+	fl, err := db.GetFiles(48)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, f := range fl {
+		fmt.Println(f)
+	}
+
+}
+
+func TestDatabase_GetFilesWithRanks(t *testing.T) {
+	// TOCEntry to
+	fl, err := db.GetFilesWithRanks(45)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, f := range fl {
+		fmt.Println(f)
+	}
 
 }

@@ -26,8 +26,7 @@ import (
 	"testing"
 )
 
-func TestNewBuilder(t *testing.T) {
-
+func InitDatabase() (context.Context, *ProxyConfiguration, *Server) {
 	ctx := context.Background()
 	cfg := LoadConfig()
 	server := &Server{
@@ -43,6 +42,12 @@ func TestNewBuilder(t *testing.T) {
 	} else {
 		server.db = db
 	}
+	return ctx, cfg, server
+}
+
+func TestNewBuilder(t *testing.T) {
+	//ctx, cfg, server := InitDatabase()
+	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:35a01e19bf90bf187278c49e5efa04e89fc03a6f5ce5ce9245eb3d98bbc6d895")
 	if err != nil {
@@ -53,22 +58,7 @@ func TestNewBuilder(t *testing.T) {
 }
 
 func TestNewBuilder2(t *testing.T) {
-
-	ctx := context.Background()
-	cfg := LoadConfig()
-	server := &Server{
-		ctx: ctx,
-		Server: http.Server{
-			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
-		},
-		config: cfg,
-		cache:  make(map[string]*LayerCache),
-	}
-	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
-		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
-	} else {
-		server.db = db
-	}
+	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a")
 	if err != nil {
@@ -76,4 +66,17 @@ func TestNewBuilder2(t *testing.T) {
 	}
 
 	fmt.Println(b)
+}
+
+func TestDatabase_GetManifestAndConfig(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if _, _, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
+		t.Error(err)
+	}
 }
