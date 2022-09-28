@@ -132,7 +132,6 @@ func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 		for k, v := range entryMap {
 			entBuffer[k] = &util.TraceableEntry{
 				TOCEntry: v,
-				Landmark: v.Landmark(),
 				Chunks:   make([]*util.TOCEntry, 0),
 			}
 		}

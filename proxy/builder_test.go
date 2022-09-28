@@ -68,7 +68,7 @@ func TestNewBuilder2(t *testing.T) {
 	fmt.Println(b)
 }
 
-func TestDatabase_GetManifestAndConfig(t *testing.T) {
+func TestBuilder_GetManifestAndConfig(t *testing.T) {
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
@@ -79,4 +79,20 @@ func TestDatabase_GetManifestAndConfig(t *testing.T) {
 	if _, _, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestBuilder_ComputeDifferences(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = b.ComputeDifferences()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(b)
 }

@@ -238,7 +238,7 @@ func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, 
 
 func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 	rows, err := d.db.Query(`
-		SELECT "stackIndex", "digest", FIS."size"
+		SELECT FIS."id", "stackIndex", "digest", FIS."size"
 		FROM starlight.starlight.layer AS L
 		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
 		WHERE image=$1
@@ -251,7 +251,7 @@ func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 	r := make([]*ImageLayer, 0)
 	for rows.Next() {
 		layer := &ImageLayer{}
-		if err := rows.Scan(&layer.stackIndex, &layer.hash, &layer.size); err != nil {
+		if err := rows.Scan(&layer.serial, &layer.stackIndex, &layer.hash, &layer.size); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		r = append(r, layer)
@@ -322,16 +322,16 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 	return r, nil
 }
 
-func (d *Database) GetFiles(imageSerial int) ([]*File, error) {
+func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
+	lids := make([]int64, 0, len(layers))
+	for _, v := range layers {
+		lids = append(lids, v.serial)
+	}
 	rows, err := d.db.Query(`
 		SELECT 
-			L."stackIndex", 
-			FI.metadata
-		FROM starlight.starlight.layer AS L
-		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
-		RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
-		WHERE image=$1
-		ORDER BY L."stackIndex" ASC`, imageSerial)
+			FI.fs, FI.metadata
+		FROM starlight.starlight.file AS FI
+		WHERE FI.fs = ANY($1) AND FI.hash != ''`, pq.Array(lids))
 	if err != nil {
 		return nil, err
 	}
@@ -340,11 +340,11 @@ func (d *Database) GetFiles(imageSerial int) ([]*File, error) {
 	fl := make([]*File, 0)
 	for rows.Next() {
 		var (
-			stackIndex int64
-			metadata   []byte
-			toc        util.TOCEntry
+			fsId     int64
+			metadata []byte
+			toc      util.TOCEntry
 		)
-		if err = rows.Scan(&stackIndex, &metadata); err != nil {
+		if err = rows.Scan(&fsId, &metadata); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		if err = json.Unmarshal(metadata, &toc); err != nil {
@@ -352,17 +352,17 @@ func (d *Database) GetFiles(imageSerial int) ([]*File, error) {
 		}
 		fl = append(fl, &File{
 			TOCEntry: toc,
-			stack:    stackIndex,
+			FsId:     fsId,
 		})
 	}
-
 	return fl, nil
 }
 
-func (d *Database) GetFilesWithRanks(imageSerial int) ([]*RankedFile, error) {
+func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*RankedFile, error) {
 	rows, err := d.db.Query(`
 		SELECT 
 			L."stackIndex", 
+		    FIS.id,
 			(SELECT AVG(o) FROM UNNEST("order") o) as "avgRank", 
 			FI.metadata
 		FROM starlight.starlight.layer AS L
@@ -378,12 +378,12 @@ func (d *Database) GetFilesWithRanks(imageSerial int) ([]*RankedFile, error) {
 	fl := make([]*RankedFile, 0)
 	for rows.Next() {
 		var (
-			stackIndex int64
-			rank       sql.NullFloat64
-			metadata   []byte
-			toc        util.TOCEntry
+			stackIndex, fsId int64
+			rank             sql.NullFloat64
+			metadata         []byte
+			toc              util.TOCEntry
 		)
-		if err = rows.Scan(&stackIndex, &rank, &metadata); err != nil {
+		if err = rows.Scan(&stackIndex, &fsId, &rank, &metadata); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		if err = json.Unmarshal(metadata, &toc); err != nil {
@@ -392,13 +392,15 @@ func (d *Database) GetFilesWithRanks(imageSerial int) ([]*RankedFile, error) {
 
 		if rank.Valid {
 			fl = append(fl, &RankedFile{
-				File: File{toc, stackIndex},
-				rank: rank.Float64,
+				File:  File{toc, fsId},
+				stack: stackIndex,
+				rank:  rank.Float64,
 			})
 		} else {
 			fl = append(fl, &RankedFile{
-				File: File{toc, stackIndex},
-				rank: math.MaxFloat64,
+				File:  File{toc, fsId},
+				stack: stackIndex,
+				rank:  math.MaxFloat64,
 			})
 		}
 	}
