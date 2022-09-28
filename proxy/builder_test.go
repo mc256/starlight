@@ -68,6 +68,17 @@ func TestNewBuilder2(t *testing.T) {
 	fmt.Println(b)
 }
 
+func TestNewBuilder3(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(b)
+}
+
 func TestBuilder_GetManifestAndConfig(t *testing.T) {
 	_, _, server := InitDatabase()
 
@@ -89,7 +100,7 @@ func TestBuilder_ComputeDifferences(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = b.ComputeDifferences()
+	err = b.computeDelta()
 	if err != nil {
 		t.Error(err)
 	}

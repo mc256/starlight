@@ -105,7 +105,10 @@ type Builder struct {
 }
 
 func (b *Builder) String() string {
-	return fmt.Sprintf("Builder (%s)->(%s)", b.Source.ref.String(), b.Destination.ref.String())
+	if b.Source != nil {
+		return fmt.Sprintf("Builder (%s)->(%s)", b.Source.ref.String(), b.Destination.ref.String())
+	}
+	return fmt.Sprintf("Builder ()->(%s)", b.Destination.ref.String())
 }
 
 func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
@@ -248,7 +251,7 @@ func (b *Builder) getUnavailableLayers() (layers []*ImageLayer, err error) {
 	return layers, nil
 }
 
-func (b *Builder) ComputeDifferences() error {
+func (b *Builder) computeDelta() error {
 	/*
 		1. compute the set of existing files from available layers
 		2. compute the set of requested files from non-existing layers
@@ -413,7 +416,7 @@ func NewBuilder(server *Server, src, dst string) (builder *Builder, err error) {
 		}
 	})
 
-	fmt.Println(availableLayers)
+	errGrp.Go(builder.computeDelta)
 
 	// Wait for all jobs to end
 	if err := errGrp.Wait(); err != nil {
