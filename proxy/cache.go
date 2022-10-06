@@ -20,7 +20,7 @@ import (
 )
 
 type LayerCache struct {
-	buffer *bytes.Buffer
+	buffer *io.SectionReader
 
 	Mutex      sync.Mutex
 	Ready      bool
@@ -81,8 +81,9 @@ func (lc *LayerCache) Load(server *Server) (err error) {
 		return err
 	}
 
+	buf := new(bytes.Buffer)
 	var n int64
-	n, err = io.Copy(lc.buffer, rc)
+	n, err = io.Copy(buf, rc)
 	if err != nil {
 		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
 		return err
@@ -92,13 +93,16 @@ func (lc *LayerCache) Load(server *Server) (err error) {
 		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
 		return err
 	}
+	rc.Close()
+
+	lc.buffer = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, n)
 
 	return nil
 }
 
 func NewLayerCache(layer *ImageLayer) *LayerCache {
 	return &LayerCache{
-		buffer: bytes.NewBuffer([]byte{}),
+		buffer: nil,
 		Mutex:  sync.Mutex{},
 		Ready:  false,
 

@@ -28,6 +28,7 @@ import (
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"io"
 	"math"
 	"net/http"
 	"sort"
@@ -41,6 +42,7 @@ type ImageLayer struct {
 	Hash       string `json:"h"`
 	digest     name.Digest
 	available  bool
+	blob       *LayerCache
 }
 
 func (il ImageLayer) String() string {
@@ -206,6 +208,12 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 	}
 	headerSize := cw.GetWrittenSize() - manifestSize - configSize
 
+	log.G(b.server.ctx).
+		WithField("manifest", manifestSize).
+		WithField("config", configSize).
+		WithField("header", headerSize).
+		Info("generated response header")
+
 	// output header
 	contentLength := cw.GetWrittenSize() + b.contentLength
 	header := w.Header()
@@ -223,7 +231,24 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 }
 
 func (b *Builder) WriteBody(w http.ResponseWriter, req *http.Request) error {
+	layers := b.Destination.Layers
 
+	// output body
+	for _, c := range b.Contents {
+		// fmt.Println(c.files[0].Name, len(c.Chunks), c.Stack, len(c.files), c.Offset, c.Size, layers[c.Stack].blob)
+		if layer := layers[c.Stack]; layer.blob != nil {
+			sr := io.NewSectionReader(layer.blob.buffer, 0, layer.size)
+			for _, chunk := range c.Chunks {
+				ssr := io.NewSectionReader(sr, chunk.ChunkOffset, chunk.CompressedSize)
+				_, err := io.CopyN(w, ssr, chunk.CompressedSize)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			return fmt.Errorf("layer %d not found for file %s (ref:%d)", c.Stack, c.files[0].Name, len(c.files))
+		}
+	}
 	return nil
 }
 
@@ -267,6 +292,8 @@ func (b *Builder) fetchLayers(cache *ImageLayer) error {
 			Info("fetched layer")
 	}
 
+	cache.blob = c
+
 	return nil
 }
 
@@ -294,8 +321,6 @@ func (b *Builder) getImage(imageStr string) (img *Image, err error) {
 		d := fmt.Sprintf("%s@%s", img.ref.Name(), layer.Hash)
 		layer.digest, err = name.NewDigest(d)
 	}
-
-	// Get Manifests
 
 	return img, nil
 }
@@ -420,6 +445,7 @@ func (b *Builder) computeDelta() error {
 			// not found, add to the list of contents to be sent to the client
 			b.Contents = append(b.Contents, reqContent)
 			reqContent.rank = math.MaxFloat64
+			reqContent.Stack = reqContent.files[0].Stack
 			for _, f := range reqContent.files {
 				if f.rank < reqContent.rank {
 					// highest rank wins

@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/mc256/starlight/test"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"net/http"
 	"testing"
 )
@@ -196,40 +196,39 @@ func TestBuilder_ComputeDifferences(t *testing.T) {
 	fmt.Println(builder.contentLength)
 }
 
-type FakeResponseWriter struct {
-	header http.Header
-}
-
-func (w *FakeResponseWriter) Header() http.Header {
-	return w.header
-}
-
-func (w *FakeResponseWriter) Write(b []byte) (int, error) {
-	err := ioutil.WriteFile("../sandbox/header.tar.gz", b, 0644)
-	if err != nil {
-		return 0, err
-	}
-	return len(b), nil
-}
-
-func (w *FakeResponseWriter) WriteHeader(statusCode int) {
-	fmt.Printf("status code: %d", statusCode)
-}
-
 func TestBuilder_WriteHeader(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
+	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a")
 	if err != nil {
 		t.Error(err)
 	}
 
 	fmt.Println(b)
 
-	w := &FakeResponseWriter{header: make(http.Header)}
+	w := test.NewFakeResponseWriter("header")
 	err = b.WriteHeader(w, &http.Request{})
 	if err != nil {
 		t.Error(err)
 	}
 	fmt.Println(w.Header())
+}
+
+func TestBuilder_WriteBody(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a")
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(b)
+
+	w := test.NewFakeResponseWriter("body")
+	err = b.WriteBody(w, &http.Request{})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(w.Header())
+
 }
