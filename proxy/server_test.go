@@ -30,7 +30,7 @@ func TestNewLayerCache(t *testing.T) {
 	lc := NewLayerCache(&ImageLayer{
 		stackIndex: 7,
 		size:       988,
-		hash:       "sha256:984d2c1b279e64cdbfdc8979865943de17cfa4bb2e657c0f63a5254d0bd08c17",
+		Hash:       "sha256:984d2c1b279e64cdbfdc8979865943de17cfa4bb2e657c0f63a5254d0bd08c17",
 		digest:     d,
 	})
 	lc.Load(server)

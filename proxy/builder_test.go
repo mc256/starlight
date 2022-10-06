@@ -20,8 +20,12 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/pkg/errors"
+	"io/ioutil"
 	"net/http"
 	"testing"
 )
@@ -82,28 +86,150 @@ func TestNewBuilder3(t *testing.T) {
 func TestBuilder_GetManifestAndConfig(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
+	var err error
+
+	src := "public/mariadb:10.8.4d"
+	dst := "public/mariadb:10.9.2a"
+
+	builder := &Builder{
+		server: server,
+	}
+
+	// Build
+	if builder.Source, err = builder.getImage(src); err != nil {
+		t.Error(errors.Wrapf(err, "failed to obtain src image"))
+	}
+
+	if builder.Destination, err = builder.getImage(dst); err != nil {
+		t.Error(errors.Wrapf(err, "failed to obtain dst image"))
+	}
+
+	var unavailableLayers, availableLayers []*ImageLayer
+	if builder.Source != nil {
+		availableLayers = builder.Source.Layers
+		unavailableLayers, err = builder.getUnavailableLayers()
+		if err != nil {
+			t.Error(err)
+		}
+	} else {
+		availableLayers = []*ImageLayer{}
+		unavailableLayers = builder.Destination.Layers
+	}
+
+	for _, a := range availableLayers {
+		a.available = true
+	}
+	for _, u := range unavailableLayers {
+		u.available = false
+	}
+
+	c, m, err := builder.getManifestAndConfig(builder.Destination.Serial)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if _, _, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
+	var (
+		manifest v1.Manifest
+		config   v1.ConfigFile
+	)
+
+	err = json.Unmarshal(m, &manifest)
+	if err != nil {
 		t.Error(err)
 	}
+
+	fmt.Println(manifest.MediaType)
+
+	err = json.Unmarshal(c, &config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(config.Config.Cmd)
 }
 
 func TestBuilder_ComputeDifferences(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a")
+	var err error
+
+	src := "public/mariadb:10.8.4d"
+	dst := "public/mariadb:10.9.2a"
+
+	builder := &Builder{
+		server: server,
+	}
+
+	// Build
+	if builder.Source, err = builder.getImage(src); err != nil {
+		t.Error(errors.Wrapf(err, "failed to obtain src image"))
+	}
+
+	if builder.Destination, err = builder.getImage(dst); err != nil {
+		t.Error(errors.Wrapf(err, "failed to obtain dst image"))
+	}
+
+	var unavailableLayers, availableLayers []*ImageLayer
+	if builder.Source != nil {
+		availableLayers = builder.Source.Layers
+		unavailableLayers, err = builder.getUnavailableLayers()
+		if err != nil {
+			t.Error(err)
+		}
+	} else {
+		availableLayers = []*ImageLayer{}
+		unavailableLayers = builder.Destination.Layers
+	}
+
+	for _, a := range availableLayers {
+		a.available = true
+	}
+	for _, u := range unavailableLayers {
+		u.available = false
+	}
+
+	err = builder.computeDelta()
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = b.computeDelta()
+	fmt.Println(builder.contentLength)
+}
+
+type FakeResponseWriter struct {
+	header http.Header
+}
+
+func (w *FakeResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *FakeResponseWriter) Write(b []byte) (int, error) {
+	err := ioutil.WriteFile("../sandbox/header.tar.gz", b, 0644)
+	if err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+func (w *FakeResponseWriter) WriteHeader(statusCode int) {
+	fmt.Printf("status code: %d", statusCode)
+}
+
+func TestBuilder_WriteHeader(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a")
 	if err != nil {
 		t.Error(err)
 	}
 
 	fmt.Println(b)
+
+	w := &FakeResponseWriter{header: make(http.Header)}
+	err = b.WriteHeader(w, &http.Request{})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(w.Header())
 }

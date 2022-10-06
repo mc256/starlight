@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 
 func TestDatabase_GetFiles(t *testing.T) {
 	// TOCEntry to
-	fl, err := db.GetUniqueFiles([]*ImageLayer{{serial: 201}, {serial: 211}, {serial: 203}})
+	fl, err := db.GetUniqueFiles([]*ImageLayer{{Serial: 201}, {Serial: 211}, {Serial: 203}})
 	if err != nil {
 		t.Error(err)
 	}

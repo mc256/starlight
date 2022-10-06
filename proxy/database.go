@@ -251,7 +251,7 @@ func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 	r := make([]*ImageLayer, 0)
 	for rows.Next() {
 		layer := &ImageLayer{}
-		if err := rows.Scan(&layer.serial, &layer.stackIndex, &layer.hash, &layer.size); err != nil {
+		if err := rows.Scan(&layer.Serial, &layer.stackIndex, &layer.Hash, &layer.size); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		r = append(r, layer)
@@ -311,7 +311,7 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 	r := make([]*ImageLayer, 0)
 	for rows.Next() {
 		layer := &ImageLayer{}
-		if err := rows.Scan(&layer.stackIndex, &layer.hash, &layer.size); err != nil {
+		if err := rows.Scan(&layer.stackIndex, &layer.Hash, &layer.size); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		r = append(r, layer)
@@ -325,7 +325,7 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
 	lids := make([]int64, 0, len(layers))
 	for _, v := range layers {
-		lids = append(lids, v.serial)
+		lids = append(lids, v.Serial)
 	}
 	rows, err := d.db.Query(`
 		SELECT 
@@ -351,8 +351,8 @@ func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
 			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
 		}
 		fl = append(fl, &File{
-			TOCEntry: toc,
-			FsId:     fsId,
+			TOCEntry: toc, // no need to parse chunks from the database
+			fsId:     fsId,
 		})
 	}
 	return fl, nil
@@ -381,25 +381,26 @@ func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*RankedFile, error) {
 			stackIndex, fsId int64
 			rank             sql.NullFloat64
 			metadata         []byte
-			toc              util.TOCEntry
+			file             File
 		)
 		if err = rows.Scan(&stackIndex, &fsId, &rank, &metadata); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
-		if err = json.Unmarshal(metadata, &toc); err != nil {
+		if err = json.Unmarshal(metadata, &file); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
 		}
+		file.fsId = fsId
 
 		if rank.Valid {
 			fl = append(fl, &RankedFile{
-				File:  File{toc, fsId},
-				stack: stackIndex,
+				File:  file,
+				Stack: stackIndex,
 				rank:  rank.Float64,
 			})
 		} else {
 			fl = append(fl, &RankedFile{
-				File:  File{toc, fsId},
-				stack: stackIndex,
+				File:  file,
+				Stack: stackIndex,
 				rank:  math.MaxFloat64,
 			})
 		}

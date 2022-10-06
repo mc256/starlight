@@ -131,9 +131,11 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 
 		if err = b.WriteHeader(w, req); err != nil {
 			log.G(a.ctx).WithError(err).Error("failed to write delta image header")
+			return
 		}
 		if err = b.WriteBody(w, req); err != nil {
 			log.G(a.ctx).WithError(err).Error("failed to write delta image body")
+			return
 		}
 		return
 	}
