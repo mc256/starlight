@@ -30,8 +30,8 @@ registry:
 imagePullSecrets: []
 
 # Starlight Proxy Default Environment Variables
-registryAddress: null
-logLevel: null
+registryAddress: goharbor-core.default.svc.cluster.local/starlight
+logLevel: info
 
 # Service
 service:

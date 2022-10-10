@@ -22,7 +22,6 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "starlight-proxy-chart.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -39,11 +38,11 @@ spec:
             periodSeconds: 60
             httpGet:
               path: /
-              port: http
+              port: 8090
           readinessProbe:
             httpGet:
               path: /
-              port: http
+              port: 8090
           env:
             - name: REGISTRY
               value: {{ .Values.registryAddress | quote | default "http://localhost:5000" }}
@@ -56,6 +55,7 @@ spec:
           {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
         {{- if .Values.registry.enabled }}
         - name: starlight-container-registry
           securityContext:
@@ -70,11 +70,11 @@ spec:
             periodSeconds: 60
             httpGet:
               path: /v2/
-              port: http
+              port: 5000
           readinessProbe:
             httpGet:
               path: /v2/
-              port: http
+              port: 5000
           env:
             - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
               value: /data
