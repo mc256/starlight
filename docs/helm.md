@@ -94,12 +94,3 @@ helm delete my-starlight-proxy
 | registry.persistence.size | storage size | 2Gi |
 
 
-
-### Registry UI
-
-| Name     | Description | Value|
-| ---      | ---       | --- |
-| registryUi.enable | enable registry | true |
-| registryUi.repository | container image | "joxit/docker-registry-ui"|
-| registryUi.pullPolicy | pull image policy | IfNotPresent |
-| registryUi.tag | tage of the image | "latest" |

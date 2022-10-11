@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature_helm_*
+      - fix_helm_*
     tags:
       - 'v*.*.*'
 jobs:
