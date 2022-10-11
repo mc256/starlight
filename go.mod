@@ -14,7 +14,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
-	github.com/urfave/cli/v2 v2.8.1
+	github.com/urfave/cli/v2 v2.3.0
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
@@ -60,7 +60,6 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/urfave/cli v1.22.9 // indirect
-	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
