@@ -29,7 +29,7 @@ sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 ```
 
 Update systemd service file `/lib/systemd/system/starlight-snapshotter.service`. 
-- Change `starlight.lan` to the address of the Starlight Proxy.
+- Change `STARLIGHT_PROXY` to the address of the Starlight Proxy.
 - remove `--plain-http` if the Starlight Proxy is behind a HTTPS reverse proxy.
 ```
 ExecStart=/usr/bin/starlight-grpc run --plain-http starlight.lan

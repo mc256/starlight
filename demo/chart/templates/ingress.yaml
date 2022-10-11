@@ -17,10 +17,11 @@ metadata:
   name: {{ $fullName }}
   labels:
     {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.ingressClassName }}
@@ -44,6 +45,13 @@ spec:
                   number: 5000
           {{- end }}
           - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: 8090
+          - path: /()(prepare.*|from.*|report.*|scanner.*|starlight.*|health-check.*)
             pathType: Prefix
             backend:
               service:
