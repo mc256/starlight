@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
 spec:
-  type: LoadBalancer
+  type: {{ .Values.service.type }}
   ports:
     - port: 8090
       targetPort: 8090
@@ -16,12 +16,6 @@ spec:
       targetPort: 5000
       protocol: TCP
       name: registry-http
-    {{- end}}
-    {{- if .Values.registryUi.enabled}}
-    - port: 8080
-      targetPort: 80
-      protocol: TCP
-      name: registry-ui-http
     {{- end}}
   selector:
     {{- include "starlight-proxy-chart.selectorLabels" . | nindent 4 }}

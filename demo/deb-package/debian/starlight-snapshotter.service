@@ -5,7 +5,7 @@ After=network.target local-fs.target containerd.service
 Wants=containerd.service
 
 [Service]
-ExecStart=/usr/bin/starlight-grpc run --plain-http starlight.lan
+ExecStart=/usr/bin/starlight-grpc run --plain-http STARLIGHT_PROXY
 
 Type=simple
 KillMode=process

@@ -23,13 +23,13 @@ Download and install the `.deb` package from the [release page](https://github.c
 
 ```shell
 export ARCH=amd64
-export SL_VERSION=0.1.1
+export SL_VERSION=0.1.2
 wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 ```
 
 Update systemd service file `/lib/systemd/system/starlight-snapshotter.service`. 
-- Change `starlight.lan` to the address of the Starlight Proxy.
+- Change `STARLIGHT_PROXY` to the address of the Starlight Proxy.
 - remove `--plain-http` if the Starlight Proxy is behind a HTTPS reverse proxy.
 ```
 ExecStart=/usr/bin/starlight-grpc run --plain-http starlight.lan

@@ -1,4 +1,4 @@
-{{- if .Values.starlightProxy.persistence.enabled -}}
+{{- if .Values.starlightProxy.persistence.enabled }}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -21,6 +21,7 @@ spec:
       storage: {{ .Values.starlightProxy.persistence.size | quote }}
 {{- end -}}
 {{- if and .Values.starlightProxy.persistence.enabled .Values.registry.persistence.enabled}}
+
 ---
 {{- end}}
 {{- if .Values.registry.persistence.enabled -}}
@@ -44,4 +45,4 @@ spec:
   resources:
     requests:
       storage: {{ .Values.registry.persistence.size | quote }}
-{{- end -}}
+{{- end}}

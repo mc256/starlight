@@ -3,7 +3,7 @@
 ## TL;DR
 
 ```shell
-helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.1
+helm upgrade --install  -f starlight/values.yaml starlight oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2
 ```
 
 ## Prerequisites
@@ -34,14 +34,14 @@ kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storagec
 To install the chart with the app name `my-starlight-proxy`:
 
 ```shell
-helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.1
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2
 ```
 
 
 You may want to set a few parameter for example the domain name for the ingress, for example set the domain name for ingress to `mydomain.local`:
 
 ```shell
-helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.1 \
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2 \
 --set "ingress.hosts={mydomain.local}"
 ```
 
@@ -67,7 +67,6 @@ helm delete my-starlight-proxy
 | ingress.hosts | domain name for the ingress | [starlight.lan] |
 | registryAddress | customize registry address if choose not to use the container registry in this chart | null |
 | registry.enable | enable container registry in this deployment | true |
-| registryUi.enable | enable web-base UI container registry in this deployment | true |
 
 ### Starlight Proxy
 
@@ -94,12 +93,3 @@ helm delete my-starlight-proxy
 | registry.persistence.size | storage size | 2Gi |
 
 
-
-### Registry UI
-
-| Name     | Description | Value|
-| ---      | ---       | --- |
-| registryUi.enable | enable registry | true |
-| registryUi.repository | container image | "joxit/docker-registry-ui"|
-| registryUi.pullPolicy | pull image policy | IfNotPresent |
-| registryUi.tag | tage of the image | "latest" |

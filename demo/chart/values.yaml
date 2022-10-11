@@ -36,8 +36,8 @@ registryUi:
 imagePullSecrets: []
 
 # Starlight Proxy Default Environment Variables
-registryAddress: null
-logLevel: null
+# registryAddress: goharbor-core.default.svc.cluster.local/starlight
+logLevel: info
 
 # Service
 service:
@@ -48,7 +48,7 @@ service:
 ingress:
   enabled: true
   className: "nginx"
-  annotations: 
+  annotations:
     # kubernetes.io/tls-acme: "true"
     # set to the largest layer size for uploading container image
     nginx.ingress.kubernetes.io/proxy-body-size: 512m

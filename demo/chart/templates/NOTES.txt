@@ -20,9 +20,6 @@ Get the application URL by running these commands:
     {{- if $.Values.registry.enabled }}
   Container Registry    : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/v2
     {{- end }}
-    {{- if $.Values.registryUi.enabled }}
-  Container Registry UI : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/ui
-    {{- end }}
   {{- end }}
 
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.

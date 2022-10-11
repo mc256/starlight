@@ -7,7 +7,7 @@ ENV GO111MODULE=on
 ENV REGISTRY=registry2
 ENV LOGLEVEL=info
 
-RUN make build-starlight-proxy-for-alpine && mkdir ./out/data
+RUN make change-version-number build-starlight-proxy-for-alpine && mkdir ./out/data
 
 #CMD ["/go/src/app/out/starlight-proxy"]
 FROM alpine:3.12
