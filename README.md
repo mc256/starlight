@@ -72,6 +72,7 @@ and starting the Starlight snapshotter daemon
    The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
    The **Starlight CLI tool** features the image conversion, example:
    ```shell
+    export REGISTRY=172.18.2.3:5000 && \
     ctr-starlight convert \
         --insecure-source --insecure-destination \
         $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
@@ -80,8 +81,9 @@ and starting the Starlight snapshotter daemon
    
    In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
    ```shell
-   curl http://$STARLIGHT_PROXY/prepare/redis:6.2.1-starlight
-   #Cached TOC: redis:6.2.1-starlight
+    export STARLIGHT_PROXY=172.18.2.3:8090 && \
+    curl http://$STARLIGHT_PROXY/prepare/redis:6.2.1-starlight
+    #Cached TOC: redis:6.2.1-starlight
    ```
    `$STARLIGHT_PROXY` is the address of your Starlight Proxy (e.g. `172.18.2.3:8090`)
 
@@ -110,7 +112,7 @@ and starting the Starlight snapshotter daemon
    
    After finished running the container several times, then we can report all the traces to the proxy, using:
    ```shell
-   ctr-starlight report --server $STARLIGHT_PROXY --plain-http
+   ctr-starlight report --plain-http
    ```
 
 5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
@@ -158,23 +160,29 @@ For more information, please check out `ctr-starlight --help` and `starlight-grp
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ```bibtex
 @inproceedings {chen2022starlight,
-author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
-title = {Starlight: Fast Container Provisioning on the Edge and over the {WAN}},
-booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI 22)},
-year = {2022},
-address = {Renton, WA},
-url = {https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin},
-publisher = {USENIX Association},
-month = apr,
+    author = {Jun Lin Chen and Daniyal Liaqat and Moshe Gabel and Eyal de Lara},
+    title = {Starlight: Fast Container Provisioning on the Edge and over the {WAN}},
+    booktitle = {19th USENIX Symposium on Networked Systems Design and Implementation (NSDI 22)},
+    year = {2022},
+    address = {Renton, WA},
+    url = {https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin},
+    publisher = {USENIX Association},
+    month = apr,
 }
 ```
 
 ## Roadmap
 Starlight is not complete. On our roadmap:
 
-* Authentication with Docker Hub.
-* Integration with Kubernetes.
-* Supporting docker-compose.
-* Jointly optimizing multiple container deployments to same worker.
-* Proxy could request partial files from the registry, rather than entire layers.
-* Converting containers that have already been fully retrieved using Starlight to use OverlayFS.
+- [ ] Scalable database backend
+- [ ] Kubernetes support 
+  - [ ] Starlight Proxy
+    - [x] Helm Chart
+    - [ ] Starlight Proxy authentication
+  - [ ] Starlight Snapshotter Plugin for kubelet containerd
+  - [ ] Starlight Optimizer CRDs for customized joint optimization
+- [ ] OCI container registry support
+  - [x] Goharbor support
+  - [ ] Multiple platforms image support 
+  - [ ] Jointly optimizing multiple containers deployments
+  - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS.
