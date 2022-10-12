@@ -125,7 +125,7 @@ func (c *Convertor) GetDst() string {
 }
 
 func (c *Convertor) readImage() (goreg.ImageIndex, error) {
-	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Debug("fetching container image")
+	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Info("fetching container image")
 	desc, err := remote.Get(c.src, c.optsRemote...)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (c *Convertor) readImage() (goreg.ImageIndex, error) {
 }
 
 func (c *Convertor) writeImage(image goreg.ImageIndex) error {
-	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Debug("uploading converted container image")
+	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Info("uploading converted container image")
 	return remote.WriteIndex(c.dst, image, c.optsRemote...)
 }
 
