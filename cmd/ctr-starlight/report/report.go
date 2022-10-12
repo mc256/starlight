@@ -20,6 +20,7 @@ package report
 
 import (
 	"context"
+	"github.com/containerd/containerd/log"
 
 	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/grpc"
@@ -36,6 +37,15 @@ func Action(c *cli.Context) error {
 	if c.Bool("plain-http") {
 		protocol = "http"
 	}
+
+	server := c.String("server")
+	if server == "starlight.yuri.moe" {
+		protocol = "https"
+		log.G(ctx).Warn("using public staging starlight proxy server. " +
+			"the public server may not have your own container image, " +
+			"please set your own starlight server using environment variable STARLIGHT_PROXY or --server flag")
+	}
+
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
 	if err := proxy.Report(tc.ToJSONBuffer()); err != nil {
 		return err
@@ -61,9 +71,10 @@ func Command() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:     "server",
-				Value:    "worker1",
+				Value:    "starlight.yuri.moe", // public starlight proxy server - for testing only
 				Usage:    "starlight proxy address",
 				Required: false,
+				EnvVars:  []string{"STARLIGHT_PROXY"},
 			},
 			&cli.BoolFlag{
 				Name:     "plain-http",
