@@ -65,7 +65,21 @@ func (a *StarlightProxy) Report(buf []byte) error {
 	if err != nil {
 		log.G(a.ctx).WithError(err).Error("response body error")
 	}
-	fmt.Println(string(resBuf[:]))
+
+	if resp.StatusCode == 200 {
+		log.G(a.ctx).WithFields(logrus.Fields{
+			"code":    fmt.Sprintf("%d"),
+			"message": strings.TrimSpace(string(resBuf[:])),
+			"version": resp.Header.Get("Starlight-Version"),
+		}).Info("upload finished")
+	} else {
+		log.G(a.ctx).WithFields(logrus.Fields{
+			"code":    fmt.Sprintf("%d"),
+			"message": strings.TrimSpace(string(resBuf[:])),
+			"version": resp.Header.Get("Starlight-Version"),
+		}).Warn("upload finished")
+	}
+
 	return nil
 }
 

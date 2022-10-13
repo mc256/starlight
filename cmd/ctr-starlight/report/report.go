@@ -21,9 +21,9 @@ package report
 import (
 	"context"
 	"github.com/containerd/containerd/log"
-
 	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/grpc"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -45,6 +45,16 @@ func Action(c *cli.Context) error {
 			"the public server may not have your own container image, " +
 			"please set your own starlight server using environment variable STARLIGHT_PROXY or --server flag")
 	}
+
+	if server == "" {
+		log.G(ctx).Fatal("no starlight proxy server address provided")
+		return nil
+	}
+
+	log.G(ctx).WithFields(logrus.Fields{
+		"server":   server,
+		"protocol": protocol,
+	}).Info("uploading data to starlight proxy server")
 
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
 	if err := proxy.Report(tc.ToJSONBuffer()); err != nil {
