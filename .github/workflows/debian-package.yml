@@ -12,6 +12,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
       - name: Build deb package
+        env:
+          APT_UPLOAD_AUTH: ${{ secrets.APT_UPLOAD_AUTH }}
         run: |
           sudo apt update -y
           sudo apt upgrade -y
@@ -20,7 +22,7 @@ jobs:
           sh /tmp/get-docker.sh
           docker run --privileged --rm tonistiigi/binfmt --install all
           docker build -t helper:latest  -f ./.github/.helper/Dockerfile ./.github/.helper/
-          docker run -d --hostname helper --expose 8080 --env AUTH=$BUILDAUTH --name helper -v "$(pwd)"/sandbox:/app/upload:rw helper:latest
+          docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw helper:latest
           export UPLOAD_URL=http://`docker inspect helper | grep "IPAddress" | grep -o -E '[0-9.]+' | head -n 1`:8080/
           make docker-buildx-multi-arch
       - name: Release

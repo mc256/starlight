@@ -86,9 +86,6 @@ create-deb-package: change-version-number set-production build-starlight-grpc bu
 .PHONY: create-deb-package.amd64
 create-deb-package.amd64: create-deb-package
 
-.PHONY: upload-deb-package.amd64
-upload-deb-package.amd64:
-	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' $(UPLOAD_URL)
 
 .PHONY: create-deb-package.armv6l
 create-deb-package.armv6l: change-version-number set-production build-starlight-grpc build-ctr-starlight generate-changelog
@@ -107,10 +104,6 @@ create-deb-package.armv6l: change-version-number set-production build-starlight-
 	dh_builddeb
 	dpkg-deb --info ./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb
 
-.PHONY: upload-deb-package.armv6l
-upload-deb-package.armv6l:
-	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' $(UPLOAD_URL)
-
 .PHONY: create-deb-package.arm64
 create-deb-package.arm64: change-version-number set-production build-starlight-grpc build-ctr-starlight generate-changelog
 	mkdir -p ./sandbox/starlight-snapshotter-$(VERSIONNUMBER)-$(COMPILEDATE)/ 2>/dev/null | true
@@ -128,16 +121,43 @@ create-deb-package.arm64: change-version-number set-production build-starlight-g
 	dh_builddeb
 	dpkg-deb --info ./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb
 
+
+.PHONY: upload-deb-package.amd64
+upload-deb-package.amd64:
+	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' $(UPLOAD_URL)
+	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
+
+.PHONY: upload-deb-package.armv6l
+upload-deb-package.armv6l:
+	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' $(UPLOAD_URL)
+	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
+
 .PHONY: upload-deb-package.amd64
 upload-deb-package.arm64:
 	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb' $(UPLOAD_URL)
+	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
 
 ######################################################################
 .PHONY: docker-buildx-multi-arch
 docker-buildx-multi-arch:
-	docker buildx build --platform linux/amd64 --build-arg ARCH=amd64 --build-arg UPLOAD_URL=$(UPLOAD_URL)  -f ./demo/deb-package/Dockerfile .
-	docker buildx build --platform linux/arm/v7 --build-arg ARCH=armv6l --build-arg UPLOAD_URL=$(UPLOAD_URL)  -f ./demo/deb-package/Dockerfile .
-	docker buildx build --platform linux/arm64/v8 --build-arg ARCH=arm64 --build-arg UPLOAD_URL=$(UPLOAD_URL)  -f ./demo/deb-package/Dockerfile .
+	docker buildx build \
+        --platform linux/amd64 \
+		--build-arg ARCH=amd64 \
+		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
+ 		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		-f ./demo/deb-package/Dockerfile .
+	docker buildx build \
+        --platform linux/arm/v7 \
+		--build-arg ARCH=armv6l \
+		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
+ 		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		-f ./demo/deb-package/Dockerfile .
+	docker buildx build \
+        --platform linux/arm64/v8 \
+		--build-arg ARCH=arm64 \
+		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
+ 		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		-f ./demo/deb-package/Dockerfile .
 
 ######################################################################
 # Clean
