@@ -61,17 +61,17 @@ func (d *Database) SetImageReady(ready bool, serial int64) error {
 	return nil
 }
 
-func (d *Database) SetImageTag(imageName, tag string, serial int64) error {
+func (d *Database) SetImageTag(name, tag, platform string, serial int64) error {
 	txn, err := d.db.Begin()
 	if err != nil {
 		return err
 	}
 
 	if _, err = txn.Exec(`
-		INSERT INTO starlight.starlight.tag (image, tag, "imageId") VALUES ($1,$2,$3) 
+		INSERT INTO starlight.starlight.tag (name, tag, platform, "imageId") VALUES ($1,$2,$3,$4) 
 		ON CONFLICT ON CONSTRAINT "primary"
-			DO UPDATE SET  "imageId"=$3`,
-		imageName, tag, serial,
+			DO UPDATE SET  "imageId"=$4`,
+		name, tag, platform, serial,
 	); err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*util
 func (d *Database) GetImage(image, identifier string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
 		SELECT "imageId" FROM starlight.starlight.tag
-		WHERE image=$1 AND tag=$2 LIMIT 1`,
+		WHERE name=$1 AND tag=$2 LIMIT 1`,
 		image, identifier).Scan(&serial); err != nil && err != sql.ErrNoRows {
 		return 0, err
 	} else if err == nil {

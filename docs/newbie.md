@@ -54,20 +54,8 @@ We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
 Please add port 8090 and 5000 to the firewall whitelist, the worker has to access these ports.
 
-3. Upload a few container images to the registry for testing
 
-```shell
-docker pull redis:6.2.1 && \
-docker pull redis:6.2.2 && \
-docker tag redis:6.2.1 localhost:5000/redis:6.2.1 && \
-docker tag redis:6.2.2 localhost:5000/redis:6.2.2 && \
-docker push localhost:5000/redis:6.2.1 && \
-docker push localhost:5000/redis:6.2.2
-```
-
-You could upload other container images to the registry if you like.
-
-4. Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
+3. Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
 
 ```shell
 cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
@@ -230,34 +218,38 @@ sudo ctr plugin ls | grep starlight
 
 ### 6. Convert Container Image
 
-Convert the container image to the **Starlight format** container image.
+Convert the container image to the **Starlight format** container image and report to the Starlight proxy.
+
 ```shell
-ctr-starlight convert \
-    --insecure-source --insecure-destination \
-    $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight && \
-ctr-starlight convert \
-    --insecure-source --insecure-destination \
-    $REGISTRY/redis:6.2.2 $REGISTRY/redis:6.2.2-starlight
+echo $STARLIGHT_PROXY 
+# make sure we have set the STARLIGHT_PROXY environment variable
+#> 172.18.1.3:8090
 ```
 
-In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
-   ```shell
-   curl http://$STARLIGHT_PROXY/prepare/redis:6.2.1-starlight
-   #Cached TOC: redis:6.2.1-starlight
-   curl http://$STARLIGHT_PROXY/prepare/redis:6.2.2-starlight
-   #Cached TOC: redis:6.2.2-starlight
-   ```
+```shell
+ctr-starlight convert \
+    --insecure-destination \
+    --notify --insecure-proxy \
+    docker.io/library/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight && \
+ctr-starlight convert \
+    --insecure-destination \
+    --notify --insecure-proxy \
+    docker.io/library/redis:6.2.2 $REGISTRY/redis:6.2.2-starlight
+```
 
-
+In this eample, we load two versions of the Redis container image from docker hub and convert them to the Starlight 
+format container image and notify the Starlight proxy (using `--notify` flag).
 
 ### 7. Optimize Container Image
 
+
 Collect traces on the worker for container startup.
+
 ```shell
 sudo ctr-starlight pull redis:6.2.1-starlight && \
 mkdir /tmp/test-redis-data && \
 sudo ctr-starlight create --optimize \
-      --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+   --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
    --env-file ./demo/config/all.env \
    --net-host \
    redis:6.2.1-starlight \
@@ -275,7 +267,7 @@ Repeat the same thing for `redis:6.2.2`
 ```shell
 sudo ctr-starlight pull redis:6.2.2-starlight && \
 sudo ctr-starlight create --optimize \
-      --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+   --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
    --env-file ./demo/config/all.env \
    --net-host \
    redis:6.2.2-starlight \

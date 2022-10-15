@@ -32,14 +32,13 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
+	"path"
 )
 
 // Extractor extract ToC from starlight-formatted container image and save it to the database
 type Extractor struct {
-	Serial     int64  `json:"serial"`
-	Digest     string `json:"digest"`
-	Image      string `json:"requested-image"`
-	LayerCount int64  `json:"layer-count"`
+	Image string `json:"requested-image"`
+
 	ParsedName string `json:"parsed-image-name"`
 	ParsedTag  string `json:"parsed-tag"`
 
@@ -51,12 +50,11 @@ type Extractor struct {
 func (ex *Extractor) saveImage(img *v1.Image) (
 	serial int64, existing bool, err error,
 ) {
-
 	d, err := (*img).Digest()
 	if err != nil {
 		return
 	}
-	ex.Digest = d.String()
+	digest := d.String()
 
 	config, err := (*img).ConfigFile()
 	if err != nil {
@@ -68,7 +66,7 @@ func (ex *Extractor) saveImage(img *v1.Image) (
 		return
 	}
 
-	serial, existing, err = ex.server.db.InsertImage(ex.ParsedName, ex.Digest, config, manifest, ex.LayerCount)
+	serial, existing, err = ex.server.db.InsertImage(ex.ParsedName, digest, config, manifest, int64(len(manifest.Layers)))
 	if err != nil {
 		return
 	}
@@ -76,12 +74,12 @@ func (ex *Extractor) saveImage(img *v1.Image) (
 	return serial, existing, nil
 }
 
-func (ex *Extractor) setImageTag() error {
-	return ex.server.db.SetImageTag(ex.ParsedName, ex.ParsedTag, ex.Serial)
+func (ex *Extractor) setImageTag(serial int64, platform string) error {
+	return ex.server.db.SetImageTag(ex.ParsedName, ex.ParsedTag, platform, serial)
 }
 
-func (ex *Extractor) enableImage() error {
-	return ex.server.db.SetImageReady(true, ex.Serial)
+func (ex *Extractor) enableImage(serial int64) error {
+	return ex.server.db.SetImageReady(true, serial)
 }
 
 func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
@@ -164,60 +162,80 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	// Container image
-	img, err := desc.Image()
+	// Container image index
+	imgIdx, err := desc.ImageIndex()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to cache ToC")
+		return nil, errors.Wrapf(err, "failed to get image index")
 	}
 
-	// Layers
-	layers, err := img.Layers()
-	ex.LayerCount = int64(len(layers))
-
-	// Insert into the "image" table
-	existing := false
-	ex.Serial, existing, err = ex.saveImage(&img)
+	idxMan, err := imgIdx.IndexManifest()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to cache ToC")
+		return nil, errors.Wrapf(err, "failed to get index manifest")
 	}
 
-	// Insert into the "layer" - "filesystem" - "file" tables
-	if !existing {
+	for _, m := range idxMan.Manifests {
+		img, err := imgIdx.Image(m.Digest)
 		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get image")
+		}
+
+		plt := m.Platform
+		pltStr := path.Join(plt.OS, plt.Architecture, plt.Variant)
+		log.G(ex.server.ctx).WithFields(logrus.Fields{
+			"image":    ex.ParsedName,
+			"tag":      ex.ParsedTag,
+			"hash":     m.Digest.String(),
+			"platform": pltStr,
+		}).Info("found image")
+
+		// Layers
+		layers, err := img.Layers()
+
+		// Insert into the "image" table
+		var (
+			existing = false
+			serial   int64
+		)
+		serial, existing, err = ex.saveImage(&img)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to save image")
+		}
+
+		// Insert into the "layer" - "filesystem" - "file" tables
+		if !existing {
+			var errGrp errgroup.Group
+			for idx, layer := range layers {
+				idx, layer, serial := int64(idx), layer, serial
+				errGrp.Go(func() error {
+					return ex.saveLayer(serial, idx, layer)
+				})
+			}
+
+			if err = errGrp.Wait(); err != nil {
+				return nil, errors.Wrapf(err, "failed to cache ToC")
+			}
+
+			if err = ex.enableImage(serial); err != nil {
+				return nil, errors.Wrapf(err, "failed to enable image")
+			}
+		} else if serial == 0 && err != nil {
+			return nil, errors.Wrapf(err, "image exists")
+		}
+
+		// Insert into the "tag" table (tag.imageId - image.id)
+		if err = ex.setImageTag(serial, pltStr); err != nil {
 			return nil, errors.Wrapf(err, "failed to cache ToC")
 		}
 
-		var errGrp errgroup.Group
-		for idx, layer := range layers {
-			idx, layer := int64(idx), layer
+		log.G(ex.server.ctx).WithFields(logrus.Fields{
+			"image":    ex.ParsedName,
+			"tag":      ex.ParsedTag,
+			"hash":     m.Digest.String(),
+			"serial":   serial,
+			"platform": pltStr,
+		}).Info("saved ToC")
 
-			errGrp.Go(func() error {
-				return ex.saveLayer(ex.Serial, idx, layer)
-			})
-		}
-
-		if err = errGrp.Wait(); err != nil {
-			return nil, errors.Wrapf(err, "failed to cache ToC")
-		}
-
-		if err = ex.enableImage(); err != nil {
-			return nil, errors.Wrapf(err, "failed to cache ToC")
-		}
-	} else if ex.Serial == 0 && err != nil {
-		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
-
-	// Insert into the "tag" table (tag.imageId - image.id)
-	if err = ex.setImageTag(); err != nil {
-		return nil, errors.Wrapf(err, "failed to cache ToC")
-	}
-
-	log.G(ex.server.ctx).WithFields(logrus.Fields{
-		"image":  ex.ParsedName,
-		"tag":    ex.ParsedTag,
-		"hash":   ex.Digest,
-		"serial": ex.Serial,
-	}).Info("saved ToC")
 
 	return &ApiResponse{
 		Status:    "OK",
@@ -229,12 +247,9 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 
 func NewExtractor(s *Server, image string) (r *Extractor, err error) {
 	r = &Extractor{
-		Serial:     0,
-		Digest:     "",
-		Image:      image,
-		ref:        nil,
-		LayerCount: 0,
-		server:     s,
+		Image:  image,
+		ref:    nil,
+		server: s,
 	}
 
 	if image == "" {

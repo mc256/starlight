@@ -24,8 +24,10 @@ import (
 
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
 	cmdCreate "github.com/mc256/starlight/cmd/ctr-starlight/create"
+	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
+
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 )
@@ -86,6 +88,7 @@ func NewApp() *cli.App {
 		cmdCreate.Command(),
 		cmdReport.Command(),
 		cmdConvert.Command(),
+		cmdNotify.Command(),
 	})
 
 	return app

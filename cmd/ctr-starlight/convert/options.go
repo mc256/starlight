@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	RegistryFlags = []cli.Flag{
+	Flags = []cli.Flag{
 		&cli.BoolFlag{
 			Name:     "insecure-source",
 			Usage:    "use HTTP for the source image",
@@ -37,9 +37,9 @@ var (
 			Required: false,
 		},
 		&cli.StringFlag{
-			Name:     "notify-starlight-proxy",
-			Usage:    "update the ToC store in the Starlight Proxy. URL of proxy api server.",
-			Value:    "",
+			Name:     "platform",
+			Usage:    "chose what platforms to convert, e.g. 'linux/amd64,linux/arm64', use comma to separate. 'all' means all platforms in the source image",
+			Value:    "all",
 			Required: false,
 		},
 	}

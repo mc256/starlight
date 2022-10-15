@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,12 +103,14 @@ type Convertor struct {
 	src, dst   name.Reference
 	ctx        context.Context
 	optsRemote []remote.Option
+	platforms  string
 }
 
-func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.Option, optsRemote []remote.Option) (c *Convertor, err error) {
+func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.Option, optsRemote []remote.Option, platforms string) (c *Convertor, err error) {
 	c = &Convertor{
 		ctx:        ctx,
 		optsRemote: optsRemote,
+		platforms:  platforms,
 	}
 	if c.src, err = name.ParseReference(src, optsSrc...); err != nil {
 		return nil, err
@@ -134,7 +139,7 @@ func (c *Convertor) readImage() (goreg.ImageIndex, error) {
 }
 
 func (c *Convertor) writeImage(image goreg.ImageIndex) error {
-	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Info("uploading converted container image")
+	log.G(c.ctx).WithFields(logrus.Fields{"image": c.dst}).Info("uploading converted container image")
 	return remote.WriteIndex(c.dst, image, c.optsRemote...)
 }
 
@@ -205,6 +210,45 @@ func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
 }
 
 func (c *Convertor) ToStarlightImage() (err error) {
+	// platform filter
+	var (
+		allPlatforms       = false
+		requestedPlatforms []*goreg.Platform
+	)
+	if c.platforms != "" && c.platforms != "all" {
+		ps := strings.Split(c.platforms, ",")
+		for _, p := range ps {
+			var plt v1.Platform
+			plt, err = platforms.Parse(p)
+			if err != nil {
+				return err
+			}
+			log.G(c.ctx).WithFields(logrus.Fields{"platform": p}).Info("requested platform")
+			requestedPlatforms = append(requestedPlatforms, &goreg.Platform{
+				Architecture: plt.Architecture,
+				OS:           plt.OS,
+				OSVersion:    plt.OSVersion,
+				OSFeatures:   plt.OSFeatures,
+				Variant:      plt.Variant,
+				Features:     nil,
+			})
+		}
+	} else {
+		log.G(c.ctx).WithFields(logrus.Fields{"platform": "all"}).Info("requested platform")
+		allPlatforms = true
+	}
+	hasPlatform := func(p *goreg.Platform) bool {
+		if allPlatforms {
+			return true
+		}
+		for _, plt := range requestedPlatforms {
+			if plt.Equals(*p) {
+				return true
+			}
+		}
+		return false
+	}
+
 	// image
 	var (
 		imgIdx, retIdx goreg.ImageIndex
@@ -219,97 +263,115 @@ func (c *Convertor) ToStarlightImage() (err error) {
 	}
 
 	retIdx = mutate.AppendManifests(empty.Index)
+	var idxAddendumMux sync.Mutex
+	var idxErrGrp errgroup.Group
 
 	for _, m := range idxMan.Manifests {
-		log.G(c.ctx).WithFields(logrus.Fields{
-			"platform": m.Platform,
-			"digest":   m.Digest.String(),
-			"size":     m.Size,
-		}).Info("found platform")
+		m := m
+		idxErrGrp.Go(func() error {
+			req := hasPlatform(m.Platform)
+			log.G(c.ctx).WithFields(logrus.Fields{
+				"platform": m.Platform,
+				"digest":   m.Digest.String(),
+				"size":     m.Size,
+				"skip":     !req,
+			}).Info("found platform")
 
-		img, err := imgIdx.Image(m.Digest)
-		if err != nil {
-			return err
-		}
-
-		// config
-		cfg, err := img.ConfigFile()
-		history := cfg.History
-		if err != nil {
-			return err
-		}
-		addendum := make([]mutate.Addendum, len(history))
-
-		// layer
-		var layers []goreg.Layer
-		if layers, err = img.Layers(); err != nil {
-			return err
-		}
-		layerMap := make([]int, len(history))
-		count := 0
-		for i, h := range history {
-			if h.EmptyLayer {
-				layerMap[i] = -1
-			} else {
-				layerMap[i] = count
-				count += 1
+			if !req {
+				return nil
 			}
-		}
 
-		var addendumMux sync.Mutex
-		var errGrp errgroup.Group
+			img, err := imgIdx.Image(m.Digest)
+			if err != nil {
+				return err
+			}
 
-		for i, h := range history {
-			i, h := i, h
-			errGrp.Go(func() error {
-				return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
+			// config
+			cfg, err := img.ConfigFile()
+			history := cfg.History
+			if err != nil {
+				return err
+			}
+			addendum := make([]mutate.Addendum, len(history))
+
+			// layer
+			var layers []goreg.Layer
+			if layers, err = img.Layers(); err != nil {
+				return err
+			}
+			layerMap := make([]int, len(history))
+			count := 0
+			for i, h := range history {
+				if h.EmptyLayer {
+					layerMap[i] = -1
+				} else {
+					layerMap[i] = count
+					count += 1
+				}
+			}
+
+			var addendumMux sync.Mutex
+			var errGrp errgroup.Group
+
+			for i, h := range history {
+				i, h := i, h
+				errGrp.Go(func() error {
+					return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
+				})
+			}
+
+			if err := errGrp.Wait(); err != nil {
+				return errors.Wrapf(err, "failed to convert the image to Starlight format")
+			}
+
+			if err != nil {
+				return err
+			}
+
+			// Clean up things that will be changed
+			cfg.RootFS.DiffIDs = []goreg.Hash{}
+			cfg.History = []goreg.History{}
+
+			// Set the configuration file to
+			configuredImage, err := mutate.ConfigFile(empty.Image, cfg)
+			if err != nil {
+				return err
+			}
+
+			// Write container image to the registry (or other places)
+			slImg, err := mutate.Append(configuredImage, addendum...)
+			if err != nil {
+				return err
+			}
+
+			var (
+				h goreg.Hash
+			)
+			h, err = slImg.Digest()
+			if err != nil {
+				return err
+			}
+
+			idxAddendumMux.Lock()
+			defer idxAddendumMux.Unlock()
+
+			retIdx = mutate.AppendManifests(retIdx, mutate.IndexAddendum{
+				Add: slImg,
+				Descriptor: goreg.Descriptor{
+					MediaType:   m.MediaType,
+					Size:        m.Size,
+					Digest:      h,
+					URLs:        m.URLs,
+					Annotations: m.Annotations,
+					Platform:    m.Platform,
+				},
 			})
-		}
-
-		if err := errGrp.Wait(); err != nil {
-			return errors.Wrapf(err, "failed to convert the image to Starlight format")
-		}
-
-		if err != nil {
-			return err
-		}
-
-		// Clean up things that will be changed
-		cfg.RootFS.DiffIDs = []goreg.Hash{}
-		cfg.History = []goreg.History{}
-
-		// Set the configuration file to
-		configuredImage, err := mutate.ConfigFile(empty.Image, cfg)
-		if err != nil {
-			return err
-		}
-
-		// Write container image to the registry (or other places)
-		slImg, err := mutate.Append(configuredImage, addendum...)
-		if err != nil {
-			return err
-		}
-
-		var (
-			h goreg.Hash
-		)
-		h, err = slImg.Digest()
-		if err != nil {
-			return err
-		}
-
-		retIdx = mutate.AppendManifests(retIdx, mutate.IndexAddendum{
-			Add: slImg,
-			Descriptor: goreg.Descriptor{
-				MediaType:   m.MediaType,
-				Size:        m.Size,
-				Digest:      h,
-				URLs:        m.URLs,
-				Annotations: m.Annotations,
-				Platform:    m.Platform,
-			},
+			return nil
 		})
+	}
 
+	if err := idxErrGrp.Wait(); err != nil {
+		return errors.Wrapf(err, "failed to convert the OCI image to Starlight format")
 	}
 
 	return c.writeImage(retIdx)

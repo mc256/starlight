@@ -116,9 +116,12 @@ func (a *Server) scanner(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
+	ip := a.getIpAddress(req)
+
+	// Parameters
 	command := strings.Trim(strings.TrimPrefix(req.RequestURI, "/starlight"), "/")
 	q := req.URL.Query()
-	log.G(a.ctx).WithFields(logrus.Fields{"command": command, "ip": a.getIpAddress(req)}).Info("request received")
+	log.G(a.ctx).WithFields(logrus.Fields{"command": command, "ip": ip}).Info("request received")
 
 	if req.Method == http.MethodGet && strings.HasPrefix(command, "delta-image") {
 		// Get Delta Image

@@ -47,35 +47,7 @@ func TestExtractor_SaveToC(t *testing.T) {
 		server.db = db
 	}
 
-	ext, err := NewExtractor(server, "public/mariadb:10.9.2a")
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Println(ext)
-	res, err := ext.SaveToC()
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Println(res)
-}
-
-func TestExtractor_SaveToC2(t *testing.T) {
-	ctx := context.Background()
-	cfg := LoadConfig()
-	server := &Server{
-		ctx: ctx,
-		Server: http.Server{
-			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
-		},
-		config: cfg,
-	}
-	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
-		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
-	} else {
-		server.db = db
-	}
-
-	ext, err := NewExtractor(server, "public/mariadb:10.9.2b")
+	ext, err := NewExtractor(server, "harbor.yuri.moe/public/redis:6.2.1")
 	if err != nil {
 		t.Error(err)
 	}

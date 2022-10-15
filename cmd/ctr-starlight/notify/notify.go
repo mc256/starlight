@@ -1,38 +1,37 @@
 /*
-   Copyright The starlight Authors.
+   file created by Junlin Chen in 2022
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-   file created by maverick in 2021
 */
 
-package report
+package notify
 
 import (
 	"context"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/grpc"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
-	var tc *fs.TraceCollection
-	tc, err = fs.NewTraceCollection(ctx, c.String("path"))
-	if err != nil {
-		return err
+	insecure := c.Bool("insecure")
+	options := []name.Option{}
+	if insecure {
+		options = append(options, name.Insecure)
 	}
+
+	argRef := c.Args().Get(0)
+	if argRef == "" {
+		log.G(ctx).Fatal("no image reference provided")
+		return nil
+	}
+
+	reference, err := name.ParseReference(argRef, options...)
+	return SharedAction(ctx, c, reference)
+}
+
+func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference) (err error) {
 	protocol := "https"
 	if c.Bool("plain-http") {
 		protocol = "http"
@@ -54,26 +53,27 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	log.G(ctx).WithFields(logrus.Fields{
 		"server":   server,
 		"protocol": protocol,
-	}).Info("uploading data to starlight proxy server")
+	}).Info("notify starlight proxy server")
 
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
-	if err = proxy.Report(tc.ToJSONBuffer()); err != nil {
+	if err = proxy.Notify(reference); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func Command() *cli.Command {
 	ctx := context.Background()
 	cmd := cli.Command{
-		Name:  "report",
-		Usage: "Upload data collected by the optimizer back to Starlight Proxy to speed up other similar deployment",
+		Name:  "notify",
+		Usage: "Notify the Starlight Proxy that a new Starlight image is available",
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
-		Flags:     Flags,
-		ArgsUsage: "",
+		Flags: append(
+			Flags,
+		),
+		ArgsUsage: "[flags] SourceImage StarlightImage",
 	}
 	return &cmd
 }

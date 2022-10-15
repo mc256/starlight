@@ -23,11 +23,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -40,6 +42,8 @@ type StarlightProxy struct {
 	serverAddress string
 
 	client *http.Client
+
+	auth url.Userinfo
 }
 
 func (a *StarlightProxy) Report(buf []byte) error {
@@ -83,26 +87,36 @@ func (a *StarlightProxy) Report(buf []byte) error {
 	return nil
 }
 
-func (a *StarlightProxy) Prepare(imageName, imageTag string) error {
-	url := fmt.Sprintf("%s://%s", a.protocol, path.Join(a.serverAddress, "prepare", imageName+":"+imageTag))
-	resp, err := http.Get(url)
+func (a *StarlightProxy) Notify(ref name.Reference) error {
+	u := url.URL{
+		Scheme: a.protocol,
+		Host:   a.serverAddress,
+		Path:   path.Join("starlight", "notify"),
+	}
+	q := u.Query()
+	q.Set("ref", ref.String())
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(a.ctx, "GET", u.String(), nil)
+	if pwd, isSet := a.auth.Password(); isSet {
+		req.SetBasicAuth(a.auth.Username(), pwd)
+	}
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
+
 	if resp.StatusCode != 200 {
 		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":      fmt.Sprintf("%d", resp.StatusCode),
-			"version":   resp.Header.Get("Starlight-Version"),
-			"imageName": imageName,
-			"imageTag":  imageTag,
+			"code":    fmt.Sprintf("%d", resp.StatusCode),
+			"version": resp.Header.Get("Starlight-Version"),
+			"ref":     ref.String(),
 		}).Warn("server prepare error")
 		return util.ErrUnknownManifest
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
-		"version":   resp.Header.Get("Starlight-Version"),
-		"imageName": imageName,
-		"imageTag":  imageTag,
+		"version": resp.Header.Get("Starlight-Version"),
+		"ref":     ref.String(),
 	}).Info("server prepared")
 	return nil
 }

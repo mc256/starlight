@@ -47,6 +47,8 @@ func LoadConfig() (c *ProxyConfiguration) {
 	}
 
 	configPath := path.Join(etcPath, "proxy_config.json")
+	log.Printf("loading config from %s", configPath)
+
 	b, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		log.Println(errors.Wrapf(err, "cannot open config file"))
