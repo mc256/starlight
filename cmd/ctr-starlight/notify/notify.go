@@ -58,7 +58,8 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
 	if err = proxy.Notify(reference); err != nil {
-		return err
+		log.G(ctx).WithError(err).Error("failed to notify starlight proxy server")
+		return nil
 	}
 	return nil
 }

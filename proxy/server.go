@@ -260,8 +260,8 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration)
 		server.db = db
 	}
 
-	http.HandleFunc("/scanner/", server.scanner)
-	http.HandleFunc("/starlight/", server.starlight)
+	http.HandleFunc("/scanner", server.scanner)
+	http.HandleFunc("/starlight", server.starlight)
 	http.HandleFunc("/health-check", server.healthCheck)
 	http.HandleFunc("/", server.root)
 

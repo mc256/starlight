@@ -41,7 +41,7 @@ func init() {
 func main() {
 	app := NewApp()
 	if err := app.Run(os.Args); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: \n%v\n", err)
 		os.Exit(1)
 	}
 }

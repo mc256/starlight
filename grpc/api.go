@@ -20,9 +20,11 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
@@ -50,7 +52,8 @@ func (a *StarlightProxy) Ping() error {
 		Path:   "",
 	}
 	q := u.Query()
-	q.Set("t", time.Now().Format(time.RFC3339Nano))
+	t := time.Now()
+	q.Set("t", t.Format(time.RFC3339Nano))
 	u.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
 	if pwd, isSet := a.auth.Password(); isSet {
@@ -65,20 +68,31 @@ func (a *StarlightProxy) Ping() error {
 	response, err := ioutil.ReadAll(resp.Body)
 	version := resp.Header.Get("Starlight-Version")
 
-	if resp.StatusCode != 200 {
+	var r proxy.ApiResponse
+	if err = json.Unmarshal(response, &r); err != nil {
+		log.G(a.ctx).WithFields(logrus.Fields{
+			"code":     fmt.Sprintf("%d", resp.StatusCode),
+			"version":  version,
+			"response": strings.TrimSpace(string(response)),
+		}).WithError(err).Error("unknown response error")
+		return nil
+	}
+
+	if resp.StatusCode != 200 && r.Message != "Starlight Proxy" {
 		log.G(a.ctx).WithFields(logrus.Fields{
 			"code":     fmt.Sprintf("%d", resp.StatusCode),
 			"version":  version,
 			"response": strings.TrimSpace(string(response)),
 		}).Error("server error")
-		return fmt.Errorf("server error:\n%s", string(response))
+		return nil
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
-		"code":     200,
-		"version":  version,
-		"response": strings.TrimSpace(string(response)),
-	}).Info("server prepared")
+		"code":    200,
+		"version": version,
+		"rtt":     time.Now().Sub(t).Milliseconds(),
+		"unit":    "ms",
+	}).Info("server is okay")
 	return nil
 }
 
@@ -112,7 +126,50 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 			"ref":      ref.String(),
 			"response": strings.TrimSpace(string(response)),
 		}).Error("server error")
-		return fmt.Errorf("server error:\n%s", string(response))
+		return nil
+	}
+
+	log.G(a.ctx).WithFields(logrus.Fields{
+		"code":     200,
+		"version":  version,
+		"ref":      ref.String(),
+		"response": strings.TrimSpace(string(response)),
+	}).Info("server prepared")
+	return nil
+}
+
+func (a *StarlightProxy) Report(ref name.Reference) error {
+
+	u := url.URL{
+		Scheme: a.protocol,
+		Host:   a.serverAddress,
+		Path:   path.Join("starlight"),
+	}
+	q := u.Query()
+	q.Set("ref", ref.String())
+	q.Set("action", "report")
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
+	if pwd, isSet := a.auth.Password(); isSet {
+		req.SetBasicAuth(a.auth.Username(), pwd)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	response, err := ioutil.ReadAll(resp.Body)
+	version := resp.Header.Get("Starlight-Version")
+
+	if resp.StatusCode != 200 {
+		log.G(a.ctx).WithFields(logrus.Fields{
+			"code":     fmt.Sprintf("%d", resp.StatusCode),
+			"version":  version,
+			"ref":      ref.String(),
+			"response": strings.TrimSpace(string(response)),
+		}).Error("server error")
+		return nil
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
