@@ -7,6 +7,7 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/grpc"
@@ -15,10 +16,10 @@ import (
 )
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
-	insecure := c.Bool("insecure")
 	options := []name.Option{}
-	if insecure {
-		options = append(options, name.Insecure)
+
+	if c.NArg() != 1 {
+		return errors.New("wrong number of arguments, expected container image reference")
 	}
 
 	argRef := c.Args().Get(0)

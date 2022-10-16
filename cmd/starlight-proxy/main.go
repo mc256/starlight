@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
@@ -44,7 +45,7 @@ func main() {
 
 func New() *cli.App {
 	app := cli.NewApp()
-	cfg := proxy.LoadConfig()
+	cfg := proxy.LoadConfig(context.TODO())
 
 	app.Name = "starlight-proxy"
 	app.Version = util.Version

@@ -91,34 +91,83 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
-		Path:   path.Join("starlight", "notify"),
+		Path:   path.Join("starlight"),
 	}
 	q := u.Query()
 	q.Set("ref", ref.String())
+	q.Set("action", "notify")
 	u.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(a.ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
 	if pwd, isSet := a.auth.Password(); isSet {
 		req.SetBasicAuth(a.auth.Username(), pwd)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
 
+	response, err := ioutil.ReadAll(resp.Body)
+	version := resp.Header.Get("Starlight-Version")
+
 	if resp.StatusCode != 200 {
 		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":    fmt.Sprintf("%d", resp.StatusCode),
-			"version": resp.Header.Get("Starlight-Version"),
-			"ref":     ref.String(),
-		}).Warn("server prepare error")
-		return util.ErrUnknownManifest
+			"code":     fmt.Sprintf("%d", resp.StatusCode),
+			"version":  version,
+			"ref":      ref.String(),
+			"response": strings.TrimSpace(string(response)),
+		}).Error("server error")
+		return fmt.Errorf("server error:\n%s", string(response))
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
-		"version": resp.Header.Get("Starlight-Version"),
-		"ref":     ref.String(),
+		"code":     200,
+		"version":  version,
+		"ref":      ref.String(),
+		"response": strings.TrimSpace(string(response)),
 	}).Info("server prepared")
 	return nil
+
+	/*
+		    u := url.URL{
+				Scheme: a.protocol,
+				Host:   a.serverAddress,
+				Path:   path.Join("scanner"),
+			}
+			q := u.Query()
+			q.Set("ref", ref.String())
+			u.RawQuery = q.Encode()
+			req, err := http.NewRequestWithContext(a.ctx, "PUT", u.String(), strings.NewReader("asdf"))
+			if pwd, isSet := a.auth.Password(); isSet {
+				req.SetBasicAuth(a.auth.Username(), pwd)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := a.client.Do(req)
+			if err != nil {
+				return err
+			}
+
+			response, err := ioutil.ReadAll(resp.Body)
+			version := resp.Header.Get("Starlight-Version")
+
+			if resp.StatusCode != 200 {
+				log.G(a.ctx).WithFields(logrus.Fields{
+					"code":    fmt.Sprintf("%d", resp.StatusCode),
+					"version": version,
+					"ref":     ref.String(),
+				}).Error("server error")
+				return fmt.Errorf("server error:\n%s", string(response))
+			}
+
+			log.G(a.ctx).WithFields(logrus.Fields{
+				"code":     200,
+				"version":  version,
+				"ref":      ref.String(),
+				"response": strings.TrimSpace(string(response)),
+			}).Info("server prepared")
+			return nil
+	*/
 }
 
 func (a *StarlightProxy) Fetch(have []string, want []string) (io.ReadCloser, int64, error) {

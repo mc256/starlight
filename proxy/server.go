@@ -27,7 +27,6 @@ import (
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -117,19 +116,23 @@ func (a *Server) scanner(w http.ResponseWriter, req *http.Request) {
 
 func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 	ip := a.getIpAddress(req)
-
-	// Parameters
-	command := strings.Trim(strings.TrimPrefix(req.RequestURI, "/starlight"), "/")
 	q := req.URL.Query()
-	log.G(a.ctx).WithFields(logrus.Fields{"command": command, "ip": ip}).Info("request received")
+	action := q.Get("action")
 
-	if req.Method == http.MethodGet && strings.HasPrefix(command, "delta-image") {
-		// Get Delta Image
+	log.G(a.ctx).WithFields(logrus.Fields{"action": action, "ip": ip}).Info("request received")
+
+	switch action {
+	case "delta-image":
 		f, t := q.Get("from"), q.Get("to")
+		if f == "" || t == "" {
+			a.error(w, req, "missing parameters")
+			return
+		}
 
 		b, err := NewBuilder(a, f, t)
 		if err != nil {
 			a.error(w, req, err.Error())
+			return
 		}
 
 		if err = b.WriteHeader(w, req); err != nil {
@@ -141,11 +144,13 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		return
-	}
 
-	if req.Method == http.MethodPut && strings.HasPrefix(command, "prepare") {
-		// Cache ToC
-		i := q.Get("image")
+	case "notify":
+		i := q.Get("ref")
+		if i == "" {
+			a.error(w, req, "missing parameters")
+			return
+		}
 
 		extractor, err := NewExtractor(a, i)
 		if err != nil {
@@ -164,10 +169,8 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 		log.G(a.ctx).WithField("container", i).Info("cached ToC")
 		a.respond(w, req, res)
 		return
-	}
 
-	if req.Method == http.MethodPost && strings.HasPrefix(command, "report") {
-		// Report FS traces
+	case "report-traces":
 		i := q.Get("image")
 		fmt.Println(i)
 
@@ -197,6 +200,9 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 
 		a.error(w, req, "not implemented yet!")
 		return
+
+	default:
+		a.error(w, req, "unknown action ('delta-image', 'notify' or 'report-traces' expected)")
 	}
 
 	a.error(w, req, "missing parameter")
