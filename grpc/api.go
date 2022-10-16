@@ -19,20 +19,17 @@
 package grpc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
+	"time"
 )
 
 type StarlightProxy struct {
@@ -46,44 +43,42 @@ type StarlightProxy struct {
 	auth url.Userinfo
 }
 
-func (a *StarlightProxy) Report(buf []byte) error {
-	url := fmt.Sprintf("%s://%s", a.protocol, path.Join(a.serverAddress, "report"))
-	postBody := bytes.NewBuffer(buf)
-	resp, err := http.Post(url, "application/json", postBody)
+func (a *StarlightProxy) Ping() error {
+	u := url.URL{
+		Scheme: a.protocol,
+		Host:   a.serverAddress,
+		Path:   "",
+	}
+	q := u.Query()
+	q.Set("t", time.Now().Format(time.RFC3339Nano))
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
+	if pwd, isSet := a.auth.Password(); isSet {
+		req.SetBasicAuth(a.auth.Username(), pwd)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
+
+	response, err := ioutil.ReadAll(resp.Body)
+	version := resp.Header.Get("Starlight-Version")
+
 	if resp.StatusCode != 200 {
 		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":    fmt.Sprintf("%d", resp.StatusCode),
-			"version": resp.Header.Get("Starlight-Version"),
-		}).Warn("server error")
-		return util.ErrUnknownManifest
+			"code":     fmt.Sprintf("%d", resp.StatusCode),
+			"version":  version,
+			"response": strings.TrimSpace(string(response)),
+		}).Error("server error")
+		return fmt.Errorf("server error:\n%s", string(response))
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
-		"version": resp.Header.Get("Starlight-Version"),
-	}).Info("uploaded filesystem traces")
-
-	resBuf, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.G(a.ctx).WithError(err).Error("response body error")
-	}
-
-	if resp.StatusCode == 200 {
-		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":    fmt.Sprintf("%d"),
-			"message": strings.TrimSpace(string(resBuf[:])),
-			"version": resp.Header.Get("Starlight-Version"),
-		}).Info("upload finished")
-	} else {
-		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":    fmt.Sprintf("%d"),
-			"message": strings.TrimSpace(string(resBuf[:])),
-			"version": resp.Header.Get("Starlight-Version"),
-		}).Warn("upload finished")
-	}
-
+		"code":     200,
+		"version":  version,
+		"response": strings.TrimSpace(string(response)),
+	}).Info("server prepared")
 	return nil
 }
 
@@ -127,97 +122,6 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 		"response": strings.TrimSpace(string(response)),
 	}).Info("server prepared")
 	return nil
-
-	/*
-		    u := url.URL{
-				Scheme: a.protocol,
-				Host:   a.serverAddress,
-				Path:   path.Join("scanner"),
-			}
-			q := u.Query()
-			q.Set("ref", ref.String())
-			u.RawQuery = q.Encode()
-			req, err := http.NewRequestWithContext(a.ctx, "PUT", u.String(), strings.NewReader("asdf"))
-			if pwd, isSet := a.auth.Password(); isSet {
-				req.SetBasicAuth(a.auth.Username(), pwd)
-			}
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := a.client.Do(req)
-			if err != nil {
-				return err
-			}
-
-			response, err := ioutil.ReadAll(resp.Body)
-			version := resp.Header.Get("Starlight-Version")
-
-			if resp.StatusCode != 200 {
-				log.G(a.ctx).WithFields(logrus.Fields{
-					"code":    fmt.Sprintf("%d", resp.StatusCode),
-					"version": version,
-					"ref":     ref.String(),
-				}).Error("server error")
-				return fmt.Errorf("server error:\n%s", string(response))
-			}
-
-			log.G(a.ctx).WithFields(logrus.Fields{
-				"code":     200,
-				"version":  version,
-				"ref":      ref.String(),
-				"response": strings.TrimSpace(string(response)),
-			}).Info("server prepared")
-			return nil
-	*/
-}
-
-func (a *StarlightProxy) Fetch(have []string, want []string) (io.ReadCloser, int64, error) {
-	var fromString string
-	if len(have) == 0 {
-		fromString = "_"
-	} else {
-		fromString = strings.Join(have, ",")
-	}
-	toString := strings.Join(want, ",")
-
-	return a.FetchWithString(fromString, toString)
-}
-
-func (a *StarlightProxy) FetchWithString(fromString string, toString string) (io.ReadCloser, int64, error) {
-	url := fmt.Sprintf("%s://%s", a.protocol, path.Join(a.serverAddress, "from", fromString, "to", toString))
-	//resp, err := http.Get(url)
-
-	req, err := http.NewRequestWithContext(a.ctx, "GET", url, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Connection", "Keep-Alive")
-
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if resp.StatusCode != 200 {
-		log.G(a.ctx).WithFields(logrus.Fields{
-			"code":    fmt.Sprintf("%d", resp.StatusCode),
-			"version": resp.Header.Get("Starlight-Version"),
-		}).Warn("server cannot build delta image")
-		return nil, 0, util.ErrUnknownManifest
-	}
-
-	log.G(a.ctx).WithFields(logrus.Fields{
-		"version": resp.Header.Get("Starlight-Version"),
-		"from":    fromString,
-		"to":      toString,
-		"header":  resp.Header.Get("Starlight-Header-Size"),
-	}).Info("server prepared delta image")
-
-	headerSize, err := strconv.Atoi(resp.Header.Get("Starlight-Header-Size"))
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return resp.Body, int64(headerSize), nil
 }
 
 func NewStarlightProxy(ctx context.Context, protocol, server string) *StarlightProxy {

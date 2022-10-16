@@ -20,6 +20,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -248,23 +249,28 @@ func (o *snapshotter) pullImage(ctx context.Context, key, parent, _key, _parent 
 	if ir, hasIr := o.receiver[targetImage]; hasIr {
 		mnt = ir.GetLayerMounts()
 	} else {
-		rc, headerSize, err := o.remote.FetchWithString(sourceImage, targetImage)
-		if err != nil {
-			return nil, err
-		}
+		/*
+			rc, headerSize, err := o.remote.FetchWithString(sourceImage, targetImage)
+			if err != nil {
+				return nil, err
+			}
 
-		nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID, func() {
-			o.extractionCompleted(targetImage)
-		})
-		if err != nil {
-			return nil, err
-		}
+			nir, err := starlightfs.NewReceiver(ctx, o.layerStore, rc, headerSize, sn.ID, func() {
+				o.extractionCompleted(targetImage)
+			})
+			if err != nil {
+				return nil, err
+			}
 
-		nir.ExtractFiles() //async call
+			nir.ExtractFiles() //async call
 
-		o.receiver[targetImage] = nir
-		mnt = nir.GetLayerMounts()
+			o.receiver[targetImage] = nir
+			mnt = nir.GetLayerMounts()
+
+		*/
+		fmt.Println(sourceImage)
 	}
+
 	return mnt, nil
 }
 
