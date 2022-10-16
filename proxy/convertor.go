@@ -121,12 +121,12 @@ func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.O
 	return c, nil
 }
 
-func (c *Convertor) GetSrc() string {
-	return c.src.String()
+func (c *Convertor) GetSrc() name.Reference {
+	return c.src
 }
 
-func (c *Convertor) GetDst() string {
-	return c.dst.String()
+func (c *Convertor) GetDst() name.Reference {
+	return c.dst
 }
 
 func (c *Convertor) readImage() (goreg.ImageIndex, error) {

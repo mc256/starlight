@@ -23,6 +23,7 @@ import (
 	"errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	"github.com/mc256/starlight/cmd/ctr-starlight/report"
 
 	"github.com/containerd/containerd/log"
@@ -78,6 +79,15 @@ func Action(ctx context.Context, c *cli.Context) error {
 	}
 	log.G(ctx).Info("conversion completed")
 
+	// notify
+	if c.Bool("notify") {
+		err = notify.SharedAction(ctx, c, convertor.GetDst())
+		if err != nil {
+			log.G(ctx).WithError(err).Error("fail to notify the converted image")
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -98,8 +108,8 @@ func Command() *cli.Command {
 			append(
 				report.Flags,
 				&cli.BoolFlag{
-					Name:     "report",
-					Usage:    "report the conversion result",
+					Name:     "notify",
+					Usage:    "notify the converted image to the Starlight Proxy",
 					Value:    false,
 					Required: false,
 				},
