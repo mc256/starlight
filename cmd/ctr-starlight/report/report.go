@@ -20,6 +20,7 @@ package report
 
 import (
 	"context"
+	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/grpc"
@@ -57,9 +58,14 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	}).Info("uploading data to starlight proxy server")
 
 	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
-	if err = proxy.Report(tc.ToJSONBuffer()); err != nil {
-		return err
-	}
+
+	/*
+		if err = proxy.Report(ref, tc.ToJSONBuffer()); err != nil {
+			return err
+		}
+	*/
+
+	fmt.Println(proxy, tc)
 
 	return nil
 }

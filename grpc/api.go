@@ -19,6 +19,7 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -138,7 +139,7 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 	return nil
 }
 
-func (a *StarlightProxy) Report(ref name.Reference) error {
+func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
 
 	u := url.URL{
 		Scheme: a.protocol,

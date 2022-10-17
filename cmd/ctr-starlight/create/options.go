@@ -30,14 +30,6 @@ var (
 			Value:    false,
 			Required: false,
 		},
-		&cli.StringFlag{
-			Name:        "optimize-group",
-			Aliases:     []string{"app", "workload"},
-			Usage:       "assign a label to this workload",
-			Value:       "default",
-			DefaultText: "default",
-			Required:    false,
-		},
 	}
 
 	// ContainerFlags are cli flags specifying container options

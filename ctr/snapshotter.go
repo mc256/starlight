@@ -20,16 +20,16 @@ package ctr
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/mc256/starlight/util"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"math/rand"
-	"sort"
-	"strings"
 	"time"
 )
 
@@ -48,74 +48,112 @@ import (
 type snOptFunc func() snapshots.Opt
 
 type SnapshotterService struct {
-	ctx     context.Context
-	sn      snapshots.Snapshotter
-	id      string
-	noGcOpt snOptFunc
+	ctx context.Context
+	sn  snapshots.Snapshotter
+	id  string
 }
 
-// PrepareDeltaImage gets
-func (s *SnapshotterService) PrepareDeltaImage(fromImages, toImages string) error {
-	var target, source string
-	if fromImages == "" {
-		source = ""
-	} else {
-		source = fmt.Sprintf("accelerated(%s)-XXXXXX", fromImages) // committed - name
-	}
-	target = fmt.Sprintf("target(%s)-%s", toImages, s.id) // active - key
+func getAcceleratedSnapshotterName(ref string) string {
+	return fmt.Sprintf("accerated-%s", ref)
+}
 
-	// check whether accelerated image exists
-	accelerated := fmt.Sprintf("accelerated(%s)-XXXXXX", toImages)
-	info, err := s.sn.Stat(s.ctx, accelerated)
+func getTemporarySnapshotterName(ref string) string {
+	return fmt.Sprintf("temp-%s", ref)
+}
+
+func (s *SnapshotterService) Pull(from, proxy, ref string) (err error) {
+	accRef := getAcceleratedSnapshotterName(ref)
+	accFrom := ""
+
+	var info snapshots.Info
+	info, err = s.sn.Stat(s.ctx, accRef)
 	if err == nil {
-		log.G(s.ctx).WithField("info", info).Info("found accelerated snapshot")
+		log.G(s.ctx).WithField("info", info).Info("found starlight image")
 		return nil
 	}
 
-	// accelerated()-X -> target()-rand()
-	if _, err := s.sn.Prepare(s.ctx, target, source, s.noGcOpt()); err != nil {
-		return err
+	if from != "" {
+		info, err = s.sn.Stat(s.ctx, accFrom)
+		if err != nil {
+			log.G(s.ctx).
+				WithError(err).
+				WithField("image", from).
+				Error("failed to get status of the base image (maybe it does not exists)")
+			return errors.Wrap(err, "failed to get status of the base image")
+		}
+		accFrom = getAcceleratedSnapshotterName(from)
 	}
 
-	// target()-rand() -> accelerated()-X
-	if err := s.sn.Commit(s.ctx, accelerated, target, s.noGcOpt()); err != nil {
+	labels := map[string]string{
+		util.ContainerdGCLabel: time.Now().UTC().Format(time.RFC3339),
+		util.SnapshotterLabel:  util.Version,
+		util.ProxyLabel:        proxy,
+	}
+
+	// "" -> ref()
+	var mnt []mount.Mount
+	if mnt, err = s.sn.Prepare(s.ctx, accFrom, ref, snapshots.WithLabels(labels)); err != nil {
 		return err
 	}
+	// will be blocked until all the necessary files are ready (or reach the readiness flag)
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"mnt": mnt,
+		"ref": ref,
+	}).Info("prepared snapshot")
+
+	// ref() -> accelerated-ref()
+	if err = s.sn.Commit(s.ctx, ref, accRef, snapshots.WithLabels(labels)); err != nil {
+		return err
+	}
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"ref": ref,
+	}).Info("committed snapshot")
+	// file system will be ready by then
 
 	return nil
 }
 
-func (s *SnapshotterService) PrepareContainerSnapshot(name, tag, acceleratedImages string, optimize bool, optimizeGroup string) (sn string, mnt []mount.Mount, err error) {
-	arrAcc := strings.Split(acceleratedImages, ",")
-	sort.Strings(arrAcc)
-	acceleratedImages = strings.Join(arrAcc, ",")
-	committed := fmt.Sprintf("worker-%s-%s-%06d-%s", name, tag, rand.Intn(1000000), s.id)
-	accelerated := fmt.Sprintf("accelerated(%s)-XXXXXX", acceleratedImages)
+func (s *SnapshotterService) Create(ref, containerName string, optimize bool) (sn string, mnt []mount.Mount, err error) {
+	accRef := getAcceleratedSnapshotterName(ref)
+
+	var info snapshots.Info
+	info, err = s.sn.Stat(s.ctx, accRef)
+	if err != nil {
+		log.G(s.ctx).WithField("info", info).Error("starlight image not found")
+		return "", nil, err
+	}
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"ref":    ref,
+		"labels": info.Labels,
+	}).Info("found starlight snapshot")
 
 	labels := map[string]string{
-		util.ImageNameLabel: name,
-		util.ImageTagLabel:  tag,
-	}
-	if optimize {
-		labels[util.OptimizeLabel] = "True"
-		labels[util.OptimizeGroupLabel] = optimizeGroup
+		util.ContainerdGCLabel: time.Now().UTC().Format(time.RFC3339),
+		util.SnapshotterLabel:  info.Labels[util.SnapshotterLabel],
+		util.ProxyLabel:        info.Labels[util.ProxyLabel],
 	}
 
+	if optimize {
+		labels[util.OptimizeLabel] = "True"
+	}
+
+	final := s.GetHash(fmt.Sprintf("%s%v", containerName, labels[util.ContainerdGCLabel]))
 	if mnt, err = s.sn.Prepare(
 		s.ctx,
-		committed,
-		accelerated,
+		accRef,
+		final,
 		snapshots.WithLabels(labels),
-		s.noGcOpt(),
 	); err != nil {
 		return "", nil, err
 	}
 
-	return committed, mnt, nil
+	return final, mnt, nil
 }
 
-func (s *SnapshotterService) CommitWorker(sn string) error {
-	return s.sn.Commit(s.ctx, fmt.Sprintf("%s-XXXXXX", sn[:len(sn)-7]), sn, s.noGcOpt())
+func (s *SnapshotterService) GetHash(ref string) string {
+	h := sha256.New()
+	h.Write([]byte(ref))
+	return fmt.Sprintf("%x.json", h.Sum(nil))
 }
 
 func NewSnapshotterService(ctx context.Context, client *containerd.Client) (sn *SnapshotterService) {
@@ -124,11 +162,6 @@ func NewSnapshotterService(ctx context.Context, client *containerd.Client) (sn *
 		ctx: ctx,
 		sn:  client.SnapshotService("starlight"),
 		id:  fmt.Sprintf("%06d", rand.Intn(100000)),
-		noGcOpt: func() snapshots.Opt {
-			return snapshots.WithLabels(map[string]string{
-				"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
-			})
-		},
 	}
 
 	log.G(ctx).WithFields(logrus.Fields{

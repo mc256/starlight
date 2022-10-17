@@ -28,8 +28,13 @@ const (
 	ImageTagLabel      = "containerd.io/snapshot/remote/starlight/imageTag.label"
 	OptimizeLabel      = "containerd.io/snapshot/remote/starlight/optimize.label"
 	OptimizeGroupLabel = "containerd.io/snapshot/remote/starlight/optimizeGroup.label"
-	ImageMediaType     = "application/vnd.mc256.starlight.toc.json"
-	UserRwLayerText    = "containerd.io/layer/user-rw-layer"
+
+	ProxyLabel        = "containerd.io/snapshot/remote/starlight/proxy"
+	SnapshotterLabel  = "containerd.io/gc.ref.snapshot.starlight"
+	ContainerdGCLabel = "containerd.io/gc.root"
+
+	ImageMediaType  = "application/vnd.mc256.starlight.toc.json"
+	UserRwLayerText = "containerd.io/layer/user-rw-layer"
 
 	SnapshotterDbName = "metadata.db"
 	ProxyDbName       = "toc.db"

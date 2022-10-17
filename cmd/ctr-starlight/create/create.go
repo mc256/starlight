@@ -41,14 +41,14 @@ const (
 )
 
 func Action(c *cli.Context) error {
-	// [flags] ImageCombination Image CONTAINER [COMMAND] [ARG...]
-	var imageCombo, ref, containerName string
+	// [flags] Image CONTAINER [COMMAND] [ARG...]
+	var ref, containerName string
 	var args []string
-	if c.Args().Len() >= 3 {
-		imageCombo = c.Args().Get(0)
-		ref = c.Args().Get(1)
-		containerName = c.Args().Get(2)
-		args = c.Args().Slice()[3:]
+
+	if c.Args().Len() >= 2 {
+		ref = c.Args().Get(0)
+		containerName = c.Args().Get(1)
+		args = c.Args().Slice()[2:]
 	} else {
 		return errors.New("wrong number of arguments")
 	}
@@ -56,41 +56,30 @@ func Action(c *cli.Context) error {
 	// Connect to containerd
 	ns := c.String("namespace")
 	socket := c.String("address")
+
 	t, ctx, err := ctr.NewContainerdClient(ns, socket, c.String("log-level"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("containerd client")
 		return nil
 	}
 	log.G(ctx).WithFields(logrus.Fields{
-		"combo":     imageCombo,
 		"ref":       ref,
 		"container": containerName,
 	}).Info("preparing snapshot")
 
-	// container image reference
-	var name, tag string
-	if sp := strings.Split(ref, ":"); len(sp) != 2 {
-		log.G(ctx).Error("invalid image name")
-		return nil
-	} else {
-		name = sp[0]
-		tag = sp[1]
-	}
-
 	// Prepare snapshot
 	optimize := c.Bool("optimize")
-	optimizeGroup := c.String("optimize-group")
 
+	// mounts
 	var mnt []mount.Mount
-	if t.SnId, mnt, err = t.Sn.PrepareContainerSnapshot(name, tag, imageCombo, optimize, optimizeGroup); err != nil {
+	if t.SnId, mnt, err = t.Sn.Create(ref, containerName, optimize); err != nil {
 		log.G(ctx).Error(err)
 		return nil
-	} else {
-		log.G(ctx).WithFields(logrus.Fields{
-			"mnt":         mnt,
-			"snapshotter": t.SnId,
-		}).Info("prepared container snapshot")
 	}
+	log.G(ctx).WithFields(logrus.Fields{
+		"mnt":         mnt,
+		"snapshotter": t.SnId,
+	}).Info("prepared container snapshot")
 
 	// Options - Container Initials
 	var (
@@ -99,16 +88,20 @@ func Action(c *cli.Context) error {
 		spec  containerd.NewContainerOpts
 	)
 
-	cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(c.StringSlice("label"))))
 	cOpts = append(cOpts,
+		containerd.WithContainerLabels(commands.LabelArgs(c.StringSlice("label"))),
 		containerd.WithSnapshotter("starlight"),
 		containerd.WithSnapshot(t.SnId),
 		containerd.WithImageName(containerName),
 	)
 
 	// Options - OCI specs Initials
-	opts = append(opts, oci.WithDefaultSpec(), oci.WithDefaultUnixDevices)
-	configPath := path.Join(mnt[0].Source, "../..", fmt.Sprintf("%s_%s.json", name, tag))
+	opts = append(opts,
+		oci.WithDefaultSpec(),
+		oci.WithDefaultUnixDevices,
+	)
+
+	configPath := path.Join(mnt[0].Source, "../config", fmt.Sprintf("%s.json", t.Sn.GetHash(ref)))
 	if config, err := ioutil.ReadFile(configPath); err == nil {
 		opts = append(opts, WithImageConfig(config))
 		log.G(ctx).WithField("path", configPath).Info("added image config")
@@ -120,7 +113,6 @@ func Action(c *cli.Context) error {
 	if ef := c.String("env-file"); ef != "" {
 		opts = append(opts, oci.WithEnvFile(ef))
 	}
-
 	opts = append(opts, oci.WithEnv(c.StringSlice("env")))
 
 	// Options mounts
@@ -251,7 +243,7 @@ func Command() *cli.Command {
 			return Action(c)
 		},
 		Flags:     append(ContainerFlags, StarlightFlags...),
-		ArgsUsage: "[flags] ImageCombination Image CONTAINER [COMMAND] [ARG...]",
+		ArgsUsage: "[flags] Image CONTAINER [COMMAND] [ARG...]",
 	}
 	return &cmd
 }
