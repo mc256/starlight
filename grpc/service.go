@@ -31,7 +31,7 @@ import (
 	"syscall"
 )
 
-func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtocol, remoteAddress, workDir string, fsTrace bool) {
+func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 	// Create a gRPC server
 	rpc := grpc.NewServer()
 
@@ -39,9 +39,7 @@ func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtoco
 	// snapshotter and a root directory. Your custom snapshotter will be
 	// much more useful than using a snapshotter which is already included.
 	// https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter
-	remote := NewStarlightProxy(ctx, remoteProtocol, remoteAddress)
-
-	sn, err := NewSnapshotter(ctx, workDir, remote, fsTrace)
+	sn, err := NewSnapshotter(ctx, cfg)
 	if err != nil {
 		log.G(ctx).WithError(err).Fatal("failed to create new snapshotter")
 		os.Exit(1)
@@ -52,13 +50,13 @@ func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtoco
 	service := snapshotservice.FromSnapshotter(sn)
 
 	// Prepare the directory for the socket
-	if err := os.MkdirAll(filepath.Dir(socketAddress), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.Socket), 0700); err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to create directory %q\n", filepath.Dir(socketAddress))
 		os.Exit(1)
 	}
 
 	// Try to remove the socket file to avoid EADDRINUSE
-	if err := os.RemoveAll(socketAddress); err != nil {
+	if err := os.RemoveAll(cfg.Socket); err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to remove %q\n", socketAddress)
 		os.Exit(1)
 	}
@@ -68,7 +66,7 @@ func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtoco
 	snapshotsapi.RegisterSnapshotsServer(rpc, service)
 
 	// Listen and serve
-	l, err := net.Listen("unix", socketAddress)
+	l, err := net.Listen("unix", cfg.Socket)
 	if err != nil {
 		log.G(ctx).WithError(err).Fatal("unix listen")
 		os.Exit(1)
@@ -85,5 +83,4 @@ func NewSnapshotterGrpcService(ctx context.Context, socketAddress, remoteProtoco
 		log.G(ctx).WithError(err).Fatal("rpc serve")
 		os.Exit(1)
 	}
-
 }

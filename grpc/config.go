@@ -1,9 +1,4 @@
-/*
-   file created by Junlin Chen in 2022
-
-*/
-
-package proxy
+package grpc
 
 import (
 	"context"
@@ -18,27 +13,32 @@ import (
 	"path"
 )
 
+type ProxyConfig struct {
+	Protocol string `json:"protocol"`
+	Address  string `json:"address"`
+
+	// Auth
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 type Configuration struct {
 	ctx context.Context
 
-	// server
-	ListenPort    int    `json:"port"`
-	ListenAddress string `json:"address"`
-	LogLevel      string `json:"log_level"`
+	LogLevel string `json:"log_level"`
+	ClientId string `json:"id"`
 
-	// database
-	PostgresConnectionString string `json:"postgres"`
-	PostgresDBSchema         string `json:"postgres_schema"`
+	// path to database
+	Metadata string `json:"metadata"`
 
-	// registry
-	DefaultRegistry string `json:"default_registry"`
+	// socket address
+	Socket string `json:"socket"`
 
-	// goharbor hook
-	EnableHarborScanner bool   `json:"harbor"`
-	HarborApiKey        string `json:"harbor_apikey"`
+	// registry + proxy
+	DefaultProxy   string `json:"default_proxy"`
+	FileSystemRoot string `json:"fs_root"`
 
-	// layer cache timeout (second)
-	CacheTimeout int `json:"cache_timeout"`
+	Proxies map[string]ProxyConfig `json:"configs"`
 }
 
 func LoadConfig(ctx context.Context) (c *Configuration) {
@@ -50,7 +50,7 @@ func LoadConfig(ctx context.Context) (c *Configuration) {
 		return
 	}
 
-	configPath := path.Join(etcPath, "proxy_config.json")
+	configPath := path.Join(etcPath, "snapshotter_config.json")
 	log.G(c.ctx).WithFields(logrus.Fields{
 		"path": configPath,
 	}).Info("loading config")
@@ -85,7 +85,7 @@ func (c *Configuration) SaveConfig() error {
 		return err
 	}
 
-	configPath := path.Join(etcPath, "proxy_config.json")
+	configPath := path.Join(etcPath, "snapshotter_config.json")
 	buf, _ := json.MarshalIndent(c, " ", " ")
 	err := ioutil.WriteFile(configPath, buf, 0644)
 	if err == nil {
@@ -99,15 +99,23 @@ func (c *Configuration) SaveConfig() error {
 func newConfig(ctx context.Context) *Configuration {
 	uuid.EnableRandPool()
 	return &Configuration{
-		ctx:                      ctx,
-		ListenPort:               8090,
-		ListenAddress:            "0.0.0.0",
-		LogLevel:                 "info",
-		PostgresConnectionString: "postgres://starlight:password@localhost/starlight?sslmode=disable",
-		PostgresDBSchema:         "starlight",
-		DefaultRegistry:          "127.0.0.1:9000",
-		EnableHarborScanner:      false,
-		HarborApiKey:             uuid.New().String(),
-		CacheTimeout:             3600,
+		ctx: ctx,
+
+		LogLevel:       "debug",
+		Metadata:       "/var/lib/starlight-grpc/metadata.db",
+		Socket:         "/run/starlight-grpc/starlight-snapshotter.socket",
+		DefaultProxy:   "starlight-shared",
+		FileSystemRoot: "/var/lib/starlight-grpc",
+		ClientId:       uuid.New().String(),
+
+		Proxies: map[string]ProxyConfig{
+			"starlight-shared": {
+				Protocol: "https",
+				Address:  "starlight.yuri.moe",
+
+				Username: "",
+				Password: "",
+			},
+		},
 	}
 }

@@ -41,16 +41,6 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-/*
-                             prepare: target() [id] ____________________________
-									|                                          |
-							  commit: accelerated()  [id]                      |
-			  ______________________|_____________________                     |
-			 |                                            |                    |
-      prepare: worker-N [mountingPoint]            prepare: loading() [id]     |
-	         |                                            |                    |
-        mount: [mountingPoint]                      commit: source() [id]  -----
-*/
 type snapshotter struct {
 	gCtx context.Context
 	root string
@@ -72,7 +62,9 @@ type snapshotter struct {
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
-func NewSnapshotter(ctx context.Context, root string, remote *StarlightProxy, fsTrace bool) (snapshots.Snapshotter, error) {
+func NewSnapshotter(ctx context.Context, cfg *Configuration) (snapshots.Snapshotter, error) {
+	remote := NewStarlightProxy(ctx, remoteProtocol, remoteAddress)
+
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}

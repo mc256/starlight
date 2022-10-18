@@ -115,10 +115,13 @@ func New() *cli.App {
 			Usage:       "api key for verify the scan requests",
 			Required:    false,
 		},
+		// ----
+		&cli.BoolFlag{
+			Name:     "version",
+			Usage:    "print version",
+			Required: false,
+		},
 	}
-	app.Commands = append([]*cli.Command{
-		util.VersionCommand(),
-	})
 	app.Action = func(c *cli.Context) error {
 		return DefaultAction(c, cfg)
 	}
@@ -126,7 +129,12 @@ func New() *cli.App {
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *proxy.ProxyConfiguration) error {
+func DefaultAction(context *cli.Context, cfg *proxy.Configuration) error {
+	if context.Bool("version") == true {
+		fmt.Printf("starlight-proxy v%s\n", util.Version)
+		return nil
+	}
+
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}

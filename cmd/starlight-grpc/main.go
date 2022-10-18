@@ -19,9 +19,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	runCommand "github.com/mc256/starlight/cmd/starlight-grpc/run"
+	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/grpc"
 	"github.com/mc256/starlight/util"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"os"
 )
@@ -42,6 +45,7 @@ func main() {
 
 func New() *cli.App {
 	app := cli.NewApp()
+	cfg := grpc.LoadConfig(context.TODO())
 
 	app.Name = "starlight-grpc"
 	app.Version = util.Version
@@ -49,11 +53,87 @@ func New() *cli.App {
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
-	app.Flags = []cli.Flag{}
-	app.Commands = append([]*cli.Command{
-		util.VersionCommand(),
-		runCommand.RunCommand(),
-	})
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:        "config",
+			DefaultText: "/etc/starlight/snapshotter_config.json",
+			Aliases:     []string{"c"},
+			EnvVars:     []string{"STARLIGHT_GRPC_CONFIG"},
+			Usage:       "json configuration file. CLI parameter will override values in the config file if specified",
+			Required:    false,
+		},
+		&cli.StringFlag{
+			Name:        "log-level",
+			DefaultText: cfg.LogLevel,
+			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
+			Required:    false,
+		},
+		// ----
+		&cli.StringFlag{
+			Name:        "metadata",
+			DefaultText: cfg.Metadata,
+			Aliases:     []string{"m"},
+			Usage:       "path to store image metadata",
+			Required:    false,
+		},
+		&cli.StringFlag{
+			Name:        "socket",
+			DefaultText: cfg.Socket,
+			Usage:       "gRPC socket address",
+			Required:    false,
+		},
+		&cli.StringFlag{
+			Name:        "default",
+			DefaultText: cfg.DefaultProxy,
+			Aliases:     []string{"d"},
+			Usage:       "name of the default proxy",
+		},
+		&cli.StringFlag{
+			Name:        "fs-root",
+			DefaultText: cfg.FileSystemRoot,
+			Aliases:     []string{"fs"},
+			Usage:       "path to store uncompress image layers",
+			Required:    false,
+		},
+		&cli.StringFlag{
+			Name:        "id",
+			DefaultText: cfg.ClientId,
+			Usage:       "identifier for the client",
+			Required:    false,
+		},
+		// ----
+		&cli.StringSliceFlag{
+			Name:        "proxy",
+			Aliases:     []string{"p"},
+			Usage:       "proxy of the configuration use comma (',') to separate components, and use another tag for other proxies, name,protocol,address,username,password",
+			Required:    false,
+			DefaultText: "starlight-shared,https,starlight.yuri.moe,,",
+		},
+	}
+	app.Action = func(c *cli.Context) error {
+		return DefaultAction(c, cfg)
+	}
 
 	return app
+}
+
+func DefaultAction(context *cli.Context, cfg *grpc.Configuration) error {
+	if context.Bool("version") == true {
+		fmt.Printf("starlight-proxy v%s\n", util.Version)
+		return nil
+	}
+
+	if l := context.String("log-level"); l != "" {
+		cfg.LogLevel = l
+	}
+	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+
+	log.G(c).WithFields(logrus.Fields{
+		"version":   util.Version,
+		"log-level": context.String("log-level"),
+	}).Info("Starlight Snapshotter")
+
+	grpc.NewSnapshotterGrpcService(c, cfg)
+
+	return nil
 }
