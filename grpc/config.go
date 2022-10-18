@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/uuid"
 	"github.com/mc256/starlight/util"
@@ -11,6 +12,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 )
 
 type ProxyConfig struct {
@@ -38,7 +40,33 @@ type Configuration struct {
 	DefaultProxy   string `json:"default_proxy"`
 	FileSystemRoot string `json:"fs_root"`
 
-	Proxies map[string]ProxyConfig `json:"configs"`
+	Proxies map[string]*ProxyConfig `json:"configs"`
+}
+
+func (c *Configuration) getProxy(name string) *ProxyConfig {
+	if p, has := c.Proxies[name]; has {
+		return p
+	}
+	return nil
+}
+
+func ParseProxyStrings(v string) (name string, c *ProxyConfig, err error) {
+	sp := strings.Split(v, ",")
+	if len(sp) < 3 {
+		return "", nil, fmt.Errorf("failed to parse '%s'", v)
+	}
+
+	c = &ProxyConfig{
+		Protocol: sp[1],
+		Address:  sp[2],
+	}
+	if len(sp) == 4 {
+		c.Username = sp[3]
+	}
+	if len(sp) == 5 {
+		c.Password = sp[4]
+	}
+	return sp[0], c, nil
 }
 
 func LoadConfig(ctx context.Context) (c *Configuration) {
@@ -108,7 +136,7 @@ func newConfig(ctx context.Context) *Configuration {
 		FileSystemRoot: "/var/lib/starlight-grpc",
 		ClientId:       uuid.New().String(),
 
-		Proxies: map[string]ProxyConfig{
+		Proxies: map[string]*ProxyConfig{
 			"starlight-shared": {
 				Protocol: "https",
 				Address:  "starlight.yuri.moe",

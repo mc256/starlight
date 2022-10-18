@@ -23,16 +23,15 @@ import (
 	"encoding/binary"
 	"github.com/containerd/containerd/log"
 	bolt "go.etcd.io/bbolt"
-	"path"
 )
 
 const (
 	metadataStorage = "metadata.db"
 )
 
-func OpenDatabase(ctx context.Context, workDir, dbName string) (*bolt.DB, error) {
+func OpenDatabase(ctx context.Context, dbPath string) (*bolt.DB, error) {
 	// Open Database
-	db, err := bolt.Open(path.Join(workDir, metadataStorage), 0600, nil)
+	db, err := bolt.Open(dbPath, 0600, nil)
 	if err != nil {
 		log.G(ctx).Fatal(err)
 		return nil, err

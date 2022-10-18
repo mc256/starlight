@@ -43,83 +43,62 @@ import (
 
 type snapshotter struct {
 	gCtx context.Context
-	root string
 
 	ms *storage.MetaStore
 	db *bbolt.DB
 
-	remote     *StarlightProxy
 	layerStore *starlightfs.LayerStore
-
-	//receiver has all the images in the local storage
-	receiver map[string]*starlightfs.Receiver
+	receiver   map[string]*starlightfs.Receiver
 
 	//imageReadersMux sync.Mutex
-	fsMap map[string]*starlightfs.FsInstance
-
+	fsMap   map[string]*starlightfs.FsInstance
 	fsTrace bool
+
+	cfg              *Configuration
+	proxyConnections map[string]*ProxyConfig
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
 func NewSnapshotter(ctx context.Context, cfg *Configuration) (snapshots.Snapshotter, error) {
-	remote := NewStarlightProxy(ctx, remoteProtocol, remoteAddress)
-
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(cfg.FileSystemRoot, 0700); err != nil {
 		return nil, err
 	}
 
-	ms, err := storage.NewMetaStore(filepath.Join(root, "metastore.db"))
+	// containerd snapshot database
+	ms, err := storage.NewMetaStore(cfg.Metadata + ".sn")
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := util.OpenDatabase(ctx, root, util.SnapshotterDbName)
+	// starlight metadata database
+	db, err := util.OpenDatabase(ctx, cfg.Metadata+".sl")
 	if err != nil {
 		return nil, err
 	}
 
-	layerStore, err := starlightfs.NewLayerStore(ctx, db, filepath.Join(root, "sfs"))
+	// root path for starlight fs
+	layerStore, err := starlightfs.NewLayerStore(ctx, db, filepath.Join(cfg.FileSystemRoot, "sfs"))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := os.Mkdir(filepath.Join(root, "sfs"), 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(filepath.Join(cfg.FileSystemRoot, "sfs"), 0700); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	return &snapshotter{
 		gCtx: ctx,
-		root: root,
 
 		ms: ms,
 		db: db,
 
-		remote:     remote,
 		layerStore: layerStore,
 
 		receiver: make(map[string]*starlightfs.Receiver, 0),
 		fsMap:    make(map[string]*starlightfs.FsInstance, 0),
-
-		fsTrace: fsTrace,
-		//imageReadersMux: sync.Mutex{},
 	}, nil
 }
 
-// Stat returns the info for an active or committed snapshot by name or
-// key.
-//
-// Should be used for parent resolution, existence checks and to discern
-// the kind of snapshot.
-/*
-type Info struct {
-    Kind    Kind
-    Name    string
-    Parent  string            `json:",omitempty"`
-    Labels  map[string]string `json:",omitempty"`
-    Created time.Time         `json:",omitempty"`
-    Updated time.Time         `json:",omitempty"`
-}
-*/
 func (o *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	log.G(ctx).WithField("key", key).Info("stat")
 	ctx, t, err := o.ms.TransactionContext(ctx, false)
@@ -205,7 +184,7 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 }
 
 func (o *snapshotter) getSnDir(id string) string {
-	return path.Join(o.root, "sfs", id)
+	return path.Join(o.cfg.FileSystemRoot, "sfs", id)
 }
 
 // pullImage is the fist step get the Starlight Image
@@ -233,7 +212,7 @@ func (o *snapshotter) pullImage(ctx context.Context, key, parent, _key, _parent 
 		return nil, err
 	}
 
-	snd := filepath.Join(o.root, "sfs", sn.ID)
+	snd := filepath.Join(o.cfg.FileSystemRoot, "sfs", sn.ID)
 	if err := os.MkdirAll(snd, 0755); err != nil {
 		return nil, err
 	}
@@ -295,7 +274,7 @@ func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _p
 			fsi, err := ir.NewFsInstance(
 				config.Labels[util.ImageNameLabel],
 				config.Labels[util.ImageTagLabel],
-				path.Join(o.root, "sfs", sn.ID),
+				path.Join(o.cfg.FileSystemRoot, "sfs", sn.ID),
 				optimize,
 				optimizeGroup,
 			)
@@ -306,7 +285,7 @@ func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _p
 			o.fsMap[path.Base(_key)] = fsi
 
 			// mounting point
-			mp := filepath.Join(o.root, "sfs", sn.ID, "m")
+			mp := filepath.Join(o.cfg.FileSystemRoot, "sfs", sn.ID, "m")
 			if err := os.MkdirAll(mp, 0755); err != nil {
 				return nil, err
 			}

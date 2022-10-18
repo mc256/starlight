@@ -49,7 +49,7 @@ func New() *cli.App {
 
 	app.Name = "starlight-grpc"
 	app.Version = util.Version
-	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment`
+	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment. Flags overwrites the configuration file`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
@@ -127,6 +127,34 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) error {
 		cfg.LogLevel = l
 	}
 	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+
+	if id := context.String("id"); id != "" {
+		cfg.ClientId = id
+	}
+	if m := context.String("metadata"); m != "" {
+		cfg.Metadata = m
+	}
+	if s := context.String("socket"); s != "" {
+		cfg.Socket = s
+	}
+	if r := context.String("fs-root"); r != "" {
+		cfg.FileSystemRoot = r
+	}
+	if d := context.String("default"); d != "" {
+		cfg.DefaultProxy = d
+	}
+	parr := context.StringSlice("proxy")
+	if len(parr) != 0 {
+		for _, v := range parr {
+			if k, vv, err := grpc.ParseProxyStrings(v); err != nil {
+				log.G(c).
+					WithError(err).
+					Error("failed to parse proxy flag")
+			} else {
+				cfg.Proxies[k] = vv
+			}
+		}
+	}
 
 	log.G(c).WithFields(logrus.Fields{
 		"version":   util.Version,

@@ -186,3 +186,6 @@ Starlight is not complete. On our roadmap:
   - [ ] Multiple platforms image support 
   - [ ] Jointly optimizing multiple containers deployments
   - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS.
+- [ ] Extra Feature for Production Readiness
+  - [ ] Encrypted fs mount
+  - [ ] Multiple Starlight proxies

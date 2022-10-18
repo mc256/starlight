@@ -36,10 +36,6 @@ const (
 	ImageMediaType  = "application/vnd.mc256.starlight.toc.json"
 	UserRwLayerText = "containerd.io/layer/user-rw-layer"
 
-	SnapshotterDbName = "metadata.db"
-	ProxyDbName       = "toc.db"
-	DataPath          = "data/"
-
 	StarlightTOCDigestAnnotation       = "containerd.io/snapshot/remote/starlight/toc.digest"
 	StarlightTOCCreationTimeAnnotation = "containerd.io/snapshot/remote/starlight/toc.timestamp"
 

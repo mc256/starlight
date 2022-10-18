@@ -51,14 +51,16 @@ func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 
 	// Prepare the directory for the socket
 	if err := os.MkdirAll(filepath.Dir(cfg.Socket), 0700); err != nil {
-		log.G(ctx).WithError(err).Fatalf("failed to create directory %q\n", filepath.Dir(socketAddress))
+		log.G(ctx).WithError(err).Fatalf("failed to create directory %q for socket\n", filepath.Dir(cfg.Socket))
 		os.Exit(1)
+		return
 	}
 
 	// Try to remove the socket file to avoid EADDRINUSE
 	if err := os.RemoveAll(cfg.Socket); err != nil {
 		log.G(ctx).WithError(err).Fatalf("failed to remove %q\n", socketAddress)
 		os.Exit(1)
+		return
 	}
 	log.G(ctx).Info("Snapshotter is ready")
 
@@ -70,6 +72,7 @@ func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 	if err != nil {
 		log.G(ctx).WithError(err).Fatal("unix listen")
 		os.Exit(1)
+		return
 	}
 
 	c := make(chan os.Signal, 1)
@@ -82,5 +85,6 @@ func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 	if err := rpc.Serve(l); err != nil {
 		log.G(ctx).WithError(err).Fatal("rpc serve")
 		os.Exit(1)
+		return
 	}
 }
