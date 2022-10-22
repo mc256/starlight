@@ -49,7 +49,14 @@ func New() *cli.App {
 
 	app.Name = "starlight-grpc"
 	app.Version = util.Version
-	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment. Flags overwrites the configuration file`
+	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment. 
+
+This is a plugin that can be used with containerd to accelerate container-based application deployments.
+To enable the plugin, please add plugin configurations to containerd config.toml. You can also verify the plugin status by
+running "ctr plugins ls". For more information, please refer to the README.md file in the project repository.
+https://github.com/mc256/starlight
+
+*CLI options will override values in the config file if specified.`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
@@ -118,10 +125,6 @@ func New() *cli.App {
 }
 
 func DefaultAction(context *cli.Context, cfg *grpc.Configuration) error {
-	if context.Bool("version") == true {
-		fmt.Printf("starlight-proxy v%s\n", util.Version)
-		return nil
-	}
 
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l

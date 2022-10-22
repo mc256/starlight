@@ -53,7 +53,7 @@ type Server struct {
 	ctx context.Context
 
 	db     *Database
-	config *ProxyConfiguration
+	config *Configuration
 
 	cache      map[string]*LayerCache
 	cacheMutex sync.Mutex
@@ -242,7 +242,7 @@ func (a *Server) healthCheck(w http.ResponseWriter, req *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *ProxyConfiguration) *Server {
+func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) *Server {
 
 	server := &Server{
 		ctx: ctx,

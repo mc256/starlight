@@ -26,6 +26,7 @@ import (
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 	"os"
+	"regexp"
 	"sync"
 )
 
@@ -43,13 +44,24 @@ func main() {
 	}
 }
 
+func ProtectPassword(c string) string {
+	p := regexp.MustCompile(`:(.*)@`)
+	return p.ReplaceAllString(c, ":********@")
+}
+
 func New() *cli.App {
 	app := cli.NewApp()
 	cfg := proxy.LoadConfig(context.TODO())
 
 	app.Name = "starlight-proxy"
 	app.Version = util.Version
-	app.Usage = `Starlight Proxy accelerates container deployments`
+	app.Usage = `Starlight Proxy accelerates container deployments. 
+
+This is a proxy server on the cloud side mediates between Starlight workers and any standard registry server. For more
+information about Starlight, please visit our repository at https://github.com/mc256/starlight
+
+*CLI options will override values in the config file if specified.
+`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
@@ -59,7 +71,7 @@ func New() *cli.App {
 			DefaultText: "/etc/starlight/proxy_config.json",
 			Aliases:     []string{"c"},
 			EnvVars:     []string{"STARLIGHT_PROXY_CONFIG"},
-			Usage:       "json configuration file. CLI parameter will override values in the config file if specified",
+			Usage:       "json configuration file.",
 			Required:    false,
 		},
 		// ----
@@ -85,7 +97,7 @@ func New() *cli.App {
 		// ----
 		&cli.StringFlag{
 			Name:        "postgres",
-			DefaultText: cfg.PostgresConnectionString,
+			DefaultText: ProtectPassword(cfg.PostgresConnectionString),
 			Usage:       "use PostgreSQL database backend for storing TOCs",
 			Required:    false,
 		},
@@ -115,12 +127,6 @@ func New() *cli.App {
 			Usage:       "api key for verify the scan requests",
 			Required:    false,
 		},
-		// ----
-		&cli.BoolFlag{
-			Name:     "version",
-			Usage:    "print version",
-			Required: false,
-		},
 	}
 	app.Action = func(c *cli.Context) error {
 		return DefaultAction(c, cfg)
@@ -130,11 +136,6 @@ func New() *cli.App {
 }
 
 func DefaultAction(context *cli.Context, cfg *proxy.Configuration) error {
-	if context.Bool("version") == true {
-		fmt.Printf("starlight-proxy v%s\n", util.Version)
-		return nil
-	}
-
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}

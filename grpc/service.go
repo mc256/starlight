@@ -58,7 +58,7 @@ func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 
 	// Try to remove the socket file to avoid EADDRINUSE
 	if err := os.RemoveAll(cfg.Socket); err != nil {
-		log.G(ctx).WithError(err).Fatalf("failed to remove %q\n", socketAddress)
+		log.G(ctx).WithError(err).Fatalf("failed to remove %q\n", cfg.Socket)
 		os.Exit(1)
 		return
 	}
