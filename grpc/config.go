@@ -1,14 +1,11 @@
 package grpc
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/log"
 	"github.com/google/uuid"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path"
@@ -25,8 +22,6 @@ type ProxyConfig struct {
 }
 
 type Configuration struct {
-	ctx context.Context
-
 	LogLevel string `json:"log_level"`
 	ClientId string `json:"id"`
 
@@ -69,66 +64,60 @@ func ParseProxyStrings(v string) (name string, c *ProxyConfig, err error) {
 	return sp[0], c, nil
 }
 
-func LoadConfig(ctx context.Context) (c *Configuration) {
-	c = newConfig(ctx)
+func LoadConfig(cfgPath string) (c *Configuration, p string, n bool, error error) {
+	c = NewConfig()
 
-	etcPath := util.GetEtcConfigPath()
-	if err := os.MkdirAll(etcPath, 0775); err != nil {
-		log.G(c.ctx).Fatal(errors.Wrapf(err, "cannot create config folder"))
-		return
-	}
-
-	configPath := path.Join(etcPath, "snapshotter_config.json")
-	log.G(c.ctx).WithFields(logrus.Fields{
-		"path": configPath,
-	}).Info("loading config")
-
-	b, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		log.G(c.ctx).Warn(errors.Wrapf(err, "cannot open config file"))
-
-		buf, _ := json.Marshal(c)
-		err := ioutil.WriteFile(configPath, buf, 0644)
-		if err == nil {
-			log.G(c.ctx).Info("created new config file.")
+	if cfgPath == "" {
+		etcPath := util.GetEtcConfigPath()
+		if err := os.MkdirAll(etcPath, 0775); err != nil {
+			error = errors.Wrapf(err, "cannot create config folder")
 			return
 		}
 
-		log.G(c.ctx).Fatal(errors.Wrapf(err, "cannot create config file"))
-		return
+		p = path.Join(etcPath, "starlight_snapshotter.json")
+
+	} else {
+		p = cfgPath
+	}
+
+	b, err := ioutil.ReadFile(p)
+	n = false
+	if err != nil {
+		n = true
+
+		buf, _ := json.MarshalIndent(c, " ", " ")
+		if err = ioutil.WriteFile(p, buf, 0644); err == nil {
+			return
+		} else {
+			error = errors.Wrapf(err, "cannot create config file")
+		}
 	}
 
 	if err = json.Unmarshal(b, c); err != nil {
-		log.G(c.ctx).Fatal(errors.Wrapf(err, "cannot parse config file"))
-		return
+		error = errors.Wrapf(err, "cannot parse config file")
 	}
-
 	return
 }
 
 func (c *Configuration) SaveConfig() error {
 	etcPath := util.GetEtcConfigPath()
 	if err := os.MkdirAll(etcPath, 0775); err != nil {
-		log.G(c.ctx).Fatal(errors.Wrapf(err, "cannot create config folder"))
-		return err
+		return errors.Wrapf(err, "cannot create config folder")
 	}
 
-	configPath := path.Join(etcPath, "snapshotter_config.json")
+	p := path.Join(etcPath, "starlight_snapshotter.json")
 	buf, _ := json.MarshalIndent(c, " ", " ")
-	err := ioutil.WriteFile(configPath, buf, 0644)
+	err := ioutil.WriteFile(p, buf, 0644)
 	if err == nil {
-		log.G(c.ctx).Info("created new config file.")
-		return err
+		return nil
 	}
 
 	return nil
 }
 
-func newConfig(ctx context.Context) *Configuration {
+func NewConfig() *Configuration {
 	uuid.EnableRandPool()
 	return &Configuration{
-		ctx: ctx,
-
 		LogLevel:       "debug",
 		Metadata:       "/var/lib/starlight-grpc/metadata.db",
 		Socket:         "/run/starlight-grpc/starlight-snapshotter.socket",

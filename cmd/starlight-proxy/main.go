@@ -19,11 +19,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"os"
 	"regexp"
@@ -51,7 +51,7 @@ func ProtectPassword(c string) string {
 
 func New() *cli.App {
 	app := cli.NewApp()
-	cfg := proxy.LoadConfig(context.TODO())
+	cfg := proxy.NewConfig()
 
 	app.Name = "starlight-proxy"
 	app.Version = util.Version
@@ -135,19 +135,47 @@ information about Starlight, please visit our repository at https://github.com/m
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *proxy.Configuration) error {
+func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
+	var (
+		p  string
+		ne bool
+	)
+
+	config := context.String("config")
+	cfg, p, ne, err = proxy.LoadConfig(config)
+
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}
 	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+	log.G(c).
+		WithField("version", util.Version).
+		Info("starlight-proxy")
 
-	if p := context.Int("port"); p != 0 {
-		cfg.ListenPort = p
+	if err != nil {
+		log.G(c).WithFields(logrus.Fields{
+			"log":  cfg.LogLevel,
+			"path": p,
+			"new":  ne,
+		}).
+			WithError(err).
+			Fatal("failed to load configuration")
+	} else {
+		log.G(c).WithFields(logrus.Fields{
+			"log":  cfg.LogLevel,
+			"path": p,
+			"new":  ne,
+		}).
+			Info("loaded configuration")
+	}
+
+	if port := context.Int("port"); port != 0 {
+		cfg.ListenPort = port
 	}
 	if h := context.String("host"); h != "" {
 		cfg.ListenAddress = h
 	}
-	log.G(c).Infof("Starlight Proxy listen on %s:%d", cfg.ListenAddress, cfg.ListenPort)
+	log.G(c).Infof("listen on %s:%d", cfg.ListenAddress, cfg.ListenPort)
 
 	if pc := context.String("postgres"); pc != "" {
 		cfg.PostgresConnectionString = pc
@@ -159,7 +187,7 @@ func DefaultAction(context *cli.Context, cfg *proxy.Configuration) error {
 	if r := context.String("registry"); r != "" {
 		cfg.DefaultRegistry = r
 	}
-	log.G(c).Infof("Backend Registry: %s", cfg.DefaultRegistry)
+	log.G(c).Infof("default backend registry: %s", cfg.DefaultRegistry)
 
 	httpServerExitDone := &sync.WaitGroup{}
 	httpServerExitDone.Add(1)

@@ -19,7 +19,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/grpc"
@@ -45,7 +44,7 @@ func main() {
 
 func New() *cli.App {
 	app := cli.NewApp()
-	cfg := grpc.LoadConfig(context.TODO())
+	cfg := grpc.NewConfig()
 
 	app.Name = "starlight-grpc"
 	app.Version = util.Version
@@ -124,12 +123,40 @@ https://github.com/mc256/starlight
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *grpc.Configuration) error {
+func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
+
+	var (
+		p  string
+		ne bool
+	)
+
+	config := context.String("config")
+	cfg, p, ne, err = grpc.LoadConfig(config)
 
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}
 	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+	log.G(c).
+		WithField("version", util.Version).
+		Info("starlight-grpc")
+
+	if err != nil {
+		log.G(c).WithFields(logrus.Fields{
+			"log":  cfg.LogLevel,
+			"path": p,
+			"new":  ne,
+		}).
+			WithError(err).
+			Fatal("failed to load configuration")
+	} else {
+		log.G(c).WithFields(logrus.Fields{
+			"log":  cfg.LogLevel,
+			"path": p,
+			"new":  ne,
+		}).
+			Info("loaded configuration")
+	}
 
 	if id := context.String("id"); id != "" {
 		cfg.ClientId = id
@@ -158,11 +185,6 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) error {
 			}
 		}
 	}
-
-	log.G(c).WithFields(logrus.Fields{
-		"version":   util.Version,
-		"log-level": context.String("log-level"),
-	}).Info("Starlight Snapshotter")
 
 	grpc.NewSnapshotterGrpcService(c, cfg)
 

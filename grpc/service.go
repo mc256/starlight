@@ -62,7 +62,7 @@ func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
 		os.Exit(1)
 		return
 	}
-	log.G(ctx).Info("Snapshotter is ready")
+	log.G(ctx).Info("snapshotter is ready")
 
 	// Register the service with the gRPC server
 	snapshotsapi.RegisterSnapshotsServer(rpc, service)
