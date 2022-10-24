@@ -172,17 +172,31 @@ If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ```
 
 ## Roadmap
-Starlight is not complete. On our roadmap:
+Starlight is not complete. Our roadmap:
 
-- [ ] Scalable database backend
-- [ ] Kubernetes support 
-  - [ ] Starlight Proxy
-    - [x] Helm Chart
-    - [ ] Starlight Proxy authentication
-  - [ ] Starlight Snapshotter Plugin for kubelet containerd
-  - [ ] Starlight Optimizer CRDs for customized joint optimization
-- [ ] OCI container registry support
-  - [x] Goharbor support
-  - [ ] Multiple platforms image support 
-  - [ ] Jointly optimizing multiple containers deployments
-  - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS.
+
+| Version                                                     | Scheduled Release |
+|-------------------------------------------------------------|-------------------|
+| [v0.2.0](https://github.com/mc256/starlight/tree/v2_master) | 2022-11-01        |
+| v0.3.0                                                      | 2022-12-01        |
+| v0.4.0                                                      | 2023-01-01        |
+
+
+- [x] Scalable database backend (v0.2)
+  - [x] Postgres Database Schema (v0.2)
+  - [x] Starlight Proxy Server (v0.2)
+- [ ] Kubernetes support (v0.3)
+  - [x] Starlight Proxy (v0.2)
+    - [x] Helm Chart (v0.2)
+    - [x] Starlight Proxy authentication (v0.2)
+  - [ ] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
+  - [ ] Kubernetes CRD for more flexible container image pulling strategies in challenging network condition (v0.3)
+    - [ ] Sidecar container/DaemonSet for container image pulling (v0.3)
+    - [ ] Speed up multi-container image pulling (v0.4)
+- [ ] OCI container registry support (v0.3)
+  - [x] Goharbor support (v0.2)
+  - [x] Multiple platforms image support (v0.2) 
+  - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.3)
+  - [ ] Jointly optimizing multiple containers deployments (v0.4)
+  - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.4)
+  
