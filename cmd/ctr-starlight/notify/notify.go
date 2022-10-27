@@ -10,7 +10,7 @@ import (
 	"errors"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/grpc"
+	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -56,7 +56,7 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 		"protocol": protocol,
 	}).Info("notify starlight proxy server")
 
-	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
+	proxy := proxy.NewStarlightProxy(ctx, protocol, c.String("server"))
 	if err = proxy.Notify(reference); err != nil {
 		log.G(ctx).WithError(err).Error("failed to notify starlight proxy server")
 		return nil

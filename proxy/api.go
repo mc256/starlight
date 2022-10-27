@@ -16,7 +16,7 @@
    file created by maverick in 2021
 */
 
-package grpc
+package proxy
 
 import (
 	"bytes"
@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -69,7 +69,7 @@ func (a *StarlightProxy) Ping() error {
 	response, err := ioutil.ReadAll(resp.Body)
 	version := resp.Header.Get("Starlight-Version")
 
-	var r proxy.ApiResponse
+	var r ApiResponse
 	if err = json.Unmarshal(response, &r); err != nil {
 		log.G(a.ctx).WithFields(logrus.Fields{
 			"code":     fmt.Sprintf("%d", resp.StatusCode),
@@ -139,6 +139,10 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 	return nil
 }
 
+func (a *StarlightProxy) DeltaImage(from, to, platform string) (reader io.ReadCloser, err error) {
+	return
+}
+
 func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
 
 	u := url.URL{
@@ -180,6 +184,10 @@ func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
 		"response": strings.TrimSpace(string(response)),
 	}).Info("server prepared")
 	return nil
+}
+
+func (a *StarlightProxy) SetAuth(username, password string) {
+	a.auth = *url.UserPassword(username, password)
 }
 
 func NewStarlightProxy(ctx context.Context, protocol, server string) *StarlightProxy {

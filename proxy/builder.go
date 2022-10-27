@@ -500,7 +500,7 @@ func (b *Builder) computeDelta() error {
 	return nil
 }
 
-func NewBuilder(server *Server, src, dst string) (builder *Builder, err error) {
+func NewBuilder(server *Server, src, dst, plt string) (builder *Builder, err error) {
 	builder = &Builder{
 		server: server,
 	}

@@ -123,13 +123,13 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 
 	switch action {
 	case "delta-image":
-		f, t := q.Get("from"), q.Get("to")
+		f, t, plt := q.Get("from"), q.Get("to"), q.Get("platform")
 		if t == "" {
 			a.error(w, req, "missing parameters")
 			return
 		}
 
-		b, err := NewBuilder(a, f, t)
+		b, err := NewBuilder(a, f, t, plt)
 		if err != nil {
 			a.error(w, req, err.Error())
 			return

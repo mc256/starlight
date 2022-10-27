@@ -207,11 +207,11 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*util
 	return nil
 }
 
-func (d *Database) GetImage(image, identifier string) (serial int64, err error) {
+func (d *Database) GetImage(image, identifier, platform string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
 		SELECT "imageId" FROM starlight.starlight.tag
-		WHERE name=$1 AND tag=$2 LIMIT 1`,
-		image, identifier).Scan(&serial); err != nil && err != sql.ErrNoRows {
+		WHERE name=$1 AND tag=$2 AND platform=$3 LIMIT 1`,
+		image, identifier, platform).Scan(&serial); err != nil && err != sql.ErrNoRows {
 		return 0, err
 	} else if err == nil {
 		return serial, nil

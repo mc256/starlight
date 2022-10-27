@@ -21,7 +21,7 @@ package main
 import (
 	"fmt"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/grpc"
+	"github.com/mc256/starlight/client"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -37,18 +37,18 @@ func init() {
 func main() {
 	app := New()
 	if err := app.Run(os.Args); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "starlight-grpc: \n%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "starlight-daemon: \n%v\n", err)
 		os.Exit(1)
 	}
 }
 
 func New() *cli.App {
 	app := cli.NewApp()
-	cfg := grpc.NewConfig()
+	cfg := client.NewConfig()
 
-	app.Name = "starlight-grpc"
+	app.Name = "starlight-daemon"
 	app.Version = util.Version
-	app.Usage = `gRPC snapshotter plugin for faster container-based application deployment. 
+	app.Usage = `Daemon for faster container-based application deployment. 
 
 This is a plugin that can be used with containerd to accelerate container-based application deployments.
 To enable the plugin, please add plugin configurations to containerd config.toml. You can also verify the plugin status by
@@ -62,9 +62,9 @@ https://github.com/mc256/starlight
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:        "config",
-			DefaultText: "/etc/starlight/snapshotter_config.json",
+			DefaultText: "/etc/starlight/daemon_config.json",
 			Aliases:     []string{"c"},
-			EnvVars:     []string{"STARLIGHT_GRPC_CONFIG"},
+			EnvVars:     []string{"STARLIGHT_DAEMON_CONFIG"},
 			Usage:       "json configuration file. CLI parameter will override values in the config file if specified",
 			Required:    false,
 		},
@@ -123,7 +123,7 @@ https://github.com/mc256/starlight
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
+func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) {
 
 	var (
 		p  string
@@ -131,7 +131,7 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
 	)
 
 	config := context.String("config")
-	cfg, p, ne, err = grpc.LoadConfig(config)
+	cfg, p, ne, err = client.LoadConfig(config)
 
 	if l := context.String("log-level"); l != "" {
 		cfg.LogLevel = l
@@ -139,7 +139,7 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
 	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
 	log.G(c).
 		WithField("version", util.Version).
-		Info("starlight-grpc")
+		Info("starlight-daemon")
 
 	if err != nil {
 		log.G(c).WithFields(logrus.Fields{
@@ -176,7 +176,7 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
 	parr := context.StringSlice("proxy")
 	if len(parr) != 0 {
 		for _, v := range parr {
-			if k, vv, err := grpc.ParseProxyStrings(v); err != nil {
+			if k, vv, err := client.ParseProxyStrings(v); err != nil {
 				log.G(c).
 					WithError(err).
 					Error("failed to parse proxy flag")
@@ -186,7 +186,9 @@ func DefaultAction(context *cli.Context, cfg *grpc.Configuration) (err error) {
 		}
 	}
 
-	grpc.NewSnapshotterGrpcService(c, cfg)
+	//client.NewSnapshotterGrpcService(c, cfg)
 
+	wait := make(chan interface{})
+	<-wait
 	return nil
 }

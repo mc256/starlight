@@ -8,7 +8,7 @@ package auth
 import "github.com/urfave/cli/v2"
 
 var (
-	Flags = []cli.Flag{
+	CLIFlags = []cli.Flag{
 		&cli.StringFlag{
 			Name:     "server",
 			Aliases:  []string{"starlight-proxy"},
@@ -23,7 +23,6 @@ var (
 			Usage:    "use plain http connects to the remote server",
 			Required: false,
 		},
-
 		&cli.StringFlag{
 			Name:    "username",
 			Aliases: []string{"u"},
@@ -36,6 +35,14 @@ var (
 			Aliases: []string{"p"},
 			Usage:   "password for Starlight Proxy authentication",
 			EnvVars: []string{"STARLIGHT_PASSWORD"},
+		},
+	}
+	DaemonFlag = []cli.Flag{
+		&cli.StringFlag{
+			Name:    "config-name",
+			Aliases: []string{"cn"},
+			Value:   "default",
+			Usage:   "the name of the config file in /etc/starlight/",
 		},
 	}
 )

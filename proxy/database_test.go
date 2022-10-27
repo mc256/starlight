@@ -15,7 +15,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	cfg := LoadConfig()
+	cfg, _, _, _ := LoadConfig("")
 	var err error
 	db, err = NewDatabase(cfg.PostgresConnectionString)
 	if err != nil {

@@ -23,9 +23,7 @@ import (
 	"os"
 
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
-	cmdCreate "github.com/mc256/starlight/cmd/ctr-starlight/create"
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
-	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
 
 	"github.com/mc256/starlight/util"
@@ -84,8 +82,6 @@ func NewApp() *cli.App {
 	}
 	app.Commands = append([]*cli.Command{
 		util.VersionCommand(),
-		cmdPull.Command(),
-		cmdCreate.Command(),
 		cmdReport.Command(),
 		cmdConvert.Command(),
 		cmdNotify.Command(),

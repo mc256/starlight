@@ -3,7 +3,7 @@
 
 */
 
-package grpc
+package proxy
 
 import (
 	"context"

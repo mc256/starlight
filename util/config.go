@@ -33,6 +33,9 @@ const (
 	SnapshotterLabel  = "containerd.io/gc.ref.snapshot.starlight"
 	ContainerdGCLabel = "containerd.io/gc.root"
 
+	ImagePullerLabel    = "puller.containerd.io"
+	StarlightProxyLabel = "proxy.starlight.mc256.dev"
+
 	ImageMediaType  = "application/vnd.mc256.starlight.toc.json"
 	UserRwLayerText = "containerd.io/layer/user-rw-layer"
 

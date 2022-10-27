@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/fs"
-	"github.com/mc256/starlight/grpc"
+	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -57,7 +57,7 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 		"protocol": protocol,
 	}).Info("uploading data to starlight proxy server")
 
-	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
+	p := proxy.NewStarlightProxy(ctx, protocol, c.String("server"))
 
 	/*
 		if err = proxy.Report(ref, tc.ToJSONBuffer()); err != nil {
@@ -65,7 +65,7 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 		}
 	*/
 
-	fmt.Println(proxy, tc)
+	fmt.Println(p, tc)
 
 	return nil
 }

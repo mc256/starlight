@@ -19,5 +19,5 @@ var (
 			DefaultText: "/tmp",
 			Required:    false,
 		},
-	}, auth.Flags...)
+	}, auth.CLIFlags...)
 )

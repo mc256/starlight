@@ -3,7 +3,7 @@
 
 */
 
-package grpc
+package client
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package grpc
+package client
 
 import (
 	"encoding/json"
@@ -29,7 +29,9 @@ type Configuration struct {
 	Metadata string `json:"metadata"`
 
 	// socket address
-	Socket string `json:"socket"`
+	Socket     string `json:"socket"`
+	Containerd string `json:"containerd"`
+	Namespace  string `json:"default_namespace"`
 
 	// registry + proxy
 	DefaultProxy   string `json:"default_proxy"`
@@ -39,6 +41,9 @@ type Configuration struct {
 }
 
 func (c *Configuration) getProxy(name string) *ProxyConfig {
+	if name == "" {
+		name = c.DefaultProxy
+	}
 	if p, has := c.Proxies[name]; has {
 		return p
 	}
@@ -119,10 +124,12 @@ func NewConfig() *Configuration {
 	uuid.EnableRandPool()
 	return &Configuration{
 		LogLevel:       "debug",
-		Metadata:       "/var/lib/starlight-grpc/metadata.db",
-		Socket:         "/run/starlight-grpc/starlight-snapshotter.socket",
+		Metadata:       "/var/lib/starlight/metadata.db",
+		Socket:         "/run/starlight/starlight-daemon.sock",
+		Containerd:     "/run/containerd/containerd.sock",
 		DefaultProxy:   "starlight-shared",
-		FileSystemRoot: "/var/lib/starlight-grpc",
+		FileSystemRoot: "/var/lib/starlight",
+		Namespace:      "default",
 		ClientId:       uuid.New().String(),
 
 		Proxies: map[string]*ProxyConfig{

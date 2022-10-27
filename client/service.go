@@ -16,7 +16,7 @@
    file created by maverick in 2021
 */
 
-package grpc
+package client
 
 import (
 	"context"

@@ -11,6 +11,6 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	cfg := LoadConfig()
+	cfg, _, _, _ := LoadConfig("")
 	fmt.Println(cfg)
 }

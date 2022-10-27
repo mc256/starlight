@@ -30,9 +30,9 @@ import (
 	"testing"
 )
 
-func InitDatabase() (context.Context, *ProxyConfiguration, *Server) {
+func InitDatabase() (context.Context, *Configuration, *Server) {
 	ctx := context.Background()
-	cfg := LoadConfig()
+	cfg, _, _, _ := LoadConfig("")
 	server := &Server{
 		ctx: ctx,
 		Server: http.Server{

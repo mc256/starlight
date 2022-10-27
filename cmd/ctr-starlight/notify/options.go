@@ -10,5 +10,5 @@ import (
 )
 
 var (
-	Flags = auth.Flags
+	Flags = auth.CLIFlags
 )
