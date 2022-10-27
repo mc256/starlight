@@ -15,7 +15,7 @@ import (
 
 func TestNewExtractor(t *testing.T) {
 	ctx := context.Background()
-	cfg := LoadConfig(context.Background())
+	cfg, _, _, _ := LoadConfig("")
 	server := &Server{
 		ctx: ctx,
 		Server: http.Server{
@@ -33,7 +33,7 @@ func TestNewExtractor(t *testing.T) {
 
 func TestExtractor_SaveToC(t *testing.T) {
 	ctx := context.Background()
-	cfg := LoadConfig(context.Background())
+	cfg, _, _, _ := LoadConfig("")
 	server := &Server{
 		ctx: ctx,
 		Server: http.Server{

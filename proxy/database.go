@@ -219,8 +219,18 @@ func (d *Database) GetImage(image, identifier, platform string) (serial int64, e
 
 	if err = d.db.QueryRow(`
 		SELECT id FROM starlight.starlight.image
-		WHERE ready IS NOT NULL AND image=$1 AND hash='sha256:'||$2 LIMIT 1`,
+		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
 		image, identifier).Scan(&serial); err != nil {
+		return 0, err
+	}
+	return serial, nil
+}
+
+func (d *Database) GetImageByDigest(image, digest string) (serial int64, err error) {
+	if err = d.db.QueryRow(`
+		SELECT id FROM starlight.starlight.image
+		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
+		image, digest).Scan(&serial); err != nil {
 		return 0, err
 	}
 	return serial, nil

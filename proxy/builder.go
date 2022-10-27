@@ -21,6 +21,7 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
@@ -146,6 +147,8 @@ type Builder struct {
 
 	// requestedFiles is the ToC with reference to the file content
 	RequestedFiles []*RankedFile
+
+	unavailableLayers, availableLayers []*ImageLayer
 }
 
 func (b *Builder) String() string {
@@ -297,9 +300,12 @@ func (b *Builder) fetchLayers(cache *ImageLayer) error {
 	return nil
 }
 
-func (b *Builder) getImage(imageStr string) (img *Image, err error) {
+// getImage returns the image with the given reference and the platform.
+// if you need to find out the available image, you should better use getImageByDigest which returns
+// the exact image that is available as tags might be changed but the digest will not change.
+func (b *Builder) getImage(ref, platform string) (img *Image, err error) {
 	img = &Image{}
-	img.ref, err = name.ParseReference(imageStr,
+	img.ref, err = name.ParseReference(ref,
 		name.WithDefaultRegistry(b.server.config.DefaultRegistry),
 		name.WithDefaultTag("latest-starlight"),
 	)
@@ -307,7 +313,36 @@ func (b *Builder) getImage(imageStr string) (img *Image, err error) {
 		return nil, err
 	}
 	refName, refTag := ParseImageReference(img.ref, b.server.config.DefaultRegistry)
-	img.Serial, err = b.server.db.GetImage(refName, refTag)
+	img.Serial, err = b.server.db.GetImage(refName, refTag, platform)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load necessary layers
+	img.Layers, err = b.server.db.GetLayers(img.Serial)
+	if err != nil {
+		return nil, err
+	}
+	for _, layer := range img.Layers {
+		d := fmt.Sprintf("%s@%s", img.ref.Name(), layer.Hash)
+		layer.digest, err = name.NewDigest(d)
+	}
+
+	return img, nil
+}
+
+// getImageByDigest returns a more precise image reference by using digest (not tag)
+func (b Builder) getImageByDigest(refWithDigest string) (img *Image, err error) {
+	img = &Image{}
+	img.ref, err = name.ParseReference(refWithDigest,
+		name.WithDefaultRegistry(b.server.config.DefaultRegistry),
+		name.WithDefaultTag("latest-starlight"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	refName, refTag := ParseImageReference(img.ref, b.server.config.DefaultRegistry)
+	img.Serial, err = b.server.db.GetImageByDigest(refName, refTag)
 	if err != nil {
 		return nil, err
 	}
@@ -500,66 +535,84 @@ func (b *Builder) computeDelta() error {
 	return nil
 }
 
-func NewBuilder(server *Server, src, dst, plt string) (builder *Builder, err error) {
-	builder = &Builder{
-		server: server,
-	}
-
-	// Build
-	if src != "" {
-		if builder.Source, err = builder.getImage(src); err != nil {
-			return nil, errors.Wrapf(err, "failed to obtain src image")
-		}
-	}
-
-	if builder.Destination, err = builder.getImage(dst); err != nil {
-		return nil, errors.Wrapf(err, "failed to obtain dst image")
-	}
-
-	var unavailableLayers, availableLayers []*ImageLayer
-	if builder.Source != nil {
-		availableLayers = builder.Source.Layers
-		unavailableLayers, err = builder.getUnavailableLayers()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		availableLayers = []*ImageLayer{}
-		unavailableLayers = builder.Destination.Layers
-	}
-
-	for _, a := range availableLayers {
-		a.available = true
-	}
-	for _, u := range unavailableLayers {
-		u.available = false
-	}
-
+func (b *Builder) Load() error {
 	// Load compressed layers from registry
 	var errGrp errgroup.Group
-	for _, layer := range unavailableLayers {
+	for _, layer := range b.unavailableLayers {
 		layer := layer
 		errGrp.Go(func() error {
-			return builder.fetchLayers(layer)
+			return b.fetchLayers(layer)
 		})
 	}
 
+	// Load manifest and config from proxy's database
 	errGrp.Go(func() error {
-		if c, m, err := builder.getManifestAndConfig(builder.Destination.Serial); err != nil {
+		if c, m, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
 			return err
 		} else {
-			builder.config = c
-			builder.manifest = m
+			b.config = c
+			b.manifest = m
 			return nil
 		}
 	})
 
-	errGrp.Go(builder.computeDelta)
+	// Computer the difference between the requested and existing files
+	errGrp.Go(b.computeDelta)
 
 	// Wait for all jobs to end
 	if err := errGrp.Wait(); err != nil {
-		return nil, errors.Wrapf(err, "failed to load all compressed layer")
+		return errors.Wrapf(err, "failed to load all compressed layer")
 	}
 
-	return builder, nil
+	return nil
+}
+
+func NewBuilder(server *Server, src, dst, plt string) (b *Builder, err error) {
+	b = &Builder{
+		server: server,
+	}
+
+	// Available Image:
+	// It must be specified by the unique hash of the image, we don't want to refercing something that is
+	// unknown (for security reasons). Therefore, platform is not required.
+	if src != "" {
+		if b.Source, err = b.getImageByDigest(src); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("source image %s not found", src)
+			} else {
+				return nil, errors.Wrapf(err, "failed to get source image")
+			}
+		}
+	}
+
+	// Requested Image:
+	// requires image name tag as well as the platform to be specified
+	// you could not download an image index for that because only one platform is needed to run the container
+	if b.Destination, err = b.getImage(dst, plt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("requested image %s not found", dst)
+		} else {
+			return nil, errors.Wrapf(err, "failed to obtain requested image")
+		}
+	}
+
+	if b.Source != nil {
+		b.availableLayers = b.Source.Layers
+		b.unavailableLayers, err = b.getUnavailableLayers()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		b.availableLayers = []*ImageLayer{}
+		b.unavailableLayers = b.Destination.Layers
+	}
+
+	for _, a := range b.availableLayers {
+		a.available = true
+	}
+	for _, u := range b.unavailableLayers {
+		u.available = false
+	}
+
+	return b, nil
 }

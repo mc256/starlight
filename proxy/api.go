@@ -140,6 +140,16 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 }
 
 func (a *StarlightProxy) DeltaImage(from, to, platform string) (reader io.ReadCloser, err error) {
+	u := url.URL{
+		Scheme: a.protocol,
+		Host:   a.serverAddress,
+		Path:   path.Join("starlight"),
+	}
+	q := u.Query()
+	q.Set("from", from)
+	q.Set("to", to)
+	q.Set("platform", platform)
+
 	return
 }
 

@@ -16,7 +16,7 @@ import (
 func TestNewLayerCache(t *testing.T) {
 
 	ctx := context.Background()
-	cfg := LoadConfig()
+	cfg, _, _, _ := LoadConfig("")
 	server := &Server{
 		ctx: ctx,
 		Server: http.Server{
