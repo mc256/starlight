@@ -236,14 +236,14 @@ func (d *Database) GetImageByDigest(image, digest string) (serial int64, err err
 	return serial, nil
 }
 
-func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, err error) {
+func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, digest string, err error) {
 	if err = d.db.QueryRow(`
-		SELECT config, manifest FROM starlight.starlight.image
+		SELECT config, manifest, hash FROM starlight.starlight.image
 		WHERE id=$1 LIMIT 1`,
-		serial).Scan(&config, &manifest); err != nil {
-		return nil, nil, err
+		serial).Scan(&config, &manifest, &digest); err != nil {
+		return nil, nil, "", err
 	}
-	return config, manifest, nil
+	return config, manifest, digest, nil
 }
 
 func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {

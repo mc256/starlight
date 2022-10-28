@@ -40,14 +40,14 @@ type Configuration struct {
 	Proxies map[string]*ProxyConfig `json:"configs"`
 }
 
-func (c *Configuration) getProxy(name string) *ProxyConfig {
+func (c *Configuration) getProxy(name string) (pc *ProxyConfig, key string) {
 	if name == "" {
 		name = c.DefaultProxy
 	}
 	if p, has := c.Proxies[name]; has {
-		return p
+		return p, name
 	}
-	return nil
+	panic(fmt.Sprintf("proxy config '%s' not found", name))
 }
 
 func ParseProxyStrings(v string) (name string, c *ProxyConfig, err error) {

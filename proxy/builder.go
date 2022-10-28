@@ -140,6 +140,7 @@ type Builder struct {
 	Destination *Image `json:"d"`
 
 	manifest, config []byte
+	manifestDigest   string
 
 	// contents and contentLength are computed by Builder.computeDelta()
 	Contents      []*Content `json:"c"`
@@ -225,6 +226,7 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
 	header.Set("Manifest-Size", fmt.Sprintf("%d", manifestSize))
 	header.Set("Config-Size", fmt.Sprintf("%d", configSize))
+	header.Set("Digest", b.manifestDigest)
 	header.Set("Starlight-Version", util.Version)
 	header.Set("Content-Disposition", `attachment; filename="starlight.tgz"`)
 	w.WriteHeader(http.StatusOK)
@@ -332,6 +334,7 @@ func (b *Builder) getImage(ref, platform string) (img *Image, err error) {
 }
 
 // getImageByDigest returns a more precise image reference by using digest (not tag)
+// this guarantees that the image is the exact image that is available on the client side.
 func (b Builder) getImageByDigest(refWithDigest string) (img *Image, err error) {
 	img = &Image{}
 	img.ref, err = name.ParseReference(refWithDigest,
@@ -360,7 +363,9 @@ func (b Builder) getImageByDigest(refWithDigest string) (img *Image, err error) 
 	return img, nil
 }
 
-func (b Builder) getManifestAndConfig(serial int64) (config, manifest []byte, err error) {
+// getManifestAndConfig returns the manifest and config of the image by its serial number.
+// This is important for creating an valid container image on the client side.
+func (b Builder) getManifestAndConfig(serial int64) (config, manifest []byte, digest string, err error) {
 	return b.server.db.GetManifestAndConfig(serial)
 }
 
@@ -433,7 +438,8 @@ func (b *Builder) computeDelta() error {
 		WithField("unique", len(deduplicatedExistingFiles)).
 		WithField("total", len(existingFiles)).
 		WithField("builder", b).
-		Info("step 1 find existing file contents")
+		WithField("_step", 1).
+		Info("find existing file contents")
 
 	// 2. compute the set of requested files from non-existing layers
 	b.RequestedFiles, err = b.server.db.GetFilesWithRanks(b.Destination.Serial)
@@ -466,7 +472,8 @@ func (b *Builder) computeDelta() error {
 		WithField("unique", len(deduplicatedRequestedContents)).
 		WithField("total", len(b.RequestedFiles)).
 		WithField("builder", b).
-		Info("step 2 find requested file contents")
+		WithField("_step", 2).
+		Info("find requested file contents")
 
 	// 3. identify the best reference to the file content
 	b.Contents = make([]*Content, 0)
@@ -530,7 +537,8 @@ func (b *Builder) computeDelta() error {
 		WithField("content", len(b.Contents)).
 		WithField("builder", b).
 		WithField("compressedSize", b.contentLength).
-		Info("step 3 identify the best reference to the file content")
+		WithField("_step", 3).
+		Info("find the best file content references")
 
 	return nil
 }
@@ -547,11 +555,12 @@ func (b *Builder) Load() error {
 
 	// Load manifest and config from proxy's database
 	errGrp.Go(func() error {
-		if c, m, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
+		if c, m, digest, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
 			return err
 		} else {
 			b.config = c
 			b.manifest = m
+			b.manifestDigest = digest
 			return nil
 		}
 	})

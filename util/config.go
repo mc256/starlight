@@ -33,8 +33,9 @@ const (
 	SnapshotterLabel  = "containerd.io/gc.ref.snapshot.starlight"
 	ContainerdGCLabel = "containerd.io/gc.root"
 
-	ImagePullerLabel    = "puller.containerd.io"
-	StarlightProxyLabel = "proxy.starlight.mc256.dev"
+	ImagePullerLabel        = "puller.containerd.io"
+	StarlightProxyMediaType = "mediaType.starlight.mc256.dev"
+	StarlightProxyLabel     = "proxy.starlight.mc256.dev"
 
 	ImageMediaType  = "application/vnd.mc256.starlight.toc.json"
 	UserRwLayerText = "containerd.io/layer/user-rw-layer"
@@ -46,6 +47,8 @@ const (
 	production = false
 
 	ProjectIdentifier = "module github.com/mc256/starlight"
+
+	MediaTypeManifestV2 = "application/vnd.docker.distribution.manifest.v2+json"
 )
 
 // FindProjectRoot returns the root directory of the Git project if exists.

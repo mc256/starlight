@@ -52,7 +52,7 @@ func TestDatabase_GetImageByDigest(t *testing.T) {
 		server: server,
 	}
 
-	i, err := b.getImageByDigest("public/redis@sha256:85d9e600f0b05e086219964af6e5038626ef816160ada234fe820331f26d34d2")
+	i, err := b.getImageByDigest("starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
 	if err != nil {
 		t.Error(err)
 	}
@@ -65,7 +65,7 @@ func TestDatabase_GetImage(t *testing.T) {
 		server: server,
 	}
 
-	i, err := b.getImage("public/redis@sha256:85d9e600f0b05e086219964af6e5038626ef816160ada234fe820331f26d34d2", "s390x")
+	i, err := b.getImage("starlight/redis:7.0.5", "linux/amd64")
 	if err != nil {
 		t.Error(err)
 	}
@@ -76,7 +76,10 @@ func TestNewBuilder(t *testing.T) {
 	//ctx, cfg, server := InitDatabase()
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb@sha256:35a01e19bf90bf187278c49e5efa04e89fc03a6f5ce5ce9245eb3d98bbc6d895", "linux/amd64")
+	b, err := NewBuilder(server,
+		"starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965",
+		"starlight/redis:7.0.5",
+		"linux/amd64")
 	if err != nil {
 		t.Error(err)
 	}
@@ -87,7 +90,10 @@ func TestNewBuilder(t *testing.T) {
 func TestNewBuilder2(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a", "linux/amd64")
+	b, err := NewBuilder(server,
+		"starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838",
+		"starlight/redis:7.0.5",
+		"linux/amd64")
 	if err != nil {
 		t.Error(err)
 	}
@@ -98,9 +104,17 @@ func TestNewBuilder2(t *testing.T) {
 func TestNewBuilder3(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "", "public/mariadb:10.9.2a", "linux/amd64")
+	b, err := NewBuilder(server,
+		"",
+		"starlight/redis:7.0.5",
+		"linux/amd64")
 	if err != nil {
 		t.Error(err)
+		return
+	}
+	if err = b.Load(); err != nil {
+		t.Error(err)
+		return
 	}
 
 	fmt.Println(b)
@@ -109,9 +123,14 @@ func TestNewBuilder3(t *testing.T) {
 func TestBuilder_WriteHeader(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a", "linux/amd64")
+	b, err := NewBuilder(server, "starlight/mariadb:10.8.4", "starlight/mariadb:10.9.2", "linux/amd64")
 	if err != nil {
 		t.Error(err)
+	}
+
+	if err = b.Load(); err != nil {
+		t.Error(err)
+		return
 	}
 
 	fmt.Println(b)
@@ -127,9 +146,14 @@ func TestBuilder_WriteHeader(t *testing.T) {
 func TestBuilder_WriteBody(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "public/mariadb:10.8.4d", "public/mariadb:10.9.2a", "linux/amd64")
+	b, err := NewBuilder(server, "starlight/mariadb:10.8.4", "starlight/mariadb:10.9.2", "linux/amd64")
 	if err != nil {
 		t.Error(err)
+	}
+
+	if err = b.Load(); err != nil {
+		t.Error(err)
+		return
 	}
 
 	fmt.Println(b)

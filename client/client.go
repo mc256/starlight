@@ -6,13 +6,24 @@
 package client
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
+	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
 	"strings"
+	"time"
 )
 
 type Client struct {
@@ -32,6 +43,10 @@ func getImageFilter(ref string) string {
 		escapeSlashes(ref),
 		util.ImagePullerLabel, "starlight",
 	)
+}
+
+func getDistributionSource(cfg string) string {
+	return fmt.Sprintf("starlight.mc256.dev/distribution.source.%s", cfg)
 }
 
 func (c *Client) findImage(filter string) (img containerd.Image, err error) {
@@ -83,6 +98,93 @@ func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err erro
 	return img, nil
 }
 
+func (c *Client) readBody(body io.ReadCloser, s int64) (*bytes.Buffer, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, s))
+	m, err := io.CopyN(buf, body, s)
+	if err != nil {
+		return nil, err
+	}
+	if m != s {
+		return nil, fmt.Errorf("failed to read body, expected %d bytes, got %d", s, m)
+	}
+	return buf, nil
+}
+
+func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []byte, err error) {
+	// decompress manifest
+	r, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to decompress manifest")
+	}
+	man, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to read manifest")
+	}
+	err = json.Unmarshal(man, &manifest)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to unmarshal manifest")
+	}
+
+	return manifest, man, nil
+}
+
+func (c *Client) storeManifest(cfgName, d, ref string, man []byte) (err error) {
+	pd := digest.Digest(d)
+
+	// create content store
+	cs := c.client.ContentStore()
+
+	err = content.WriteBlob(
+		c.ctx, cs, pd.Hex(), bytes.NewReader(man),
+		v1.Descriptor{Size: int64(len(man)), Digest: pd},
+		content.WithLabels(map[string]string{
+			util.ImagePullerLabel:          "starlight",
+			util.StarlightProxyMediaType:   "manifest",
+			getDistributionSource(cfgName): ref,
+		}))
+	if err != nil {
+		return errors.Wrapf(err, "failed to open writer for manifest")
+	}
+	return nil
+}
+
+func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.ImageConfig, b []byte, err error) {
+	// decompress config
+	r, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to decompress config")
+	}
+	cfg, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to read config")
+	}
+	err = json.Unmarshal(cfg, &config)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to unmarshal config")
+	}
+
+	return config, cfg, nil
+}
+
+func (c *Client) storeConfig(cfgName, ref string, pd digest.Digest, cfg []byte) (err error) {
+
+	// create content store
+	cs := c.client.ContentStore()
+
+	err = content.WriteBlob(
+		c.ctx, cs, pd.Hex(), bytes.NewReader(cfg),
+		v1.Descriptor{Size: int64(len(cfg)), Digest: pd},
+		content.WithLabels(map[string]string{
+			util.ImagePullerLabel:          "starlight",
+			util.StarlightProxyMediaType:   "config",
+			getDistributionSource(cfgName): ref,
+		}))
+	if err != nil {
+		return errors.Wrapf(err, "failed to open writer for config")
+	}
+	return nil
+}
+
 func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, err error) {
 	// check local image
 	reqFilter := getImageFilter(ref)
@@ -94,8 +196,8 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		return nil, fmt.Errorf("requested image %s already exists", ref)
 	}
 
-	// pull image
-	pc := c.cfg.getProxy(proxyCfg)
+	// connect to proxy
+	pc, pcn := c.cfg.getProxy(proxyCfg)
 	p := proxy.NewStarlightProxy(c.ctx, pc.Protocol, pc.Address)
 	if pc.Username != "" {
 		p.SetAuth(pc.Username, pc.Password)
@@ -105,18 +207,78 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if base != nil {
 		baseRef = fmt.Sprintf("%s@%s", base.Name(), base.Target().Digest)
 	}
-	_, err = p.DeltaImage(baseRef, ref, platform)
+
+	// pull image
+	body, mSize, cSize, sSize, md, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %s", ref)
 	}
+	defer body.Close()
 
-	// extract image
+	log.G(c.ctx).
+		WithField("manifest", mSize).
+		WithField("config", cSize).
+		WithField("starlight", sSize).
+		WithField("digest", md).
+		Infof("pulling image %s", ref)
 
-	// write to content store: finished manifest close channel
+	var (
+		buf      *bytes.Buffer
+		man      []byte
+		manifest *v1.Manifest
+		newImg   images.Image
+	)
+
+	// manifest
+	buf, err = c.readBody(body, mSize)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read manifest")
+	}
+	manifest, man, err = c.handleManifest(buf)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to handle manifest")
+	}
+	err = c.storeManifest(pcn, md, ref, man)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to store manifest")
+	}
+
+	// config
+	buf, err = c.readBody(body, cSize)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read config")
+	}
+	_, cFile, err := c.handleConfig(buf)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to handle config")
+	}
+	err = c.storeConfig(pcn, ref, manifest.Config.Digest, cFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to store config")
+	}
 
 	// create image
+	is := c.client.ImageService()
+	newImg, err = is.Create(c.ctx, images.Image{
+		Name: ref,
+		Target: v1.Descriptor{
+			MediaType: util.MediaTypeManifestV2,
+			Digest:    digest.Digest(md),
+			Size:      int64(len(man)),
+		},
+		Labels: map[string]string{
+			util.ImagePullerLabel: "starlight",
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	})
 
-	// continue writing to content store:
+	// send a ready signal
+	close(*ready)
+	// keep going and download layers
+
+	fmt.Println("---------------------")
+	fmt.Println(manifest, newImg, err)
 
 	return
 }
