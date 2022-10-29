@@ -154,7 +154,7 @@ func parseNumber(k, s string) (int64, error) {
 func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	reader io.ReadCloser,
 	manifestSize, configSize, starlightHeaderSize int64,
-	digest string,
+	digest, slDigest string,
 	err error) {
 	u := url.URL{
 		Scheme: a.protocol,
@@ -182,7 +182,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	req.Header.Set("Content-Type", "application/octet-stream")
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return nil, 0, 0, 0, "", err
+		return nil, 0, 0, 0, "", "", err
 	}
 
 	version := resp.Header.Get("Starlight-Version")
@@ -196,7 +196,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 			}).
 			WithError(err).
 			Error("server error")
-		return nil, 0, 0, 0, "", err
+		return nil, 0, 0, 0, "", "", err
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
@@ -209,25 +209,30 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 
 	manifestSize, err = parseNumber("Manifest-Size", resp.Header.Get("Manifest-Size"))
 	if err != nil {
-		return nil, 0, 0, 0, "", err
+		return nil, 0, 0, 0, "", "", err
 	}
 
 	configSize, err = parseNumber("Config-Size", resp.Header.Get("Config-Size"))
 	if err != nil {
-		return nil, 0, 0, 0, "", err
+		return nil, 0, 0, 0, "", "", err
 	}
 
 	starlightHeaderSize, err = parseNumber("Starlight-Header-Size", resp.Header.Get("Starlight-Header-Size"))
 	if err != nil {
-		return nil, 0, 0, 0, "", err
+		return nil, 0, 0, 0, "", "", err
 	}
 
 	digest = resp.Header.Get("Digest")
 	if digest == "" {
-		return nil, 0, 0, 0, "", fmt.Errorf("header Digest not found")
+		return nil, 0, 0, 0, "", "", fmt.Errorf("header Digest not found")
 	}
 
-	return resp.Body, manifestSize, configSize, starlightHeaderSize, digest, nil
+	slDigest = resp.Header.Get("Starlight-Digest")
+	if slDigest == "" {
+		return nil, 0, 0, 0, "", "", fmt.Errorf("header Starlight-Digest not found")
+	}
+
+	return resp.Body, manifestSize, configSize, starlightHeaderSize, digest, slDigest, nil
 }
 
 func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {

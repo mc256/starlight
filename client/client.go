@@ -12,7 +12,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/contrib/snapshotservice"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
@@ -20,8 +22,12 @@ import (
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 	"io"
 	"io/ioutil"
+	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -30,6 +36,9 @@ type Client struct {
 	ctx    context.Context
 	cfg    *Configuration
 	client *containerd.Client
+	server *grpc.Server
+	sn     *Snapshotter
+	cs     content.Store
 }
 
 func escapeSlashes(s string) string {
@@ -132,10 +141,9 @@ func (c *Client) storeManifest(cfgName, d, ref string, man []byte) (err error) {
 	pd := digest.Digest(d)
 
 	// create content store
-	cs := c.client.ContentStore()
 
 	err = content.WriteBlob(
-		c.ctx, cs, pd.Hex(), bytes.NewReader(man),
+		c.ctx, c.cs, pd.Hex(), bytes.NewReader(man),
 		v1.Descriptor{Size: int64(len(man)), Digest: pd},
 		content.WithLabels(map[string]string{
 			util.ImagePullerLabel:          "starlight",
@@ -148,7 +156,7 @@ func (c *Client) storeManifest(cfgName, d, ref string, man []byte) (err error) {
 	return nil
 }
 
-func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.ImageConfig, b []byte, err error) {
+func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.Image, b []byte, err error) {
 	// decompress config
 	r, err := gzip.NewReader(buf)
 	if err != nil {
@@ -167,12 +175,10 @@ func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.ImageConfig, b []by
 }
 
 func (c *Client) storeConfig(cfgName, ref string, pd digest.Digest, cfg []byte) (err error) {
-
 	// create content store
-	cs := c.client.ContentStore()
 
 	err = content.WriteBlob(
-		c.ctx, cs, pd.Hex(), bytes.NewReader(cfg),
+		c.ctx, c.cs, pd.Hex(), bytes.NewReader(cfg),
 		v1.Descriptor{Size: int64(len(cfg)), Digest: pd},
 		content.WithLabels(map[string]string{
 			util.ImagePullerLabel:          "starlight",
@@ -181,6 +187,41 @@ func (c *Client) storeConfig(cfgName, ref string, pd digest.Digest, cfg []byte) 
 		}))
 	if err != nil {
 		return errors.Wrapf(err, "failed to open writer for config")
+	}
+	return nil
+}
+
+func (c *Client) handleStarlightHeader(buf *bytes.Buffer) (header *proxy.Builder, h []byte, err error) {
+	// decompress starlight header
+	r, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to decompress starlight header")
+	}
+	h, err = ioutil.ReadAll(r)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to read starlight header")
+	}
+	err = json.Unmarshal(h, &header)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to unmarshal starlight header")
+	}
+	return header, h, nil
+}
+
+func (c *Client) storeStarlightHeader(cfgName, ref, sld string, h []byte) (err error) {
+	hd := digest.Digest(sld)
+
+	// create content store
+	err = content.WriteBlob(
+		c.ctx, c.cs, hd.Hex(), bytes.NewReader(h),
+		v1.Descriptor{Size: int64(len(h)), Digest: hd},
+		content.WithLabels(map[string]string{
+			util.ImagePullerLabel:          "starlight",
+			util.StarlightProxyMediaType:   "starlight",
+			getDistributionSource(cfgName): ref,
+		}))
+	if err != nil {
+		return errors.Wrapf(err, "failed to open writer for starlight header")
 	}
 	return nil
 }
@@ -209,7 +250,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	}
 
 	// pull image
-	body, mSize, cSize, sSize, md, err := p.DeltaImage(baseRef, ref, platform)
+	body, mSize, cSize, sSize, md, sld, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %s", ref)
 	}
@@ -220,13 +261,18 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		WithField("config", cSize).
 		WithField("starlight", sSize).
 		WithField("digest", md).
+		WithField("sl_digest", sld).
 		Infof("pulling image %s", ref)
 
 	var (
-		buf      *bytes.Buffer
-		man      []byte
+		buf *bytes.Buffer
+
+		man, con []byte
+
 		manifest *v1.Manifest
-		newImg   images.Image
+		config   *v1.Image
+
+		newImg images.Image
 	)
 
 	// manifest
@@ -248,13 +294,27 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read config")
 	}
-	_, cFile, err := c.handleConfig(buf)
+	config, con, err = c.handleConfig(buf)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to handle config")
 	}
-	err = c.storeConfig(pcn, ref, manifest.Config.Digest, cFile)
+	err = c.storeConfig(pcn, ref, manifest.Config.Digest, con)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to store config")
+	}
+
+	// starlight header
+	buf, err = c.readBody(body, sSize)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read starlight header")
+	}
+	star, sta, err := c.handleStarlightHeader(buf)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to handle starlight header")
+	}
+	err = c.storeStarlightHeader(pcn, ref, sld, sta)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to store starlight header")
 	}
 
 	// create image
@@ -278,19 +338,76 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// keep going and download layers
 
 	fmt.Println("---------------------")
-	fmt.Println(manifest, newImg, err)
+	//fmt.Println(newImg, err)
+
+	// Extract layers
+	for idx, _ := range manifest.Layers {
+		fmt.Println(idx, manifest.Layers[idx].Digest.String(), config.RootFS.DiffIDs[idx].String())
+	}
+	_ = star
+	_ = newImg
+	_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
+
+	// content:
+	// use the content store
+
+	// snapshot:
+	// use diff ids in the config
 
 	return
 }
 
 func (c *Client) Close() {
 	_ = c.client.Close()
+	if c.server != nil {
+		c.server.Stop()
+	}
+	os.Exit(1)
+}
+
+func (c *Client) StartSnapshotterService() {
+	// snapshotter plugin
+	rpc := grpc.NewServer()
+	svc := snapshotservice.FromSnapshotter(c.sn)
+	if err := os.MkdirAll(filepath.Dir(c.cfg.Socket), 0700); err != nil {
+		log.G(c.ctx).WithError(err).Fatalf("failed to create directory %q for socket\n", filepath.Dir(c.cfg.Socket))
+		os.Exit(1)
+		return
+	}
+
+	// Try to remove the socket file to avoid EADDRINUSE
+	if err := os.RemoveAll(c.cfg.Socket); err != nil {
+		log.G(c.ctx).WithError(err).Fatalf("failed to remove %q\n", c.cfg.Socket)
+		os.Exit(1)
+		return
+	}
+	snapshotsapi.RegisterSnapshotsServer(rpc, svc)
+
+	// Listen and serve
+	l, err := net.Listen("unix", c.cfg.Socket)
+	if err != nil {
+		log.G(c.ctx).WithError(err).Fatal("unix listen")
+		os.Exit(1)
+		return
+	}
+	log.G(c.ctx).
+		WithField("addr", c.cfg.Socket).
+		Info("starlight snapshotter service started")
+
+	if err := rpc.Serve(l); err != nil {
+		log.G(c.ctx).WithError(err).Fatal("rpc serve")
+		os.Exit(1)
+		return
+	}
 }
 
 func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 	c = &Client{
-		ctx: ctx,
-		cfg: cfg,
+		ctx:    ctx,
+		cfg:    cfg,
+		client: nil,
+		server: nil,
+		sn:     NewSnapshotter(),
 	}
 
 	// containerd client
@@ -299,8 +416,7 @@ func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 		return nil, err
 	}
 
-	// starlight proxy api
-	c.client.ContentStore()
+	c.cs = c.client.ContentStore()
 
 	return c, nil
 }

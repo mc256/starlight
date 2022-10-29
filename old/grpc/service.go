@@ -16,13 +16,14 @@
    file created by maverick in 2021
 */
 
-package client
+package grpc
 
 import (
 	"context"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/contrib/snapshotservice"
 	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/client"
 	"google.golang.org/grpc"
 	"net"
 	"os"
@@ -31,7 +32,7 @@ import (
 	"syscall"
 )
 
-func NewSnapshotterGrpcService(ctx context.Context, cfg *Configuration) {
+func NewSnapshotterGrpcService(ctx context.Context, cfg *client.Configuration) {
 	// Create a gRPC server
 	rpc := grpc.NewServer()
 

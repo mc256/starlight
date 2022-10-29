@@ -16,11 +16,12 @@
    file created by maverick in 2021
 */
 
-package client
+package grpc
 
 import (
 	"context"
 	"fmt"
+	"github.com/mc256/starlight/client"
 	"io/ioutil"
 	"os"
 	"path"
@@ -54,13 +55,13 @@ type snapshotter struct {
 	fsMap   map[string]*starlightfs.FsInstance
 	fsTrace bool
 
-	cfg              *Configuration
-	proxyConnections map[string]*ProxyConfig
+	cfg              *client.Configuration
+	proxyConnections map[string]*client.ProxyConfig
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
 // file system. A metadata file is stored under the root.
-func NewSnapshotter(ctx context.Context, cfg *Configuration) (snapshots.Snapshotter, error) {
+func NewSnapshotter(ctx context.Context, cfg *client.Configuration) (snapshots.Snapshotter, error) {
 	if err := os.MkdirAll(cfg.FileSystemRoot, 0700); err != nil {
 		return nil, err
 	}

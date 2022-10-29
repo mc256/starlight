@@ -18,7 +18,11 @@
 
 package util
 
-import "io"
+import (
+	"crypto/sha256"
+	"hash"
+	"io"
+)
 
 type CountWriter struct {
 	w     io.Writer
@@ -39,6 +43,35 @@ func NewCountWriter(w io.Writer) (cw *CountWriter) {
 	cw = &CountWriter{
 		w:     w,
 		count: 0,
+	}
+	return
+}
+
+type DigestWriter struct {
+	w      io.Writer
+	digest hash.Hash
+}
+
+func (d *DigestWriter) Write(p []byte) (n int, err error) {
+	n, err = d.w.Write(p)
+	if err != nil {
+		return n, err
+	}
+	n, err = d.digest.Write(p)
+	if err != nil {
+		return n, err
+	}
+	return
+}
+
+func (d *DigestWriter) GetDigest() []byte {
+	return d.digest.Sum(nil)
+}
+
+func NewDigestWriter(w io.Writer) (dw *DigestWriter) {
+	dw = &DigestWriter{
+		w:      w,
+		digest: sha256.New(),
 	}
 	return
 }

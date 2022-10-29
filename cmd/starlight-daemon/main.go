@@ -26,6 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func init() {
@@ -124,7 +126,6 @@ https://github.com/mc256/starlight
 }
 
 func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) {
-
 	var (
 		p  string
 		ne bool
@@ -187,8 +188,24 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 	}
 
 	//client.NewSnapshotterGrpcService(c, cfg)
+	var slc *client.Client
+	slc, err = client.NewClient(c, cfg)
+	if err != nil {
+		log.G(c).
+			WithError(err).
+			Fatal("failed to create starlight daemon client")
+	}
+
+	slc.StartSnapshotterService()
 
 	wait := make(chan interface{})
+	si := make(chan os.Signal, 1)
+	signal.Notify(si, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	go func() {
+		<-si
+		close(wait)
+		slc.Close()
+	}()
 	<-wait
 	return nil
 }

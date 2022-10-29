@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"io"
@@ -212,10 +213,13 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 	}
 	headerSize := cw.GetWrittenSize() - manifestSize - configSize
 
+	slDigest := digest.FromBytes(h)
+
 	log.G(b.server.ctx).
 		WithField("manifest", manifestSize).
 		WithField("config", configSize).
 		WithField("header", headerSize).
+		WithField("digest", slDigest.String()).
 		Info("generated response header")
 
 	// output header
@@ -227,6 +231,7 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 	header.Set("Manifest-Size", fmt.Sprintf("%d", manifestSize))
 	header.Set("Config-Size", fmt.Sprintf("%d", configSize))
 	header.Set("Digest", b.manifestDigest)
+	header.Set("Starlight-Digest", slDigest.String())
 	header.Set("Starlight-Version", util.Version)
 	header.Set("Content-Disposition", `attachment; filename="starlight.tgz"`)
 	w.WriteHeader(http.StatusOK)

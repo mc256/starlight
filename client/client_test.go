@@ -44,7 +44,7 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 	//t.Log("pulling image", "platform", plt)
 	ready := make(chan bool)
 	img, err := c.PullImage(nil,
-		"starlight/redis:6.2.7",
+		"harbor.yuri.moe/starlight/redis:6.2.7",
 		"linux/amd64",
 		"",
 		&ready)
