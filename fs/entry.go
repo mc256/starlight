@@ -21,6 +21,7 @@ package fs
 import (
 	"archive/tar"
 	"fmt"
+	"github.com/mc256/starlight/util/common"
 	"os"
 	"path"
 	"sync"
@@ -100,7 +101,7 @@ func (t *TemplateEntry) recursiveDeepCopy(fi *FsInstance) *FsEntry {
 func (t *TemplateEntry) DeepCopy(fi *FsInstance) *FsEntry {
 	ent := &FsEntry{
 		Entry: Entry{
-			TraceableEntry: util.GetRootNode(),
+			TraceableEntry: common.GetRootNode(),
 			State:          EnRwLayer,
 			ready:          t.ready,
 		},
@@ -348,7 +349,7 @@ func (fe *FsEntry) Promote() syscall.Errno {
 //---------------------------------------------------------------------------------------
 // Entry
 type Entry struct {
-	*util.TraceableEntry
+	*common.TraceableEntry
 
 	parent TocEntry
 	child  map[string]TocEntry

@@ -21,6 +21,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"github.com/mc256/starlight/util/common"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -259,8 +259,8 @@ func (n *StarlightFsNode) Link(ctx context.Context, target fs.InodeEmbedder, nam
 
 	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
 		Entry{
-			TraceableEntry: &util.TraceableEntry{
-				TOCEntry: &util.TOCEntry{
+			TraceableEntry: &common.TraceableEntry{
+				TOCEntry: &common.TOCEntry{
 					Name: filepath.Join(n.Ent.Name, name),
 					Type: "hardlink",
 				},
@@ -709,8 +709,8 @@ func (n *StarlightFsNode) Symlink(ctx context.Context, target, name string, out 
 
 	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
 		Entry{
-			TraceableEntry: &util.TraceableEntry{
-				TOCEntry: &util.TOCEntry{
+			TraceableEntry: &common.TraceableEntry{
+				TOCEntry: &common.TOCEntry{
 					Name:     filepath.Join(n.Ent.Name, name),
 					Type:     "symlink",
 					LinkName: target,
@@ -778,8 +778,8 @@ func (n *StarlightFsNode) Mkdir(ctx context.Context, name string, mode uint32, o
 
 	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
 		Entry{
-			TraceableEntry: &util.TraceableEntry{
-				TOCEntry: &util.TOCEntry{
+			TraceableEntry: &common.TraceableEntry{
+				TOCEntry: &common.TOCEntry{
 					Name: filepath.Join(n.Ent.Name, name),
 					Type: "dir",
 				},
@@ -862,8 +862,8 @@ func (n *StarlightFsNode) Create(ctx context.Context, name string, flags uint32,
 
 	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
 		Entry{
-			TraceableEntry: &util.TraceableEntry{
-				TOCEntry: &util.TOCEntry{
+			TraceableEntry: &common.TraceableEntry{
+				TOCEntry: &common.TOCEntry{
 					Name: filepath.Join(n.Ent.Name, name),
 					Type: "reg",
 				},
@@ -1160,8 +1160,8 @@ func (n *StarlightFsNode) Mknod(ctx context.Context, name string, mode, rdev uin
 
 	child = NewFsEntry(n.Ent.fi, &TemplateEntry{
 		Entry{
-			TraceableEntry: &util.TraceableEntry{
-				TOCEntry: &util.TOCEntry{
+			TraceableEntry: &common.TraceableEntry{
+				TOCEntry: &common.TOCEntry{
 					Name: filepath.Join(n.Ent.Name, name),
 					Type: "dir",
 				},

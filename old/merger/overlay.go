@@ -21,6 +21,7 @@ package merger
 import (
 	"context"
 	"encoding/json"
+	"github.com/mc256/starlight/util/common"
 	"io"
 	"path"
 
@@ -41,16 +42,16 @@ type Overlay struct {
 	db  *bolt.DB
 
 	// root is the root of the file system
-	Root *util.TraceableEntry `json:"-"`
+	Root *common.TraceableEntry `json:"-"`
 
 	// pool stores the list of pointer to all the TOC entries
-	EntryMap map[string]*util.TraceableEntry `json:"p,omitempty"`
+	EntryMap map[string]*common.TraceableEntry `json:"p,omitempty"`
 
 	// digest list (reference to actual layer storage)
 	// DigestList index range [0, n) where n is the total number of layers
 	// proxy.TraceableEntry's "source" int is starting from 1 which needs to subtract one to
 	// get the correct index
-	DigestList []*util.TraceableBlobDigest `json:"d,omitempty"`
+	DigestList []*common.TraceableBlobDigest `json:"d,omitempty"`
 
 	ImageName string `json:"-"`
 	ImageTag  string `json:"-"`
@@ -66,25 +67,25 @@ func (ov *Overlay) ExportTOC(w io.Writer) error {
 }
 
 func NewOverlayBuilder(ctx context.Context, db *bolt.DB) (ov *Overlay) {
-	root := util.GetRootNode()
+	root := common.GetRootNode()
 	root.SetSourceLayer(SourceLayerUnboundedIndex)
 
 	ov = &Overlay{
 		ctx:  ctx,
 		db:   db,
 		Root: root,
-		EntryMap: map[string]*util.TraceableEntry{
+		EntryMap: map[string]*common.TraceableEntry{
 			".": root,
 		},
 		ImageName:  "",
-		DigestList: make([]*util.TraceableBlobDigest, 0),
+		DigestList: make([]*common.TraceableBlobDigest, 0),
 	}
 	return ov
 }
 
 // Overlay functions
 
-func (ov *Overlay) recursiveDelete(ent *util.TOCEntry) {
+func (ov *Overlay) recursiveDelete(ent *common.TOCEntry) {
 	delete(ov.EntryMap, ent.Name)
 	for _, c := range ent.Children() {
 		if c.IsDir() {
@@ -97,7 +98,7 @@ func (ov *Overlay) recursiveDelete(ent *util.TOCEntry) {
 }
 
 // recursiveAdd upper layer to the lower layer. Parameter lDir and uDir must be directories only.
-func (ov *Overlay) recursiveAdd(lDir, uDir *util.TOCEntry, upperPool *map[string]*util.TraceableEntry) {
+func (ov *Overlay) recursiveAdd(lDir, uDir *common.TOCEntry, upperPool *map[string]*common.TraceableEntry) {
 	// Merge all the child
 	if lDir == nil {
 		for _, upperChild := range uDir.Children() {
@@ -183,7 +184,7 @@ func (ov *Overlay) recursiveAdd(lDir, uDir *util.TOCEntry, upperPool *map[string
 }
 
 // AddLayer overlays a single layer on top of what exists in the Overlay object.
-func (ov *Overlay) AddLayer(tb *util.TraceableBlobDigest) error {
+func (ov *Overlay) AddLayer(tb *common.TraceableBlobDigest) error {
 	/*
 		log.G(ov.ctx).WithFields(logrus.Fields{
 			"digest": tb.Digest.String(),
@@ -209,12 +210,12 @@ func (ov *Overlay) AddLayer(tb *util.TraceableBlobDigest) error {
 
 	// Read TOC
 	// populate: ov.DigestList, ov.Root, ov.EntryMap
-	pool := make(map[string]*util.TraceableEntry)
+	pool := make(map[string]*common.TraceableEntry)
 	ov.DigestList = append(ov.DigestList, tb)
 
 	idx := len(ov.DigestList) // starting from 1
 	err = layer.ForEach(func(k, v []byte) error {
-		ent := &util.TraceableEntry{}
+		ent := &common.TraceableEntry{}
 		err := json.Unmarshal(v, ent)
 		fn := string(k[:])
 		if fn == ".prefetch.landmark" || fn == ".no.prefetch.landmark" {
@@ -228,7 +229,7 @@ func (ov *Overlay) AddLayer(tb *util.TraceableBlobDigest) error {
 		return err
 	}
 
-	root := util.GetRootNode()
+	root := common.GetRootNode()
 	pool["."] = root
 
 	// Rebuild Tree
@@ -289,7 +290,7 @@ func (ov *Overlay) AddImage(imageName, imageTag string) error {
 		if err != nil {
 			return err
 		}
-		err = ov.AddLayer(&util.TraceableBlobDigest{Digest: d, ImageName: imageName})
+		err = ov.AddLayer(&common.TraceableBlobDigest{Digest: d, ImageName: imageName})
 		if err != nil {
 			return err
 		}
@@ -392,7 +393,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 
 	// 1. Add Entry
 	err = merged.ForEach(func(k, v []byte) error {
-		ent := &util.TraceableEntry{}
+		ent := &common.TraceableEntry{}
 		err := json.Unmarshal(v, ent)
 		name := string(k[:])
 
@@ -419,7 +420,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 		if err != nil {
 			return nil, err
 		}
-		ov.DigestList = append(ov.DigestList, &util.TraceableBlobDigest{Digest: d, ImageName: imageName})
+		ov.DigestList = append(ov.DigestList, &common.TraceableBlobDigest{Digest: d, ImageName: imageName})
 	}
 
 	// Rebuild Tree

@@ -21,6 +21,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"github.com/mc256/starlight/util/common"
 	"os"
 	"path"
 	"sync"
@@ -42,7 +43,7 @@ type LayerMeta struct {
 
 	// Connection to Store
 	store  *LayerStore
-	digest util.TraceableBlobDigest
+	digest common.TraceableBlobDigest
 }
 
 func (ls *LayerMeta) ToByte() []byte {
@@ -106,7 +107,7 @@ func (ls *LayerMeta) GetAbsPath() string {
 	return ls.absPath
 }
 
-func newLayerMetaFromByte(b []byte, s *LayerStore, d util.TraceableBlobDigest) *LayerMeta {
+func newLayerMetaFromByte(b []byte, s *LayerStore, d common.TraceableBlobDigest) *LayerMeta {
 	bb := b[0]
 
 	return &LayerMeta{
@@ -135,7 +136,7 @@ type LayerStore struct {
 	ctx context.Context
 	db  *bolt.DB
 
-	cache map[util.TraceableBlobDigest]*LayerMeta
+	cache map[common.TraceableBlobDigest]*LayerMeta
 
 	workDir string
 }
@@ -144,7 +145,7 @@ func (s *LayerStore) GetWorkDir() string {
 	return s.workDir
 }
 
-func (s *LayerStore) saveLayer(digest util.TraceableBlobDigest, lay *LayerMeta, create bool) error {
+func (s *LayerStore) saveLayer(digest common.TraceableBlobDigest, lay *LayerMeta, create bool) error {
 	tx, err := s.db.Begin(true)
 	if err != nil {
 		return err
@@ -181,7 +182,7 @@ func (s *LayerStore) saveLayer(digest util.TraceableBlobDigest, lay *LayerMeta, 
 // =====================================================================================================================
 // Register
 
-func (s *LayerStore) RegisterLayerWithAbsolutePath(digest util.TraceableBlobDigest, lay *LayerMeta) (*LayerMeta, error) {
+func (s *LayerStore) RegisterLayerWithAbsolutePath(digest common.TraceableBlobDigest, lay *LayerMeta) (*LayerMeta, error) {
 	lay.store = s
 	lay.digest = digest
 
@@ -197,12 +198,12 @@ func (s *LayerStore) RegisterLayerWithAbsolutePath(digest util.TraceableBlobDige
 	return lay, nil
 }
 
-func (s *LayerStore) RegisterLayerWithPath(digest util.TraceableBlobDigest, lay *LayerMeta) (*LayerMeta, error) {
+func (s *LayerStore) RegisterLayerWithPath(digest common.TraceableBlobDigest, lay *LayerMeta) (*LayerMeta, error) {
 	lay.absPath = path.Join(s.workDir, lay.absPath)
 	return s.RegisterLayerWithAbsolutePath(digest, lay)
 }
 
-func (s *LayerStore) RegisterLayerWithPrefix(prefix string, count int, digest util.TraceableBlobDigest, writable, complete bool) (*LayerMeta, error) {
+func (s *LayerStore) RegisterLayerWithPrefix(prefix string, count int, digest common.TraceableBlobDigest, writable, complete bool) (*LayerMeta, error) {
 	lay := &LayerMeta{
 		absPath:  path.Join(s.workDir, prefix, fmt.Sprintf("%d", count)),
 		writable: writable,
@@ -211,7 +212,7 @@ func (s *LayerStore) RegisterLayerWithPrefix(prefix string, count int, digest ut
 	return s.RegisterLayerWithAbsolutePath(digest, lay)
 }
 
-func (s *LayerStore) RegisterLayer(digest util.TraceableBlobDigest, writable, complete bool) (*LayerMeta, error) {
+func (s *LayerStore) RegisterLayer(digest common.TraceableBlobDigest, writable, complete bool) (*LayerMeta, error) {
 	lay := &LayerMeta{
 		absPath:  path.Join(s.workDir, fmt.Sprintf("%d-%d", time.Now().Day(), time.Now().Nanosecond())),
 		writable: writable,
@@ -223,7 +224,7 @@ func (s *LayerStore) RegisterLayer(digest util.TraceableBlobDigest, writable, co
 // =====================================================================================================================
 // Lookup
 
-func (s *LayerStore) FindLayer(digest util.TraceableBlobDigest) (*LayerMeta, error) {
+func (s *LayerStore) FindLayer(digest common.TraceableBlobDigest) (*LayerMeta, error) {
 	if lm, ok := s.cache[digest]; ok {
 		return lm, nil
 	}
@@ -259,7 +260,7 @@ func (s *LayerStore) FindLayer(digest util.TraceableBlobDigest) (*LayerMeta, err
 // =====================================================================================================================
 // Remove
 
-func (s *LayerStore) RemoveLayer(digest util.TraceableBlobDigest, removeFile bool) error {
+func (s *LayerStore) RemoveLayer(digest common.TraceableBlobDigest, removeFile bool) error {
 	if l, hl := s.cache[digest]; hl {
 		l.store = nil
 		delete(s.cache, digest)
@@ -313,7 +314,7 @@ func NewLayerStore(ctx context.Context, db *bolt.DB, workDir string) (*LayerStor
 	fs := &LayerStore{
 		ctx:     ctx,
 		db:      db,
-		cache:   make(map[util.TraceableBlobDigest]*LayerMeta),
+		cache:   make(map[common.TraceableBlobDigest]*LayerMeta),
 		workDir: workDir,
 	}
 	return fs, nil

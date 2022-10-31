@@ -20,6 +20,7 @@ package util
 
 import (
 	"encoding/json"
+	"github.com/mc256/starlight/util/common"
 	"io"
 )
 
@@ -32,12 +33,12 @@ type OutputEntry struct {
 }
 
 type Protocol struct {
-	Images                []*ImageRef            `json:"refs"`
-	Tables                [][]*TraceableEntry    `json:"tables"`
-	Configs               []string               `json:"config"`
-	DigestList            []*TraceableBlobDigest `json:"digests"`
-	ImageDigestReferences [][]int                `json:"idr"`
-	Offsets               []int64                `json:"offsets"`
+	Images                []*ImageRef                   `json:"refs"`
+	Tables                [][]*common.TraceableEntry    `json:"tables"`
+	Configs               []string                      `json:"config"`
+	DigestList            []*common.TraceableBlobDigest `json:"digests"`
+	ImageDigestReferences [][]int                       `json:"idr"`
+	Offsets               []int64                       `json:"offsets"`
 }
 
 type ProtocolTemplate struct {

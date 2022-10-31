@@ -3,10 +3,11 @@
 
 */
 
-package proxy
+package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -19,8 +20,13 @@ import (
 	"time"
 )
 
+type CacheInterface interface {
+	Digest() name.Digest
+	Size() int64
+}
+
 type LayerCache struct {
-	buffer *io.SectionReader
+	Buffer *io.SectionReader
 
 	Mutex      sync.Mutex
 	Ready      bool
@@ -66,7 +72,7 @@ func (lc *LayerCache) Subscribe(errChan *chan error) {
 	lc.subscribers = append(lc.subscribers, errChan)
 }
 
-func (lc *LayerCache) Load(server *Server) (err error) {
+func (lc *LayerCache) Load(ctx context.Context) (err error) {
 	defer lc.SetReady(err)
 
 	var l v1.Layer
@@ -77,7 +83,7 @@ func (lc *LayerCache) Load(server *Server) (err error) {
 	var rc io.ReadCloser
 	rc, err = l.Compressed()
 	if err != nil {
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
+		log.G(ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
 		return err
 	}
 
@@ -85,30 +91,30 @@ func (lc *LayerCache) Load(server *Server) (err error) {
 	var n int64
 	n, err = io.Copy(buf, rc)
 	if err != nil {
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
+		log.G(ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
 		return err
 	}
 	if n != lc.size {
 		err = fmt.Errorf("size unmatch expected %d, but got %d", lc.size, n)
-		log.G(server.ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
+		log.G(ctx).WithField("layer", lc.String()).Error(errors.Wrapf(err, "failed to load layer"))
 		return err
 	}
 	rc.Close()
 
-	lc.buffer = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, n)
+	lc.Buffer = io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, n)
 
 	return nil
 }
 
-func NewLayerCache(layer *ImageLayer) *LayerCache {
+func NewLayerCache(layer CacheInterface) *LayerCache {
 	return &LayerCache{
-		buffer: nil,
+		Buffer: nil,
 		Mutex:  sync.Mutex{},
 		Ready:  false,
 
 		UseCounter: 0,
 		LastUsed:   time.Now(),
-		digest:     layer.digest,
-		size:       layer.size,
+		digest:     layer.Digest(),
+		size:       layer.Size(),
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/platforms"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/mc256/starlight/old/util"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -33,7 +34,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 )
 

@@ -26,7 +26,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -117,7 +117,7 @@ func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 
 		reader := bytes.NewReader(buf.Bytes())
 		sr := io.NewSectionReader(reader, 0, reader.Size())
-		layerFile, err := util.OpenStargz(sr)
+		layerFile, err := common.OpenStargz(sr)
 		if err != nil {
 			return err
 		}
@@ -126,11 +126,11 @@ func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 		entryMap, chunks, _ := layerFile.GetTOC()
 
 		// entries map
-		entBuffer := make(map[string]*util.TraceableEntry)
+		entBuffer := make(map[string]*common.TraceableEntry)
 		for k, v := range entryMap {
-			entBuffer[k] = &util.TraceableEntry{
+			entBuffer[k] = &common.TraceableEntry{
 				TOCEntry: v,
-				Chunks:   make([]*util.TOCEntry, 0),
+				Chunks:   make([]*common.TOCEntry, 0),
 			}
 		}
 

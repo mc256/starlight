@@ -13,7 +13,8 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
-	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
+	"github.com/mc256/starlight/util/send"
 	"github.com/pkg/errors"
 	"math"
 	"path"
@@ -171,7 +172,7 @@ func (d *Database) InsertLayer(
 	return fsId, false, nil
 }
 
-func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*util.TraceableEntry) (err error) {
+func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*common.TraceableEntry) (err error) {
 	if _, err = txn.Exec(`DELETE FROM starlight.starlight.file WHERE fs=$1`, fsId); err != nil {
 		return err
 	}
@@ -246,7 +247,7 @@ func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, 
 	return config, manifest, digest, nil
 }
 
-func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
+func (d *Database) GetLayers(imageSerial int64) ([]*send.ImageLayer, error) {
 	rows, err := d.db.Query(`
 		SELECT FIS."id", "stackIndex", "digest", FIS."size"
 		FROM starlight.starlight.layer AS L
@@ -258,10 +259,10 @@ func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 	}
 	defer rows.Close()
 
-	r := make([]*ImageLayer, 0)
+	r := make([]*send.ImageLayer, 0)
 	for rows.Next() {
-		layer := &ImageLayer{}
-		if err := rows.Scan(&layer.Serial, &layer.stackIndex, &layer.Hash, &layer.size); err != nil {
+		layer := &send.ImageLayer{}
+		if err := rows.Scan(&layer.Serial, &layer.StackIndex, &layer.Hash, &layer.UncompressedSize); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		r = append(r, layer)
@@ -275,7 +276,7 @@ func (d *Database) GetLayers(imageSerial int64) ([]*ImageLayer, error) {
 // GetRoughDeduplicatedLayers returns the likely unique files
 // because it would be hard for the database to apply overlayfs correctly, so this deduplication
 // does not consider whiteout files.
-func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*ImageLayer, error) {
+func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*send.ImageLayer, error) {
 	rows, err := d.db.Query(`
 		WITH
 		ALPHA AS (
@@ -318,10 +319,10 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 	}
 	defer rows.Close()
 
-	r := make([]*ImageLayer, 0)
+	r := make([]*send.ImageLayer, 0)
 	for rows.Next() {
-		layer := &ImageLayer{}
-		if err := rows.Scan(&layer.stackIndex, &layer.Hash, &layer.size); err != nil {
+		layer := &send.ImageLayer{}
+		if err := rows.Scan(&layer.StackIndex, &layer.Hash, &layer.UncompressedSize); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
 		}
 		r = append(r, layer)
@@ -332,7 +333,7 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*Im
 	return r, nil
 }
 
-func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
+func (d *Database) GetUniqueFiles(layers []*send.ImageLayer) ([]*send.File, error) {
 	lids := make([]int64, 0, len(layers))
 	for _, v := range layers {
 		lids = append(lids, v.Serial)
@@ -347,12 +348,12 @@ func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
 	}
 	defer rows.Close()
 
-	fl := make([]*File, 0)
+	fl := make([]*send.File, 0)
 	for rows.Next() {
 		var (
 			fsId     int64
 			metadata []byte
-			toc      util.TOCEntry
+			toc      common.TOCEntry
 		)
 		if err = rows.Scan(&fsId, &metadata); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
@@ -360,15 +361,15 @@ func (d *Database) GetUniqueFiles(layers []*ImageLayer) ([]*File, error) {
 		if err = json.Unmarshal(metadata, &toc); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
 		}
-		fl = append(fl, &File{
+		fl = append(fl, &send.File{
 			TOCEntry: toc, // no need to parse chunks from the database
-			fsId:     fsId,
+			FsId:     fsId,
 		})
 	}
 	return fl, nil
 }
 
-func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*RankedFile, error) {
+func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*send.RankedFile, error) {
 	rows, err := d.db.Query(`
 		SELECT 
 			L."stackIndex", 
@@ -385,13 +386,13 @@ func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*RankedFile, error) {
 	}
 	defer rows.Close()
 
-	fl := make([]*RankedFile, 0)
+	fl := make([]*send.RankedFile, 0)
 	for rows.Next() {
 		var (
 			stackIndex, fsId int64
 			rank             sql.NullFloat64
 			metadata         []byte
-			file             File
+			file             send.File
 		)
 		if err = rows.Scan(&stackIndex, &fsId, &rank, &metadata); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan file")
@@ -399,19 +400,19 @@ func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*RankedFile, error) {
 		if err = json.Unmarshal(metadata, &file); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
 		}
-		file.fsId = fsId
+		file.FsId = fsId
 
 		if rank.Valid {
-			fl = append(fl, &RankedFile{
+			fl = append(fl, &send.RankedFile{
 				File:  file,
 				Stack: stackIndex,
-				rank:  rank.Float64,
+				Rank:  rank.Float64,
 			})
 		} else {
-			fl = append(fl, &RankedFile{
+			fl = append(fl, &send.RankedFile{
 				File:  file,
 				Stack: stackIndex,
-				rank:  math.MaxFloat64,
+				Rank:  math.MaxFloat64,
 			})
 		}
 	}

@@ -24,6 +24,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	util2 "github.com/mc256/starlight/old/util"
+	"github.com/mc256/starlight/util/common"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -99,7 +101,7 @@ func (r *Receiver) NewFsInstance(imageName, imageTag, snapshotId string, optimiz
 	d := digest.FromBytes(randBuf)
 
 	// Prepare RW layer
-	lm, err := r.layerStore.RegisterLayerWithAbsolutePath(util.TraceableBlobDigest{
+	lm, err := r.layerStore.RegisterLayerWithAbsolutePath(common.TraceableBlobDigest{
 		Digest:    digest.FromString(snapshotId),
 		ImageName: util.UserRwLayerText,
 	}, NewLayerMeta(path.Join(snapshotId, "rw"), true, true))
@@ -403,7 +405,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 	if err != nil {
 		return nil, err
 	}
-	header := &util.Protocol{}
+	header := &util2.Protocol{}
 	err = json.Unmarshal(headerBuf, header)
 	if err != nil {
 		return nil, err
@@ -423,7 +425,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 		fsTemplate:  make([]TocEntry, 0, len(header.Images)), // #3
 		fsInstances: make([]*FsInstance, 0),                  // Snapshotter
 
-		name:   util.ByImageName(header.Images).String(),
+		name:   util2.ByImageName(header.Images).String(),
 		prefix: prefix,
 		cb:     cb,
 	}
@@ -471,7 +473,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 	for _, table := range header.Tables {
 		root := &TemplateEntry{
 			Entry{
-				TraceableEntry: util.GetRootNode(),
+				TraceableEntry: common.GetRootNode(),
 				State:          EnRwLayer,
 			},
 		}

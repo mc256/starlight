@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
+	"github.com/mc256/starlight/util/send"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -37,127 +39,24 @@ import (
 )
 
 ////////////////////////////////////////////////
-type ImageLayer struct {
-	stackIndex int64
-	size       int64
-	Serial     int64  `json:"f"`
-	Hash       string `json:"h"`
-	digest     name.Digest
-	available  bool
-	blob       *LayerCache
-}
-
-func (il ImageLayer) String() string {
-	return fmt.Sprintf("[%05d:%02d]%s-%d", il.Serial, il.stackIndex, il.Hash, il.size)
-}
-
-type Content struct {
-	files []*RankedFile
-
-	// highest rank of all the files using this content
-	rank float64
-
-	// stack identify which layer should this content be placed, all the files will be referencing the content
-	Stack int64 `json:"stack"`
-
-	// offset is non-zero if the file is in the delta bundle body
-	Offset int64 `json:"offset,omitempty"`
-
-	// size is the size of the compressed content
-	Size int64 `json:"size"`
-
-	Chunks []*FileChunk `json:"chunks"`
-}
-
-type ByRank []*Content
-
-func (b ByRank) Len() int {
-	return len(b)
-}
-
-func (b ByRank) Less(i, j int) bool {
-	return b[i].rank < b[j].rank
-}
-
-func (b ByRank) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
-}
-
-type RankedFile struct {
-	File
-
-	// rank of the file, smaller has the higher priority
-	rank float64
-
-	// Stack in the existing image from bottom to top
-	Stack int64 `json:"ST"`
-
-	// if the file is available on the client then ReferenceFsId is non-zero,
-	// expecting the file is available on the client and can be accessed using the File.Digest .
-	ReferenceFsId int64 `json:"RFS,omitempty"`
-
-	// if the file is not available on the client then ReferenceFsId is zero and ReferenceStack is non-zero,
-	// expecting the file content in the delta bundle body
-	ReferenceStack int64 `json:"RST,omitempty"`
-	// if the file is not available on the client then PayloadOrder is non-zero shows when this file can be ready
-	PayloadOrder int `json:"PO,omitempty"`
-}
-
-type FileChunk struct {
-	Offset         int64  `json:"offset"`
-	ChunkOffset    int64  `json:"chunkOffset"`
-	ChunkSize      int64  `json:"chunkSize"`
-	ChunkDigest    string `json:"chunkDigest"`
-	CompressedSize int64  `json:"compressedSize"`
-}
-
-type File struct {
-	util.TOCEntry
-	Chunks []*FileChunk `json:"chunks,omitempty"`
-	fsId   int64
-}
-
-type Image struct {
-	ref    name.Reference
-	Serial int64         `json:"s"`
-	Layers []*ImageLayer `json:"l"`
-}
-
-type LayerSource bool
-
-const (
-	FromDestination LayerSource = false
-	FromSource                  = true
-)
-
-func (i Image) String() string {
-	return fmt.Sprintf("%d->%v", i.Serial, i.Layers)
-}
 
 type Builder struct {
-	server *Server
+	send.DeltaBundle
 
-	Source      *Image `json:"s"`
-	Destination *Image `json:"d"`
+	// non-exported fields
+	server *Server
 
 	manifest, config []byte
 	manifestDigest   string
 
-	// contents and contentLength are computed by Builder.computeDelta()
-	Contents      []*Content `json:"c"`
-	contentLength int64
-
-	// requestedFiles is the ToC with reference to the file content
-	RequestedFiles []*RankedFile
-
-	unavailableLayers, availableLayers []*ImageLayer
+	unavailableLayers, availableLayers []*send.ImageLayer
 }
 
 func (b *Builder) String() string {
 	if b.Source != nil {
-		return fmt.Sprintf("Builder (%s)->(%s)", b.Source.ref.String(), b.Destination.ref.String())
+		return fmt.Sprintf("Builder (%s)->(%s)", b.Source.Ref.String(), b.Destination.Ref.String())
 	}
-	return fmt.Sprintf("Builder ()->(%s)", b.Destination.ref.String())
+	return fmt.Sprintf("Builder ()->(%s)", b.Destination.Ref.String())
 }
 
 func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
@@ -219,14 +118,15 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 		WithField("manifest", manifestSize).
 		WithField("config", configSize).
 		WithField("header", headerSize).
-		WithField("digest", slDigest.String()).
+		WithField("body", b.BodyLength).
+		WithField("_digest", slDigest.String()).
 		Info("generated response header")
 
 	// output header
-	contentLength := cw.GetWrittenSize() + b.contentLength
+	httpLength := cw.GetWrittenSize() + b.BodyLength
 	header := w.Header()
 	header.Set("Content-Type", "application/octet-stream")
-	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
+	header.Set("Content-Length", fmt.Sprintf("%d", httpLength))
 	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
 	header.Set("Manifest-Size", fmt.Sprintf("%d", manifestSize))
 	header.Set("Config-Size", fmt.Sprintf("%d", configSize))
@@ -246,25 +146,25 @@ func (b *Builder) WriteBody(w http.ResponseWriter, req *http.Request) error {
 	// output body
 	for _, c := range b.Contents {
 		// fmt.Println(c.files[0].Name, len(c.Chunks), c.Stack, len(c.files), c.Offset, c.Size, layers[c.Stack].blob)
-		if layer := layers[c.Stack]; layer.blob != nil {
-			sr := io.NewSectionReader(layer.blob.buffer, 0, layer.size)
+		if layer := layers[c.Stack]; layer.Blob != nil {
+			sr := io.NewSectionReader(layer.Blob.Buffer, 0, layer.UncompressedSize)
 			for _, chunk := range c.Chunks {
-				ssr := io.NewSectionReader(sr, chunk.ChunkOffset, chunk.CompressedSize)
+				ssr := io.NewSectionReader(sr, chunk.Offset, chunk.CompressedSize)
 				_, err := io.CopyN(w, ssr, chunk.CompressedSize)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "failed to read chunk at %d bytes for %s, perhaps outdated ToC in database", chunk.Offset, c.Files[0].Name)
 				}
 			}
 		} else {
-			return fmt.Errorf("layer %d not found for file %s (ref:%d)", c.Stack, c.files[0].Name, len(c.files))
+			return fmt.Errorf("layer %d not found for file %s (ref:%d)", c.Stack, c.Files[0].Name, len(c.Files))
 		}
 	}
 	return nil
 }
 
-func (b *Builder) fetchLayers(cache *ImageLayer) error {
+func (b *Builder) fetchLayers(cache *send.ImageLayer) error {
 	var (
-		c   *LayerCache
+		c   *common.LayerCache
 		has bool
 	)
 
@@ -286,11 +186,11 @@ func (b *Builder) fetchLayers(cache *ImageLayer) error {
 			WithField("shared", true).
 			Info("fetched layer")
 	} else {
-		c = NewLayerCache(cache)
+		c = common.NewLayerCache(cache)
 		b.server.cache[cache.Hash] = c
 		b.server.cacheMutex.Unlock()
 
-		if err := c.Load(b.server); err != nil {
+		if err := c.Load(b.server.ctx); err != nil {
 			log.G(b.server.ctx).
 				WithField("layer", cache.String()).
 				Error(errors.Wrapf(err, "failed to load layer"))
@@ -302,7 +202,7 @@ func (b *Builder) fetchLayers(cache *ImageLayer) error {
 			Info("fetched layer")
 	}
 
-	cache.blob = c
+	cache.Blob = c
 
 	return nil
 }
@@ -310,16 +210,16 @@ func (b *Builder) fetchLayers(cache *ImageLayer) error {
 // getImage returns the image with the given reference and the platform.
 // if you need to find out the available image, you should better use getImageByDigest which returns
 // the exact image that is available as tags might be changed but the digest will not change.
-func (b *Builder) getImage(ref, platform string) (img *Image, err error) {
-	img = &Image{}
-	img.ref, err = name.ParseReference(ref,
+func (b *Builder) getImage(ref, platform string) (img *send.Image, err error) {
+	img = &send.Image{}
+	img.Ref, err = name.ParseReference(ref,
 		name.WithDefaultRegistry(b.server.config.DefaultRegistry),
 		name.WithDefaultTag("latest-starlight"),
 	)
 	if err != nil {
 		return nil, err
 	}
-	refName, refTag := ParseImageReference(img.ref, b.server.config.DefaultRegistry)
+	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry)
 	img.Serial, err = b.server.db.GetImage(refName, refTag, platform)
 	if err != nil {
 		return nil, err
@@ -331,8 +231,10 @@ func (b *Builder) getImage(ref, platform string) (img *Image, err error) {
 		return nil, err
 	}
 	for _, layer := range img.Layers {
-		d := fmt.Sprintf("%s@%s", img.ref.Name(), layer.Hash)
-		layer.digest, err = name.NewDigest(d)
+		d := fmt.Sprintf("%s@%s", img.Ref.Name(), layer.Hash)
+		var dd name.Digest
+		dd, err = name.NewDigest(d)
+		layer.SetDigest(dd)
 	}
 
 	return img, nil
@@ -340,16 +242,16 @@ func (b *Builder) getImage(ref, platform string) (img *Image, err error) {
 
 // getImageByDigest returns a more precise image reference by using digest (not tag)
 // this guarantees that the image is the exact image that is available on the client side.
-func (b Builder) getImageByDigest(refWithDigest string) (img *Image, err error) {
-	img = &Image{}
-	img.ref, err = name.ParseReference(refWithDigest,
+func (b Builder) getImageByDigest(refWithDigest string) (img *send.Image, err error) {
+	img = &send.Image{}
+	img.Ref, err = name.ParseReference(refWithDigest,
 		name.WithDefaultRegistry(b.server.config.DefaultRegistry),
 		name.WithDefaultTag("latest-starlight"),
 	)
 	if err != nil {
 		return nil, err
 	}
-	refName, refTag := ParseImageReference(img.ref, b.server.config.DefaultRegistry)
+	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry)
 	img.Serial, err = b.server.db.GetImageByDigest(refName, refTag)
 	if err != nil {
 		return nil, err
@@ -361,8 +263,10 @@ func (b Builder) getImageByDigest(refWithDigest string) (img *Image, err error) 
 		return nil, err
 	}
 	for _, layer := range img.Layers {
-		d := fmt.Sprintf("%s@%s", img.ref.Name(), layer.Hash)
-		layer.digest, err = name.NewDigest(d)
+		d := fmt.Sprintf("%s@%s", img.Ref.Name(), layer.Hash)
+		var dd name.Digest
+		dd, err = name.NewDigest(d)
+		layer.SetDigest(dd)
 	}
 
 	return img, nil
@@ -374,9 +278,9 @@ func (b Builder) getManifestAndConfig(serial int64) (config, manifest []byte, di
 	return b.server.db.GetManifestAndConfig(serial)
 }
 
-func (b *Builder) getUnavailableLayers() (layers []*ImageLayer, err error) {
+func (b *Builder) getUnavailableLayers() (layers []*send.ImageLayer, err error) {
 	dedup := make(map[string]bool, len(b.Destination.Layers))
-	layers = make([]*ImageLayer, 0, len(b.Destination.Layers))
+	layers = make([]*send.ImageLayer, 0, len(b.Destination.Layers))
 	if b.Source != nil {
 		for _, v := range b.Source.Layers {
 			dedup[v.Hash] = true
@@ -400,14 +304,14 @@ func (b *Builder) computeDelta() error {
 		3. identify the best reference to the file content
 		4. sort file contents
 	*/
-	unavailable, available := make([]*ImageLayer, 0), make([]*ImageLayer, 0)
-	availableIds := make(map[int64]LayerSource)
+	unavailable, available := make([]*send.ImageLayer, 0), make([]*send.ImageLayer, 0)
+	availableIds := make(map[int64]send.LayerSource)
 
 	if b.Source != nil {
 		for _, layer := range b.Source.Layers {
-			if layer.available {
+			if layer.Available {
 				available = append(available, layer)
-				availableIds[layer.Serial] = FromSource
+				availableIds[layer.Serial] = send.FromSource
 			} else {
 				unavailable = append(unavailable, layer)
 			}
@@ -415,9 +319,9 @@ func (b *Builder) computeDelta() error {
 	}
 
 	for _, layer := range b.Destination.Layers {
-		if layer.available {
+		if layer.Available {
 			available = append(available, layer)
-			availableIds[layer.Serial] = FromDestination
+			availableIds[layer.Serial] = send.FromDestination
 		} else {
 			unavailable = append(unavailable, layer)
 		}
@@ -429,11 +333,12 @@ func (b *Builder) computeDelta() error {
 		return errors.Wrapf(err, "failed to get existing files")
 	}
 
-	deduplicatedExistingFiles := make(map[string]*File)
+	deduplicatedExistingFiles := make(map[string]*send.File)
 	for _, f := range existingFiles {
 		// find the lowest layer, if available find it in the destination image, so we can create references within the
 		// requested image and reduce future cleanup steps
-		if fe, has := deduplicatedExistingFiles[f.Digest]; has && ((f.fsId < fe.fsId) || (availableIds[f.fsId] == FromDestination)) {
+
+		if fe, has := deduplicatedExistingFiles[f.Digest]; has && ((f.FsId < fe.FsId) || (availableIds[f.FsId] == send.FromDestination)) {
 			continue
 		}
 		deduplicatedExistingFiles[f.Digest] = f
@@ -452,7 +357,7 @@ func (b *Builder) computeDelta() error {
 		return errors.Wrapf(err, "failed to get requested files")
 	}
 
-	deduplicatedRequestedContents := make(map[string]*Content)
+	deduplicatedRequestedContents := make(map[string]*send.Content)
 	for _, f := range b.RequestedFiles {
 		if f.Digest == "" {
 			continue
@@ -460,16 +365,16 @@ func (b *Builder) computeDelta() error {
 		if f.Size == 0 {
 			continue
 		}
-		if _, has := availableIds[f.fsId]; has {
+		if _, has := availableIds[f.FsId]; has {
 			continue
 		}
 		if fe, has := deduplicatedRequestedContents[f.Digest]; has {
-			fe.files = append(fe.files, f)
+			fe.Files = append(fe.Files, f)
 			continue
 		}
-		deduplicatedRequestedContents[f.Digest] = &Content{
-			files: []*RankedFile{f},
-			rank:  0,
+		deduplicatedRequestedContents[f.Digest] = &send.Content{
+			Files: []*send.RankedFile{f},
+			Rank:  0,
 		}
 	}
 
@@ -481,22 +386,22 @@ func (b *Builder) computeDelta() error {
 		Info("find requested file contents")
 
 	// 3. identify the best reference to the file content
-	b.Contents = make([]*Content, 0)
-	for digest, reqContent := range deduplicatedRequestedContents {
-		if existingContent, has := deduplicatedExistingFiles[digest]; has {
+	b.Contents = make([]*send.Content, 0)
+	for d, reqContent := range deduplicatedRequestedContents {
+		if existingContent, has := deduplicatedExistingFiles[d]; has {
 			// found requested file in existing files
-			for _, r := range reqContent.files {
-				r.ReferenceFsId = existingContent.fsId
+			for _, r := range reqContent.Files {
+				r.ReferenceFsId = existingContent.FsId
 			}
 		} else {
 			// not found, add to the list of contents to be sent to the client
 			b.Contents = append(b.Contents, reqContent)
-			reqContent.rank = math.MaxFloat64
-			reqContent.Stack = reqContent.files[0].Stack
-			for _, f := range reqContent.files {
-				if f.rank < reqContent.rank {
+			reqContent.Rank = math.MaxFloat64
+			reqContent.Stack = reqContent.Files[0].Stack
+			for _, f := range reqContent.Files {
+				if f.Rank < reqContent.Rank {
 					// highest rank wins
-					reqContent.rank = f.rank
+					reqContent.Rank = f.Rank
 				}
 				if f.Stack < reqContent.Stack {
 					// lowest stack wins
@@ -506,42 +411,47 @@ func (b *Builder) computeDelta() error {
 		}
 	}
 
-	sort.Sort(ByRank(b.Contents))
+	sort.Sort(send.ByRank(b.Contents))
 
-	b.contentLength = int64(0)
+	b.BodyLength = int64(0)
 	for idx, c := range b.Contents {
 		// update the reference to the content
-		for _, f := range c.files {
+		for _, f := range c.Files {
 			f.ReferenceStack = c.Stack
 			f.PayloadOrder = idx
 		}
 
-		c.Offset = b.contentLength
-
-		if len(c.files[0].Chunks) > 0 {
-			for _, chunk := range c.files[0].Chunks {
+		c.Offset = b.BodyLength
+		c.Digest = c.Files[0].Digest
+		if len(c.Files[0].ParsingChunks) > 0 {
+			c.Chunks = make([]*send.FileChunk, 0, len(c.Files[0].ParsingChunks))
+			for _, chunk := range c.Files[0].ParsingChunks {
 				c.Size += chunk.CompressedSize
+				c.Chunks = append(c.Chunks, &send.FileChunk{
+					Offset:         chunk.Offset,
+					ChunkOffset:    chunk.ChunkOffset,
+					ChunkSize:      chunk.ChunkSize,
+					CompressedSize: chunk.CompressedSize,
+				})
 			}
-			c.Chunks = c.files[0].Chunks
 		} else {
-			c.Size = c.files[0].CompressedSize
-			c.Chunks = []*FileChunk{{
-				Offset:         c.files[0].Offset,
-				ChunkOffset:    c.files[0].ChunkOffset,
-				ChunkSize:      c.files[0].ChunkSize,
-				ChunkDigest:    c.files[0].ChunkDigest,
-				CompressedSize: c.files[0].CompressedSize,
+			c.Size = c.Files[0].CompressedSize
+			c.Chunks = []*send.FileChunk{{
+				Offset:         c.Files[0].Offset,
+				ChunkOffset:    c.Files[0].ChunkOffset,
+				ChunkSize:      c.Files[0].ChunkSize,
+				CompressedSize: c.Files[0].CompressedSize,
 			}}
 		}
 
 		// calculate the total size of the compressed contents
-		b.contentLength += c.Size
+		b.BodyLength += c.Size
 	}
 
 	log.G(b.server.ctx).
 		WithField("content", len(b.Contents)).
 		WithField("builder", b).
-		WithField("compressedSize", b.contentLength).
+		WithField("compressedSize", b.BodyLength).
 		WithField("_step", 3).
 		Info("find the best file content references")
 
@@ -560,12 +470,12 @@ func (b *Builder) Load() error {
 
 	// Load manifest and config from proxy's database
 	errGrp.Go(func() error {
-		if c, m, digest, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
+		if c, m, d, err := b.getManifestAndConfig(b.Destination.Serial); err != nil {
 			return err
 		} else {
 			b.config = c
 			b.manifest = m
-			b.manifestDigest = digest
+			b.manifestDigest = d
 			return nil
 		}
 	})
@@ -617,15 +527,15 @@ func NewBuilder(server *Server, src, dst, plt string) (b *Builder, err error) {
 			return nil, err
 		}
 	} else {
-		b.availableLayers = []*ImageLayer{}
+		b.availableLayers = []*send.ImageLayer{}
 		b.unavailableLayers = b.Destination.Layers
 	}
 
 	for _, a := range b.availableLayers {
-		a.available = true
+		a.Available = true
 	}
 	for _, u := range b.unavailableLayers {
-		u.available = false
+		u.Available = false
 	}
 
 	return b, nil

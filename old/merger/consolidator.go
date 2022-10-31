@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
 	"io"
 	"sort"
@@ -35,7 +36,7 @@ const (
 type ConsolidatorEntry struct {
 	// entries has the same file content
 	// the first entry consist of
-	entries []*util.TraceableEntry
+	entries []*common.TraceableEntry
 
 	// smaller means higher priority, it should be lowest landmark
 	landmarkScore float32
@@ -105,7 +106,7 @@ type Consolidator struct {
 	layerImageMap map[int]int
 
 	// Source starts from index 0
-	Source []*util.TraceableBlobDigest `json:"source,omitempty"`
+	Source []*common.TraceableBlobDigest `json:"source,omitempty"`
 
 	consolidated bool
 	outputQueue  []*OutputEntry
@@ -307,12 +308,12 @@ func (c *Consolidator) AddDelta(delta *Delta) error {
 			} else {
 				if superSuperHot[item.Name] {
 					c.uniqueMap[item.Digest] = &ConsolidatorEntry{
-						entries:       []*util.TraceableEntry{item},
+						entries:       []*common.TraceableEntry{item},
 						landmarkScore: -1.0,
 					}
 				} else {
 					c.uniqueMap[item.Digest] = &ConsolidatorEntry{
-						entries:       []*util.TraceableEntry{item},
+						entries:       []*common.TraceableEntry{item},
 						landmarkScore: float32(priority),
 					}
 				}

@@ -22,6 +22,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"github.com/mc256/starlight/util/common"
 	"io"
 
 	"github.com/containerd/containerd/log"
@@ -37,13 +38,13 @@ type Delta struct {
 	ctx context.Context
 
 	// DigestList references to actual layer storage
-	DigestList []*util.TraceableBlobDigest `json:"d,omitempty"`
+	DigestList []*common.TraceableBlobDigest `json:"d,omitempty"`
 
 	// start from the secondOffset are the layers that we want to transit to
 	secondOffset int
 
 	// Pool stores the list of pointer to all the TOC entries
-	Pool [][]*util.TraceableEntry `json:"p,omitempty"`
+	Pool [][]*common.TraceableEntry `json:"p,omitempty"`
 
 	// file queue
 	CheckPoint []int64
@@ -56,7 +57,7 @@ type Delta struct {
 	Config string `json:"config"`
 }
 
-func (d *Delta) recursiveDelta(aDir, bDir *util.TOCEntry, bSource *Overlay) {
+func (d *Delta) recursiveDelta(aDir, bDir *common.TOCEntry, bSource *Overlay) {
 	if aDir == nil && bDir != nil {
 		// copy b dir to the list recursively
 		for _, entry := range bDir.Children() {
@@ -109,10 +110,10 @@ func (d *Delta) recursiveDelta(aDir, bDir *util.TOCEntry, bSource *Overlay) {
 
 		// Remove files
 		if opaque == true && len(aDir.Children()) != 0 {
-			d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(util.MakeOpaqueWhiteoutFile(aDir.Name)))
+			d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], common.ExtendEntry(common.MakeOpaqueWhiteoutFile(aDir.Name)))
 		} else {
 			for _, fileName := range pendingDelete {
-				d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], util.ExtendEntry(util.MakeWhiteoutFile(fileName, aDir.Name)))
+				d.Pool[aDir.Landmark()] = append(d.Pool[aDir.Landmark()], common.ExtendEntry(common.MakeWhiteoutFile(fileName, aDir.Name)))
 			}
 		}
 
@@ -147,7 +148,7 @@ func GetDelta(ctx context.Context, a, b *Overlay) (d *Delta) {
 		ctx:          ctx,
 		DigestList:   append(a.DigestList, b.DigestList...),
 		secondOffset: len(a.DigestList),
-		Pool:         make([][]*util.TraceableEntry, 0),
+		Pool:         make([][]*common.TraceableEntry, 0),
 		CheckPoint:   make([]int64, 0),
 		consolidated: false,
 		ImageName:    b.ImageName,
@@ -156,7 +157,7 @@ func GetDelta(ctx context.Context, a, b *Overlay) (d *Delta) {
 	}
 
 	for i := 0; i <= MaxLandmark; i++ {
-		d.Pool = append(d.Pool, make([]*util.TraceableEntry, 0))
+		d.Pool = append(d.Pool, make([]*common.TraceableEntry, 0))
 	}
 
 	// Size Offset

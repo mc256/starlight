@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"sync"
@@ -55,7 +56,7 @@ type Server struct {
 	db     *Database
 	config *Configuration
 
-	cache      map[string]*LayerCache
+	cache      map[string]*common.LayerCache
 	cacheMutex sync.Mutex
 }
 
@@ -255,7 +256,7 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) *Ser
 			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
 		},
 		config: cfg,
-		cache:  make(map[string]*LayerCache),
+		cache:  make(map[string]*common.LayerCache),
 	}
 
 	// connect database

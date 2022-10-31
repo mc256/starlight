@@ -191,7 +191,7 @@ func (c *Client) storeConfig(cfgName, ref string, pd digest.Digest, cfg []byte) 
 	return nil
 }
 
-func (c *Client) handleStarlightHeader(buf *bytes.Buffer) (header *proxy.Builder, h []byte, err error) {
+func (c *Client) handleStarlightHeader(buf *bytes.Buffer) (header *Manager, h []byte, err error) {
 	// decompress starlight header
 	r, err := gzip.NewReader(buf)
 	if err != nil {
@@ -271,8 +271,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 
 		manifest *v1.Manifest
 		config   *v1.Image
-
-		newImg images.Image
+		//newImg   images.Image
 	)
 
 	// manifest
@@ -319,7 +318,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 
 	// create image
 	is := c.client.ImageService()
-	newImg, err = is.Create(c.ctx, images.Image{
+	_, err = is.Create(c.ctx, images.Image{
 		Name: ref,
 		Target: v1.Descriptor{
 			MediaType: util.MediaTypeManifestV2,
@@ -335,24 +334,29 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 
 	// send a ready signal
 	close(*ready)
+
+	/*
+		_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
+		f, err := os.OpenFile("/tmp/starlight-test.tar.gz", os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to open file")
+		}
+		defer f.Close()
+		_, err = io.Copy(f, body)
+
+		_, _ = config, star
+	*/
+
 	// keep going and download layers
-
-	fmt.Println("---------------------")
-	//fmt.Println(newImg, err)
-
-	// Extract layers
-	for idx, _ := range manifest.Layers {
-		fmt.Println(idx, manifest.Layers[idx].Digest.String(), config.RootFS.DiffIDs[idx].String())
+	err = star.InitFromProxy(&body, c.cfg, config)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to process starlight header")
 	}
-	_ = star
-	_ = newImg
-	_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
 
-	// content:
-	// use the content store
-
-	// snapshot:
-	// use diff ids in the config
+	err = star.Extract()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to extract starlight image")
+	}
 
 	return
 }

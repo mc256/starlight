@@ -20,6 +20,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/mc256/starlight/util"
 	"sort"
 	"strings"
 )
@@ -50,7 +51,7 @@ func NewImageRef(s string) ([]*ImageRef, error) {
 	for _, is := range arr {
 		imgArr := strings.Split(is, ":")
 		if len(imgArr) != 2 || strings.Trim(imgArr[0], " ") == "" || strings.Trim(imgArr[1], " ") == "" {
-			return nil, ErrWrongImageFormat
+			return nil, util.ErrWrongImageFormat
 		}
 		out = append(out, &ImageRef{
 			ImageName: imgArr[0],

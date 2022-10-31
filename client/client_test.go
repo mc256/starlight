@@ -55,6 +55,53 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 	t.Log(img)
 }
 
+func TestClient_FindBaseImage(t *testing.T) {
+	cfg, _, _, _ := LoadConfig("/root/daemon.json")
+	c, err := NewClient(context.Background(), cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	img, err := c.FindBaseImage("", "harbor.yuri.moe/starlight/redis:7.0.5")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(img)
+}
+
+func TestClient_PullImageWithUpdate(t *testing.T) {
+	cfg, _, _, _ := LoadConfig("/root/daemon.json")
+	c, err := NewClient(context.Background(), cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	//plt := platforms.Format(platforms.DefaultSpec())
+	//t.Log("pulling image", "platform", plt)
+	//"harbor.yuri.moe/starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965"
+
+	base, err := c.FindBaseImage("", "harbor.yuri.moe/starlight/redis:7.0.5")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	ready := make(chan bool)
+	img, err := c.PullImage(base,
+		"harbor.yuri.moe/starlight/redis:7.0.5",
+		"linux/amd64",
+		"",
+		&ready)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(img)
+}
+
 func TestClient_CreateImageService(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)

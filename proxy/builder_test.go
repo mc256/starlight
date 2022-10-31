@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/test"
+	"github.com/mc256/starlight/util/common"
 	"net/http"
 	"testing"
 )
@@ -36,7 +37,7 @@ func InitDatabase() (context.Context, *Configuration, *Server) {
 			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
 		},
 		config: cfg,
-		cache:  make(map[string]*LayerCache),
+		cache:  make(map[string]*common.LayerCache),
 	}
 	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
 		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
@@ -123,7 +124,7 @@ func TestNewBuilder3(t *testing.T) {
 func TestBuilder_WriteHeader(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "starlight/mariadb:10.8.4", "starlight/mariadb:10.9.2", "linux/amd64")
+	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
 	if err != nil {
 		t.Error(err)
 	}
@@ -146,7 +147,7 @@ func TestBuilder_WriteHeader(t *testing.T) {
 func TestBuilder_WriteBody(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "starlight/mariadb:10.8.4", "starlight/mariadb:10.9.2", "linux/amd64")
+	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
 	if err != nil {
 		t.Error(err)
 	}
@@ -164,5 +165,50 @@ func TestBuilder_WriteBody(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Println(w.Header())
+}
 
+func TestBuilder_WriteBody2(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "", "starlight/mariadb:10.9.2", "linux/amd64")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = b.Load(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	fmt.Println(b)
+
+	w := test.NewFakeResponseWriter("body")
+	err = b.WriteBody(w, &http.Request{})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(w.Header())
+}
+
+func TestBuilder_WriteBody3(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server, "", "starlight/redis:6.2.7", "linux/amd64")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err = b.Load(); err != nil {
+		t.Error(err)
+		return
+	}
+
+	fmt.Println(b)
+
+	w := test.NewFakeResponseWriter("body")
+	err = b.WriteBody(w, &http.Request{})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(w.Header())
 }

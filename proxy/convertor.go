@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	"github.com/mc256/starlight/util/common"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -73,7 +74,7 @@ func fileSectionReader(file *os.File) (*io.SectionReader, error) {
 }
 
 // NewStarlightLayer mainly populate the hash values for the StarlightLayer object
-func NewStarlightLayer(f *os.File, stargzWriter *util.Writer) (goreg.Layer, error) {
+func NewStarlightLayer(f *os.File, stargzWriter *common.Writer) (goreg.Layer, error) {
 	d, err := goreg.NewHash(stargzWriter.DiffID())
 	if err != nil {
 		return nil, err
@@ -176,7 +177,7 @@ func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
 		return err
 	}
 	// modified version of stargz writer
-	w := util.NewWriterLevel(f, gzip.BestCompression)
+	w := common.NewWriterLevel(f, gzip.BestCompression)
 	// TODO: we could change the chunk size here but let's keep it as 4KB
 	if err := w.AppendTar(l); err != nil {
 		return err
@@ -202,7 +203,7 @@ func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
 		Annotations: map[string]string{
 			util.StarlightTOCDigestAnnotation:       tocDigest.String(),
 			util.StarlightTOCCreationTimeAnnotation: time.Now().Format(time.RFC3339Nano),
-			util.TOCJSONDigestAnnotation:            tocDigest.String(),
+			common.TOCJSONDigestAnnotation:          tocDigest.String(),
 		},
 	}
 

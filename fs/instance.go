@@ -19,11 +19,11 @@
 package fs
 
 import (
+	"github.com/mc256/starlight/util/common"
 	"time"
 
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -49,8 +49,8 @@ type FsInstance struct {
 	tracer   *Tracer
 }
 
-func (fi *FsInstance) GetRwTraceableBlobDigest() util.TraceableBlobDigest {
-	return util.TraceableBlobDigest{
+func (fi *FsInstance) GetRwTraceableBlobDigest() common.TraceableBlobDigest {
+	return common.TraceableBlobDigest{
 		Digest: fi.rwLayerHash, ImageName: fi.name,
 	}
 }
