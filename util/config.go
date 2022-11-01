@@ -29,26 +29,32 @@ const (
 	OptimizeLabel      = "containerd.io/snapshot/remote/starlight/optimize.label"
 	OptimizeGroupLabel = "containerd.io/snapshot/remote/starlight/optimizeGroup.label"
 
-	ProxyLabel        = "containerd.io/snapshot/remote/starlight/proxy"
-	SnapshotterLabel  = "containerd.io/gc.ref.snapshot.starlight"
-	ContainerdGCLabel = "containerd.io/gc.root"
+	ProxyLabel       = "containerd.io/snapshot/remote/starlight/proxy"
+	SnapshotterLabel = "containerd.io/gc.ref.snapshot.starlight"
 
-	ImagePullerLabel        = "puller.containerd.io"
-	StarlightProxyMediaType = "mediaType.starlight.mc256.dev"
-	StarlightProxyLabel     = "proxy.starlight.mc256.dev"
-
-	ImageMediaType  = "application/vnd.mc256.starlight.toc.json"
 	UserRwLayerText = "containerd.io/layer/user-rw-layer"
 
 	StarlightTOCDigestAnnotation       = "containerd.io/snapshot/remote/starlight/toc.digest"
 	StarlightTOCCreationTimeAnnotation = "containerd.io/snapshot/remote/starlight/toc.timestamp"
 
+	// ImageMediaTypeManifestV2 for containerd image TYPE field
+	ImageMediaTypeManifestV2 = "application/vnd.docker.distribution.manifest.v2+json"
+
+	// ImageLabelPuller and ImageLabelStarlightMetadata are labels for containerd image
+	ImageLabelPuller            = "puller.containerd.io"
+	ImageLabelStarlightMetadata = "metadata.starlight.mc256.dev"
+
+	// ContentLabelStarlightMediaType is the media type of the content, can be manifest, config, or starlight
+	ContentLabelStarlightMediaType = "mediaType.starlight.mc256.dev"
+	// ContentLabelContainerdGC prevents containerd from removing the content
+	ContentLabelContainerdGC = "containerd.io/gc.ref.content"
+	// ContentLabelTraceCollect is set to true if we want to collect traces from the filesystem
+	ContentLabelTraceCollect = "trace-collect.starlight.mc256.dev"
+
+	// ---------------------------------------------------------------------------------
 	// Switch to false in `Makefile` when build for production environment
-	production = false
-
+	production        = false
 	ProjectIdentifier = "module github.com/mc256/starlight"
-
-	MediaTypeManifestV2 = "application/vnd.docker.distribution.manifest.v2+json"
 )
 
 // FindProjectRoot returns the root directory of the Git project if exists.

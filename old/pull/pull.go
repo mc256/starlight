@@ -8,7 +8,7 @@ package pull
 import (
 	"errors"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/ctr"
+	"github.com/mc256/starlight/old/ctr"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )

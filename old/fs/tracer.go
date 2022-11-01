@@ -22,9 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/platforms"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/mc256/starlight/old/util"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -34,6 +31,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+	"github.com/mc256/starlight/old/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -159,7 +157,6 @@ type OptimizedGroup struct {
 type TraceCollection struct {
 	tracerMap map[string][]Tracer
 	Groups    []*OptimizedGroup
-	Platform  v1.Platform `json:"platform"`
 }
 
 func (tc TraceCollection) ToJSONBuffer() []byte {
@@ -187,18 +184,9 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 		return nil, err
 	}
 
-	platform := platforms.DefaultSpec()
-
 	tc := &TraceCollection{
 		tracerMap: make(map[string][]Tracer),
 		Groups:    make([]*OptimizedGroup, 0),
-		Platform: v1.Platform{
-			Architecture: platform.Architecture,
-			OS:           platform.OS,
-			OSVersion:    platform.OSVersion,
-			OSFeatures:   platform.OSFeatures,
-			Variant:      platform.Variant,
-		},
 	}
 
 	for _, f := range files {

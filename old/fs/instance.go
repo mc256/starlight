@@ -27,8 +27,8 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-// FsInstance should be created using
-type FsInstance struct {
+// Instance should be created using
+type Instance struct {
 	r    *Receiver
 	Root *FsEntry
 
@@ -49,21 +49,21 @@ type FsInstance struct {
 	tracer   *Tracer
 }
 
-func (fi *FsInstance) GetRwTraceableBlobDigest() common.TraceableBlobDigest {
+func (fi *Instance) GetRwTraceableBlobDigest() common.TraceableBlobDigest {
 	return common.TraceableBlobDigest{
 		Digest: fi.rwLayerHash, ImageName: fi.name,
 	}
 }
 
-func (fi *FsInstance) GetRwLayerPath() string        { return fi.rwLayerPath }
-func (fi *FsInstance) GetRwLayerHash() digest.Digest { return fi.rwLayerHash }
-func (fi *FsInstance) GetImageName() string          { return fi.name }
-func (fi *FsInstance) GetImageTag() string           { return fi.tag }
-func (fi *FsInstance) GetMountPoint() string         { return fi.mountPoint }
-func (fi *FsInstance) GetServer() *fuse.Server       { return fi.server }
+func (fi *Instance) GetRwLayerPath() string        { return fi.rwLayerPath }
+func (fi *Instance) GetRwLayerHash() digest.Digest { return fi.rwLayerHash }
+func (fi *Instance) GetImageName() string          { return fi.name }
+func (fi *Instance) GetImageTag() string           { return fi.tag }
+func (fi *Instance) GetMountPoint() string         { return fi.mountPoint }
+func (fi *Instance) GetServer() *fuse.Server       { return fi.server }
 
-func newFsInstance(r *Receiver, layerLookupMap *[]*LayerMeta, d digest.Digest, rwLayerPath, imageName, imageTag string) *FsInstance {
-	return &FsInstance{
+func newFsInstance(r *Receiver, layerLookupMap *[]*LayerMeta, d digest.Digest, rwLayerPath, imageName, imageTag string) *Instance {
+	return &Instance{
 		r:              r,
 		layerLookupMap: layerLookupMap,
 		rwLayerHash:    d,
@@ -76,14 +76,14 @@ func newFsInstance(r *Receiver, layerLookupMap *[]*LayerMeta, d digest.Digest, r
 }
 
 // Teardown unmounts the file system and close the logging file if there is one writing
-func (fi *FsInstance) Teardown() error {
+func (fi *Instance) Teardown() error {
 	if fi.tracer != nil {
 		_ = fi.tracer.Close()
 	}
 	return fi.GetServer().Unmount()
 }
 
-func (fi *FsInstance) SetOptimizerOn(optimizeGroup string) (err error) {
+func (fi *Instance) SetOptimizerOn(optimizeGroup string) (err error) {
 	fi.tracer, err = NewTracer(optimizeGroup, fi.name, fi.tag)
 	fi.optimize = true
 	if err != nil {
@@ -92,7 +92,7 @@ func (fi *FsInstance) SetOptimizerOn(optimizeGroup string) (err error) {
 	return nil
 }
 
-func (fi *FsInstance) NewFuseServer(dir string, options *fs.Options, debug bool) (*fuse.Server, error) {
+func (fi *Instance) NewFuseServer(dir string, options *fs.Options, debug bool) (*fuse.Server, error) {
 	fi.rootInode = &StarlightFsNode{
 		Inode: fs.Inode{},
 		Ent:   fi.Root,

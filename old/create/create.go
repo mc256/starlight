@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	"github.com/mc256/starlight/ctr"
+	"github.com/mc256/starlight/old/ctr"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"

@@ -7,20 +7,18 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 )
 
 type Snapshotter struct {
+	root string
 }
 
-func NewSnapshotter() *Snapshotter {
-	return &Snapshotter{}
-}
-
-func (s *Snapshotter) findOutWhy() {
-	fmt.Println("find out why")
+func NewSnapshotter(root string) *Snapshotter {
+	return &Snapshotter{
+		root: root,
+	}
 }
 
 // Stat returns the info for an active or committed snapshot by name or
@@ -29,7 +27,6 @@ func (s *Snapshotter) findOutWhy() {
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
 func (s *Snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -37,7 +34,6 @@ func (s *Snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, err
 //
 // Only mutable properties of a snapshot may be updated.
 func (s *Snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -50,7 +46,6 @@ func (s *Snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 // attempt to honer context cancellation and avoid taking locks when making
 // the calculation.
 func (s *Snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -60,7 +55,6 @@ func (s *Snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 //
 // This can be used to recover mounts after calling View or Prepare.
 func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -79,7 +73,6 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 //
 // Multiple calls to Prepare or View with the same key should fail.
 func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -97,7 +90,6 @@ func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 // To collect the resources associated with key, Remove must be called with
 // key as the argument.
 func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -110,7 +102,6 @@ func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 //
 // After commit, the snapshot identified by key is removed.
 func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -121,7 +112,6 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 // If the snapshot is a parent of another snapshot, its children must be
 // removed before proceeding.
 func (s *Snapshotter) Remove(ctx context.Context, key string) error {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -134,7 +124,6 @@ func (s *Snapshotter) Remove(ctx context.Context, key string) error {
 //  kind (active,view,committed)
 //  labels.(label)
 func (s *Snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, filters ...string) error {
-	s.findOutWhy()
 	panic("not implemented")
 }
 
@@ -145,6 +134,5 @@ func (s *Snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, filters .
 //
 // Close returns nil when it is already closed.
 func (s *Snapshotter) Close() error {
-	s.findOutWhy()
 	panic("not implemented")
 }

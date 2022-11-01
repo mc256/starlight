@@ -84,7 +84,7 @@ type TemplateEntry struct {
 	Entry
 }
 
-func (t *TemplateEntry) recursiveDeepCopy(fi *FsInstance) *FsEntry {
+func (t *TemplateEntry) recursiveDeepCopy(fi *Instance) *FsEntry {
 	source := t.TraceableEntry.Source
 	ent := NewFsEntry(fi, t)
 	ent.Entry.SetSourceLayer(source)
@@ -98,7 +98,7 @@ func (t *TemplateEntry) recursiveDeepCopy(fi *FsInstance) *FsEntry {
 	return ent
 }
 
-func (t *TemplateEntry) DeepCopy(fi *FsInstance) *FsEntry {
+func (t *TemplateEntry) DeepCopy(fi *Instance) *FsEntry {
 	ent := &FsEntry{
 		Entry: Entry{
 			TraceableEntry: common.GetRootNode(),
@@ -127,11 +127,11 @@ type FsEntry struct {
 	Entry
 
 	stable  fuseFs.StableAttr
-	fi      *FsInstance
+	fi      *Instance
 	StateMu sync.Mutex
 }
 
-func NewFsEntry(fi *FsInstance, t *TemplateEntry) *FsEntry {
+func NewFsEntry(fi *Instance, t *TemplateEntry) *FsEntry {
 	ent := &FsEntry{
 		Entry: Entry{
 			TraceableEntry: t.TraceableEntry.DeepCopy(),

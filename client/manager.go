@@ -9,13 +9,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/containerd/containerd/images"
+	fusefs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util/receive"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 )
 
 // Manager should be unmarshalled from a json file and then Populate() should be called to populate other fields
@@ -26,15 +31,16 @@ type Manager struct {
 	compressLayerDigest []digest.Digest
 	diffDigest          []digest.Digest
 
-	//
-	reader *io.ReadCloser
-	cfg    *Configuration
-
-	//
-	img *v1.Image
+	cfg *Configuration
 
 	layers         map[int64]*receive.ImageLayer
 	stackSerialMap []int64
+
+	image       *images.Image
+	imageConfig *v1.Image
+	manifest    *v1.Manifest
+
+	fileLookUpMap []map[string]fs.ReceivedFile
 }
 
 func (m *Manager) getDirectory(layerHash string) string {
@@ -48,6 +54,17 @@ func (m *Manager) getPathByStack(stack int64) string {
 	return m.layers[m.stackSerialMap[stack]].Local
 }
 
+func (m *Manager) GetPathByLayer(stack int64) string {
+	return m.getPathByStack(stack)
+}
+
+func (m *Manager) LookUpFile(stack int64, filename string) fs.ReceivedFile {
+	if file, has := m.fileLookUpMap[stack][filename]; has {
+		return file
+	}
+	return nil
+}
+
 func (m *Manager) getPathBySerial(serial int64) string {
 	if layer, has := m.layers[serial]; has {
 		return layer.Local
@@ -55,8 +72,8 @@ func (m *Manager) getPathBySerial(serial int64) string {
 	panic("layer not found")
 }
 
-func (m *Manager) Extract() error {
-	if m.reader == nil {
+func (m *Manager) Extract(r *io.ReadCloser) error {
+	if r == nil {
 		return fmt.Errorf("cannot call extract if it has completed")
 	}
 
@@ -86,7 +103,7 @@ func (m *Manager) Extract() error {
 		}
 		for idx, ch := range c.Chunks {
 			b := bytes.NewBuffer(make([]byte, 0, ch.CompressedSize))
-			if n, err := io.CopyN(b, *m.reader, ch.CompressedSize); err != nil || n != ch.CompressedSize {
+			if n, err := io.CopyN(b, *r, ch.CompressedSize); err != nil || n != ch.CompressedSize {
 				return errors.Wrapf(err, "failed to read content %d-%d at %d", i, idx, c.Offset)
 			}
 			gr, err := gzip.NewReader(b)
@@ -105,16 +122,17 @@ func (m *Manager) Extract() error {
 	return nil
 }
 
-func (m *Manager) InitFromProxy(r *io.ReadCloser, cfg *Configuration, img *v1.Image) error {
+// Init populates the manager with the necessary information and data structures.
+// Use json.Unmarshal to unmarshal the json file from data storage into a Manager struct.
+func (m *Manager) Init(cfg *Configuration, image *images.Image, manifest *v1.Manifest, imageConfig *v1.Image) {
 	// init variables
-	m.reader = r
 	m.cfg = cfg
-	m.img = img
 	m.stackSerialMap = make([]int64, 0, len(m.Destination.Layers))
 	m.layers = make(map[int64]*receive.ImageLayer)
-	if m.reader == nil {
-		return fmt.Errorf("cannot call extract if it has completed")
-	}
+
+	m.image = image
+	m.manifest = manifest
+	m.imageConfig = imageConfig
 
 	// populate directory fields
 	for _, layer := range m.Destination.Layers {
@@ -138,24 +156,67 @@ func (m *Manager) InitFromProxy(r *io.ReadCloser, cfg *Configuration, img *v1.Im
 	for _, f := range m.RequestedFiles {
 		if _, isInPayload := f.InPayload(); isInPayload {
 			f.Ready = &m.Contents[f.PayloadOrder].Signal
+		} else {
+			f.Ready = nil
 		}
 	}
 
-	return nil
+	// build filesystem tree
+	m.fileLookUpMap = make([]map[string]fs.ReceivedFile, len(m.Destination.Layers))
+	for i, _ := range m.fileLookUpMap {
+		m.fileLookUpMap[i] = make(map[string]fs.ReceivedFile)
+	}
+	for _, f := range m.RequestedFiles {
+		f.InitFuseStableAttr()
+		f.InitModTime()
+		m.fileLookUpMap[f.Stack][f.Name] = f
+	}
+	for _, layer := range m.fileLookUpMap {
+		layer["."] = layer[""]
+		delete(layer, "")
+		layer["."].(*receive.ReferencedFile).Name = "."
+		for fn, f := range layer {
+			if fn == "." {
+				continue
+			}
+			base := filepath.Base(fn)
+			d := path.Dir(fn)
+			if p, has := layer[d]; has {
+				if base == ".wh..wh..opq" {
+					if p.(*receive.ReferencedFile).Xattrs == nil {
+						p.(*receive.ReferencedFile).Xattrs = make(map[string][]byte)
+					}
+					p.(*receive.ReferencedFile).Xattrs["trusted.overlay.opaque"] = []byte("y")
+					delete(layer, fn)
+					continue
+				}
+
+				p.AppendChild(f)
+				if strings.HasPrefix(base, ".wh.") {
+					f.(*receive.ReferencedFile).Name = filepath.Join(d, strings.TrimPrefix(base, ".wh."))
+					f.(*receive.ReferencedFile).DevMinor = 0
+					f.(*receive.ReferencedFile).DevMajor = 0
+					f.(*receive.ReferencedFile).GID = 0
+					f.(*receive.ReferencedFile).UID = 0
+					f.(*receive.ReferencedFile).Mode = 0x2000
+				}
+			}
+
+		}
+	}
 }
 
-func (m *Manager) InitFromContentStore(cfg *Configuration) error {
-	return nil
+func (m *Manager) GetImageManifestDigest() string {
+	return m.manifest.Config.Digest.String()
 }
 
-/*
-func (m *Manager) NewStarlightFS() *fs.FsInstance {
-	return nil
-}
-*/
+// NewStarlightFS creates FUSE server and mount to provided mount directory
+func (m *Manager) NewStarlightFS(mount string, stack int64, options *fusefs.Options, debug bool) (f *fs.Instance, err error) {
 
-// NewManager should not be used directly,
-// Create Manager object using json.Unmarshal and init it using InitFromProxy or InitFromContentStore
-func NewManager() *Manager {
-	panic("do not use this method, use InitFromProxy or InitFromContentStore instead")
+	f, err = fs.NewInstance(m, m.fileLookUpMap[stack]["."], stack, mount, options, debug)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create new filesystem instance")
+	}
+
+	return
 }

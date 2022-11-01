@@ -7,8 +7,14 @@ package receive
 
 import (
 	"fmt"
+	fuseFs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util/common"
+	"golang.org/x/sys/unix"
 	"path/filepath"
+	"syscall"
+	"unsafe"
 )
 
 type ImageLayer struct {
@@ -69,8 +75,89 @@ type ReferencedFile struct {
 	// if the file is not available on the client then PayloadOrder is non-zero shows when this file can be ready
 	PayloadOrder int `json:"O,omitempty"`
 
+	// if Ready is nil or closed, means the file is ready
 	Ready *chan interface{} `json:"-"`
+
+	stable   fuseFs.StableAttr
+	children []fs.ReceivedFile
 }
+
+// ------------------------------------------
+// use in file system
+//
+
+func (r *ReferencedFile) GetChildren() []fs.ReceivedFile {
+	return r.children
+}
+
+func (r *ReferencedFile) AppendChild(children fs.ReceivedFile) {
+	if r.children == nil {
+		r.children = make([]fs.ReceivedFile, 0)
+	}
+	r.children = append(r.children, children)
+}
+
+func (r *ReferencedFile) IsReady() bool {
+	return r.Ready == nil
+}
+
+func (r *ReferencedFile) InitFuseStableAttr() {
+	r.stable.Ino = uint64(uintptr(unsafe.Pointer(r)))
+	r.stable.Gen = 0
+	r.stable.Mode = modeOfEntry(r)
+}
+
+func (r *ReferencedFile) GetAttr(out *fuse.Attr) syscall.Errno {
+	out.Ino = r.stable.Ino
+	out.Size = uint64(r.Size)
+	if r.IsDir() {
+		out.Size = 4096
+	} else if r.Type == "symlink" {
+		out.Size = uint64(len(r.LinkName))
+	}
+	r.SetBlockSize(out)
+	mtime := r.ModTime()
+	out.SetTimes(&mtime, &mtime, &mtime)
+	out.Mode = r.stable.Mode
+	out.Owner = fuse.Owner{Uid: uint32(r.UID), Gid: uint32(r.GID)}
+	out.Rdev = uint32(unix.Mkdev(uint32(r.DevMajor), uint32(r.DevMinor)))
+	out.Nlink = uint32(r.NumLink)
+	if out.Nlink == 0 {
+		out.Nlink = 1 // zero "NumLink" means one.
+	}
+	return 0
+}
+
+func (r *ReferencedFile) GetXAttrs() map[string][]byte {
+	if r.Xattrs == nil {
+		return make(map[string][]byte)
+	}
+	return r.Xattrs
+}
+
+func (r *ReferencedFile) GetName() string {
+	return r.Name
+}
+
+func (r *ReferencedFile) GetStableAttr() *fuseFs.StableAttr {
+	return &r.stable
+}
+
+func (r *ReferencedFile) GetLinkName() string {
+	return r.LinkName
+}
+
+func (r *ReferencedFile) GetBaseDir() string {
+	return filepath.Join(r.Digest[7:8], r.Digest[8:10], r.Digest[10:12])
+}
+
+func (r *ReferencedFile) GetRealPath() string {
+	return filepath.Join(r.GetBaseDir(), r.Digest[12:])
+}
+
+// ------------------------------------------
+// used in extract from the delta bundle
+//
 
 func (r *ReferencedFile) ExistingFsIndex() (layerSerial int64, existing bool) {
 	if r.ReferenceFsId > 0 {

@@ -7,7 +7,7 @@ require (
 	github.com/containerd/continuity v0.3.0
 	github.com/google/go-containerregistry v0.5.1
 	github.com/google/uuid v1.3.0
-	github.com/hanwen/go-fuse/v2 v2.1.0
+	github.com/hanwen/go-fuse/v2 v2.1.1-0.20221003202731-4c25c9c1eece // resolved overlayfs OICTL issue in https://github.com/hanwen/go-fuse/pull/408
 	github.com/lib/pq v1.10.6
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198

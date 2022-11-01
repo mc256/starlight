@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mc256/starlight/client"
+	fs3 "github.com/mc256/starlight/old/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
-	starlightfs "github.com/mc256/starlight/fs"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -48,11 +48,11 @@ type snapshotter struct {
 	ms *storage.MetaStore
 	db *bbolt.DB
 
-	layerStore *starlightfs.LayerStore
-	receiver   map[string]*starlightfs.Receiver
+	layerStore *fs3.LayerStore
+	receiver   map[string]*fs3.Receiver
 
 	//imageReadersMux sync.Mutex
-	fsMap   map[string]*starlightfs.FsInstance
+	fsMap   map[string]*fs3.Instance
 	fsTrace bool
 
 	cfg              *client.Configuration
@@ -79,7 +79,7 @@ func NewSnapshotter(ctx context.Context, cfg *client.Configuration) (snapshots.S
 	}
 
 	// root path for starlight fs
-	layerStore, err := starlightfs.NewLayerStore(ctx, db, filepath.Join(cfg.FileSystemRoot, "sfs"))
+	layerStore, err := fs3.NewLayerStore(ctx, db, filepath.Join(cfg.FileSystemRoot, "sfs"))
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +95,8 @@ func NewSnapshotter(ctx context.Context, cfg *client.Configuration) (snapshots.S
 
 		layerStore: layerStore,
 
-		receiver: make(map[string]*starlightfs.Receiver, 0),
-		fsMap:    make(map[string]*starlightfs.FsInstance, 0),
+		receiver: make(map[string]*fs3.Receiver, 0),
+		fsMap:    make(map[string]*fs3.Instance, 0),
 	}, nil
 }
 

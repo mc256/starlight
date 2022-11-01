@@ -51,7 +51,7 @@ type Receiver struct {
 	// we must perform a deep-copy of this tree.
 	fsTemplate []TocEntry
 	// fsInstances that associates with this ImageReader.
-	fsInstances []*FsInstance
+	fsInstances []*Instance
 
 	// imageMap helps you to find the corresponding index in other data structure
 	imageMap map[string]int
@@ -94,7 +94,7 @@ func (r *Receiver) GetLayerMounts() []mount.Mount {
 // - snapshotId is the absolute path will be created to hold the rw layer and the mounting point.
 // - checkpoint is the starting point for the image reader
 // - optimize determines whether the file system should collect access traces for optimization
-func (r *Receiver) NewFsInstance(imageName, imageTag, snapshotId string, optimize bool, optimizeGroup string) (*FsInstance, error) {
+func (r *Receiver) NewFsInstance(imageName, imageTag, snapshotId string, optimize bool, optimizeGroup string) (*Instance, error) {
 	// Fs ID
 	randBuf := make([]byte, 64)
 	_, _ = rand.Read(randBuf)
@@ -423,7 +423,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 		entryMap: make(map[int64]*[]TocEntry),                   // #3
 
 		fsTemplate:  make([]TocEntry, 0, len(header.Images)), // #3
-		fsInstances: make([]*FsInstance, 0),                  // Snapshotter
+		fsInstances: make([]*Instance, 0),                    // Snapshotter
 
 		name:   util2.ByImageName(header.Images).String(),
 		prefix: prefix,

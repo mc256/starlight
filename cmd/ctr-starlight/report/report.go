@@ -22,7 +22,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"

@@ -85,9 +85,9 @@ func (s *SnapshotterService) Pull(from, proxy, ref string) (err error) {
 	}
 
 	labels := map[string]string{
-		util.ContainerdGCLabel: time.Now().UTC().Format(time.RFC3339),
-		util.SnapshotterLabel:  util.Version,
-		util.ProxyLabel:        proxy,
+		util.ContentLabelContainerdGC: time.Now().UTC().Format(time.RFC3339),
+		util.SnapshotterLabel:         util.Version,
+		util.ProxyLabel:               proxy,
 	}
 
 	// "" -> ref()
@@ -128,16 +128,16 @@ func (s *SnapshotterService) Create(ref, containerName string, optimize bool) (s
 	}).Info("found starlight snapshot")
 
 	labels := map[string]string{
-		util.ContainerdGCLabel: time.Now().UTC().Format(time.RFC3339),
-		util.SnapshotterLabel:  info.Labels[util.SnapshotterLabel],
-		util.ProxyLabel:        info.Labels[util.ProxyLabel],
+		util.ContentLabelContainerdGC: time.Now().UTC().Format(time.RFC3339),
+		util.SnapshotterLabel:         info.Labels[util.SnapshotterLabel],
+		util.ProxyLabel:               info.Labels[util.ProxyLabel],
 	}
 
 	if optimize {
 		labels[util.OptimizeLabel] = "True"
 	}
 
-	final := s.GetHash(fmt.Sprintf("%s%v", containerName, labels[util.ContainerdGCLabel]))
+	final := s.GetHash(fmt.Sprintf("%s%v", containerName, labels[util.ContentLabelContainerdGC]))
 	if mnt, err = s.sn.Prepare(
 		s.ctx,
 		accRef,
