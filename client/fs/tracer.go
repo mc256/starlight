@@ -38,6 +38,7 @@ import (
 
 type TraceItem struct {
 	FileName string        `json:"f"`
+	Stack    int64         `json:"s"`
 	Access   time.Duration `json:"a"`
 	Wait     time.Duration `json:"w"`
 }
@@ -51,6 +52,7 @@ func (b ByAccessTime) Len() int {
 func (b ByAccessTime) Less(i, j int) bool {
 	return b[i].Access < b[j].Access
 }
+
 func (b ByAccessTime) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
 }
@@ -80,9 +82,10 @@ type Tracer struct {
 	Seq           []*TraceItem `json:"seq"`
 }
 
-func (t *Tracer) Log(fileName string, accessTime, completeTime time.Time) {
+func (t *Tracer) Log(fileName string, stack int64, accessTime, completeTime time.Time) {
 	item := TraceItem{
 		FileName: fileName,
+		Stack:    stack,
 		Access:   accessTime.Sub(t.StartTime),
 		Wait:     completeTime.Sub(accessTime),
 	}
@@ -113,7 +116,7 @@ func NewTracer(optimizeGroup, digest string) (*Tracer, error) {
 	if err != nil {
 		return nil, err
 	}
-	logPath := path.Join(os.TempDir(), "starlight-optimizer", fmt.Sprintf("%05d.log", r))
+	logPath := path.Join(os.TempDir(), "starlight-optimizer", fmt.Sprintf("%05d.json", r))
 
 	fh, err := os.Create(logPath)
 	if err != nil {
@@ -193,7 +196,7 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 	}
 
 	for _, f := range files {
-		if path.Ext(f.Name()) == ".log" {
+		if path.Ext(f.Name()) == ".json" {
 			buf, err := ioutil.ReadFile(path.Join(pp, f.Name()))
 			if err != nil {
 				log.G(ctx).WithField("file", f.Name()).Error("cannot read file")

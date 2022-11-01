@@ -338,7 +338,6 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	})
 
 	// send a ready signal
-	//close(*ready)
 
 	/*
 		// for debug purpose
@@ -354,9 +353,13 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	*/
 
 	// keep going and download layers
-	star.Init(c.cfg, &ctrImg, manifest, imageConfig)
-	err = star.Extract(&body)
-	if err != nil {
+	star.Init(c.cfg, false, &ctrImg, manifest, imageConfig)
+
+	// Image is ready (content is still on the way)
+	close(*ready)
+
+	// download content
+	if err = star.Extract(&body); err != nil {
 		return nil, errors.Wrapf(err, "failed to extract starlight image")
 	}
 
@@ -372,18 +375,25 @@ func (c *Client) Close() {
 }
 
 func (c *Client) StartSnapshotterService() {
+	var err error
 	// snapshotter plugin
 	rpc := grpc.NewServer()
-	c.sn = NewSnapshotter(c.cfg.FileSystemRoot)
+	c.sn, err = NewSnapshotter(c.ctx, c.cfg)
+	if err != nil {
+		log.G(c.ctx).WithError(err).Errorf("failed to create snapshotter")
+		os.Exit(1)
+		return
+	}
+
 	svc := snapshotservice.FromSnapshotter(c.sn)
-	if err := os.MkdirAll(filepath.Dir(c.cfg.Socket), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(c.cfg.Socket), 0700); err != nil {
 		log.G(c.ctx).WithError(err).Fatalf("failed to create directory %q for socket\n", filepath.Dir(c.cfg.Socket))
 		os.Exit(1)
 		return
 	}
 
 	// Try to remove the socket file to avoid EADDRINUSE
-	if err := os.RemoveAll(c.cfg.Socket); err != nil {
+	if err = os.RemoveAll(c.cfg.Socket); err != nil {
 		log.G(c.ctx).WithError(err).Fatalf("failed to remove %q\n", c.cfg.Socket)
 		os.Exit(1)
 		return
@@ -391,7 +401,8 @@ func (c *Client) StartSnapshotterService() {
 	snapshotsapi.RegisterSnapshotsServer(rpc, svc)
 
 	// Listen and serve
-	l, err := net.Listen("unix", c.cfg.Socket)
+	var l net.Listener
+	l, err = net.Listen("unix", c.cfg.Socket)
 	if err != nil {
 		log.G(c.ctx).WithError(err).Fatal("unix listen")
 		os.Exit(1)
@@ -406,6 +417,8 @@ func (c *Client) StartSnapshotterService() {
 		os.Exit(1)
 		return
 	}
+
+	// Remount existing snapshot instances
 }
 
 func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {

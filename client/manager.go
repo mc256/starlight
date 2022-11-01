@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Manager should be unmarshalled from a json file and then Populate() should be called to populate other fields
@@ -41,6 +42,9 @@ type Manager struct {
 	manifest    *v1.Manifest
 
 	fileLookUpMap []map[string]fs.ReceivedFile
+
+	tracer *fs.Tracer
+	fs     map[int64]*fs.Instance
 }
 
 func (m *Manager) getDirectory(layerHash string) string {
@@ -63,6 +67,12 @@ func (m *Manager) LookUpFile(stack int64, filename string) fs.ReceivedFile {
 		return file
 	}
 	return nil
+}
+
+func (m *Manager) LogTrace(stack int64, filename string, access, complete time.Time) {
+	if m.tracer != nil {
+		m.tracer.Log(filename, stack, access, complete)
+	}
 }
 
 func (m *Manager) getPathBySerial(serial int64) string {
@@ -124,11 +134,15 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 
 // Init populates the manager with the necessary information and data structures.
 // Use json.Unmarshal to unmarshal the json file from data storage into a Manager struct.
-func (m *Manager) Init(cfg *Configuration, image *images.Image, manifest *v1.Manifest, imageConfig *v1.Image) {
+// - ready: if set to false, we will then use Extract() to get the content of the file
+// - cfg: configuration of the client
+// - image, manifest, imageConfig: information about the image (maybe we don't need this)
+func (m *Manager) Init(cfg *Configuration, ready bool, image *images.Image, manifest *v1.Manifest, imageConfig *v1.Image) {
 	// init variables
 	m.cfg = cfg
 	m.stackSerialMap = make([]int64, 0, len(m.Destination.Layers))
 	m.layers = make(map[int64]*receive.ImageLayer)
+	m.fs = make(map[int64]*fs.Instance)
 
 	m.image = image
 	m.manifest = manifest
@@ -148,16 +162,17 @@ func (m *Manager) Init(cfg *Configuration, image *images.Image, manifest *v1.Man
 	}
 
 	// create a list of signals
-	for _, content := range m.Contents {
-		content.Signal = make(chan interface{})
-	}
-
-	// create filesystem template
-	for _, f := range m.RequestedFiles {
-		if _, isInPayload := f.InPayload(); isInPayload {
-			f.Ready = &m.Contents[f.PayloadOrder].Signal
-		} else {
-			f.Ready = nil
+	if !ready {
+		for _, content := range m.Contents {
+			content.Signal = make(chan interface{})
+		}
+		// create filesystem template
+		for _, f := range m.RequestedFiles {
+			if _, isInPayload := f.InPayload(); isInPayload {
+				f.Ready = &m.Contents[f.PayloadOrder].Signal
+			} else {
+				f.Ready = nil
+			}
 		}
 	}
 
@@ -204,19 +219,33 @@ func (m *Manager) Init(cfg *Configuration, image *images.Image, manifest *v1.Man
 
 		}
 	}
+
 }
 
-func (m *Manager) GetImageManifestDigest() string {
-	return m.manifest.Config.Digest.String()
+func (m *Manager) SetOptimizerOn(optimizeGroup, imageDigest string) (err error) {
+	m.tracer, err = fs.NewTracer(optimizeGroup, imageDigest)
+	return
+}
+
+func (m *Manager) Teardown() {
+	if m.tracer != nil {
+		_ = m.tracer.Close()
+	}
+	for _, v := range m.fs {
+		_ = v.Teardown()
+	}
 }
 
 // NewStarlightFS creates FUSE server and mount to provided mount directory
 func (m *Manager) NewStarlightFS(mount string, stack int64, options *fusefs.Options, debug bool) (f *fs.Instance, err error) {
-
+	has := false
+	if f, has = m.fs[stack]; has {
+		_ = f.Teardown()
+	}
 	f, err = fs.NewInstance(m, m.fileLookUpMap[stack]["."], stack, mount, options, debug)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create new filesystem instance")
 	}
-
+	m.fs[stack] = f
 	return
 }

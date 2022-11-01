@@ -155,6 +155,10 @@ func (r *ReferencedFile) GetRealPath() string {
 	return filepath.Join(r.GetBaseDir(), r.Digest[12:])
 }
 
+func (r *ReferencedFile) WaitForReady() {
+	<-*r.Ready
+}
+
 // ------------------------------------------
 // used in extract from the delta bundle
 //

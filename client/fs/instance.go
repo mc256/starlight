@@ -12,10 +12,9 @@ import (
 )
 
 type ImageManager interface {
-	// GetImageManifestDigest returns the digest of the image manifest
-	GetImageManifestDigest() (ref string)
 	GetPathByLayer(stack int64) string
 	LookUpFile(stack int64, filename string) ReceivedFile
+	LogTrace(stack int64, filename string, access, complete time.Time)
 }
 
 // Instance should be created using
@@ -29,9 +28,6 @@ type Instance struct {
 
 	manager ImageManager
 	server  *fuse.Server
-
-	optimize bool
-	tracer   *Tracer
 }
 
 func (fi *Instance) GetRootPath() string     { return fi.rootPath }
@@ -40,19 +36,7 @@ func (fi *Instance) GetServer() *fuse.Server { return fi.server }
 
 // Teardown unmounts the file system and close the logging file if there is one writing
 func (fi *Instance) Teardown() error {
-	if fi.tracer != nil {
-		_ = fi.tracer.Close()
-	}
 	return fi.GetServer().Unmount()
-}
-
-func (fi *Instance) SetOptimizerOn(optimizeGroup string) (err error) {
-	fi.tracer, err = NewTracer(optimizeGroup, fi.manager.GetImageManifestDigest())
-	fi.optimize = true
-	if err != nil {
-		return
-	}
-	return nil
 }
 
 func (fi *Instance) Serve() {
@@ -61,10 +45,8 @@ func (fi *Instance) Serve() {
 
 func NewInstance(m ImageManager, root ReceivedFile, stack int64, dir string, options *fs.Options, debug bool) (fi *Instance, err error) {
 	fi = &Instance{
-		manager:  m,
-		optimize: false,
-		tracer:   nil,
-		stack:    stack,
+		manager: m,
+		stack:   stack,
 	}
 
 	fi.rootInode = &StarlightFsNode{fs.Inode{}, root, fi}

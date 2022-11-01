@@ -7,12 +7,12 @@ package fs
 
 import (
 	"context"
-	"fmt"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -29,6 +29,7 @@ type ReceivedFile interface {
 	GetStableAttr() *fs.StableAttr
 	GetLinkName() string
 	GetRealPath() string
+	WaitForReady()
 }
 
 type StarlightFsNode struct {
@@ -47,6 +48,10 @@ func (n *StarlightFsNode) getRealPath() string {
 	return filepath.Join(p, pp)
 }
 
+func (n *StarlightFsNode) log(filename string, access, complete time.Time) {
+	n.instance.manager.LogTrace(n.instance.stack, filename, access, complete)
+}
+
 var _ = (fs.NodeLookuper)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Lookup(ctx context.Context, name string, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
@@ -60,8 +65,6 @@ func (n *StarlightFsNode) Lookup(ctx context.Context, name string, out *fuse.Ent
 		return nil, err
 	}
 	out.Attr = attr
-	fmt.Printf("------|%v\n", attr)
-
 	return n.NewInode(ctx, &StarlightFsNode{
 		ReceivedFile: f,
 		instance:     n.instance,
@@ -158,6 +161,14 @@ var _ = (fs.NodeOpener)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
 	r := n.getRealPath()
+
+	access := time.Now()
+	if !n.IsReady() {
+		n.WaitForReady()
+	}
+	complete := time.Now()
+	n.log(n.GetName(), access, complete)
+
 	fd, err := syscall.Open(r, int(flags), 0)
 	if err != nil {
 		return nil, 0, fs.ToErrno(err)

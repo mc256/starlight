@@ -80,6 +80,13 @@ create-deb-package: change-version-number set-production build-starlight-daemon 
 	dh_builddeb
 	dpkg-deb --info ./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb
 
+.PHONY: update-protobuf
+update-protobuf:
+	protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    client/api/v0.2/api.proto
+
+
 ######################################################################
 ###### Platform dependent build
 

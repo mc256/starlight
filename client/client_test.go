@@ -161,5 +161,4 @@ func Test_WriteContent(t *testing.T) {
 		t.Error(err)
 		return
 	}
-
 }
