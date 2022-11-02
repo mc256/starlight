@@ -187,16 +187,25 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 		}
 	}
 
-	//client.NewSnapshotterGrpcService(c, cfg)
 	var slc *client.Client
+
 	slc, err = client.NewClient(c, cfg)
 	if err != nil {
 		log.G(c).
 			WithError(err).
 			Fatal("failed to create starlight daemon client")
+		os.Exit(1)
+		return
 	}
 
-	slc.StartSnapshotterService()
+	err = slc.StartSnapshotterService()
+	if err != nil {
+		log.G(c).
+			WithError(err).
+			Fatal("failed to start snapshotter service")
+		os.Exit(1)
+		return
+	}
 
 	wait := make(chan interface{})
 	si := make(chan os.Signal, 1)

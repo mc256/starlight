@@ -40,6 +40,11 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 		return
 	}
 
+	err = c.InitSnapshotter()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	//plt := platforms.Format(platforms.DefaultSpec())
 	//t.Log("pulling image", "platform", plt)
 	ready := make(chan bool)
@@ -157,6 +162,36 @@ func Test_WriteContent(t *testing.T) {
 	}, content.WithLabels(map[string]string{
 		"containerd.io/gasdft": "true",
 	}))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+}
+
+func TestClient_scanExistingFilesystems(t *testing.T) {
+	cfg, _, _, _ := LoadConfig("/root/daemon.json")
+	c, err := NewClient(context.Background(), cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	c.scanExistingFilesystems()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+}
+
+func TestClient_scanSnapshots(t *testing.T) {
+	cfg, _, _, _ := LoadConfig("/root/daemon.json")
+	c, err := NewClient(context.Background(), cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	c.scanSnapshots()
 	if err != nil {
 		t.Error(err)
 		return

@@ -17,6 +17,8 @@ import (
 	"github.com/containerd/containerd/contrib/snapshotservice"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
@@ -24,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"net"
 	"os"
@@ -32,6 +35,13 @@ import (
 	"time"
 )
 
+type MountPoint struct {
+	// active mount point for snapshots
+	mount string
+	// chainIDs that are using the mount point
+	snapshots []*snapshots.Info
+}
+
 type Client struct {
 	ctx    context.Context
 	cfg    *Configuration
@@ -39,6 +49,8 @@ type Client struct {
 	server *grpc.Server
 	sn     *Snapshotter
 	cs     content.Store
+
+	existingLayers map[string]*MountPoint
 }
 
 func escapeSlashes(s string) string {
@@ -321,12 +333,13 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	}
 
 	// create image
+	mdd := digest.Digest(md)
 	is := c.client.ImageService()
 	ctrImg, err = is.Create(c.ctx, images.Image{
 		Name: ref,
 		Target: v1.Descriptor{
 			MediaType: util.ImageMediaTypeManifestV2,
-			Digest:    digest.Digest(md),
+			Digest:    mdd,
 			Size:      int64(len(man)),
 		},
 		Labels: map[string]string{
@@ -336,6 +349,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	})
+	log.G(c.ctx).WithField("image", ctrImg.Name).Debugf("created image")
 
 	// send a ready signal
 
@@ -353,7 +367,15 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	*/
 
 	// keep going and download layers
-	star.Init(c.cfg, false, &ctrImg, manifest, imageConfig)
+	star.Init(c.cfg, false, manifest, imageConfig, mdd)
+
+	if err = star.PrepareDirectories(); err != nil {
+		return nil, errors.Wrapf(err, "failed to initialize directories")
+	}
+
+	if err = star.CreateSnapshots(c); err != nil {
+		return nil, errors.Wrapf(err, "failed to create snapshots")
+	}
 
 	// Image is ready (content is still on the way)
 	close(*ready)
@@ -374,51 +396,171 @@ func (c *Client) Close() {
 	os.Exit(1)
 }
 
-func (c *Client) StartSnapshotterService() {
-	var err error
-	// snapshotter plugin
-	rpc := grpc.NewServer()
+func (c *Client) scanExistingFilesystems() {
+	var (
+		err                    error
+		dir1, dir2, dir3, dir4 []fs.FileInfo
+		x1, x2, x3             bool
+	)
+	dir1, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers"))
+	if err != nil {
+		return
+	}
+	for _, d1 := range dir1 {
+		x1 = false
+		if d1.IsDir() && len(d1.Name()) == 1 {
+			dir2, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
+				d1.Name(),
+			))
+			if err != nil {
+				continue
+			}
+			for _, d2 := range dir2 {
+				x2 = false
+				if d2.IsDir() && len(d2.Name()) == 2 {
+					dir3, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
+						d1.Name(), d2.Name(),
+					))
+					if err != nil {
+						continue
+					}
+					for _, d3 := range dir3 {
+						x3 = false
+						if d3.IsDir() && len(d3.Name()) == 2 {
+							dir4, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
+								d1.Name(), d2.Name(), d3.Name(),
+							))
+							if err != nil {
+								continue
+							}
+							for _, d4 := range dir4 {
+								if d4.IsDir() {
+									d := filepath.Join(c.cfg.FileSystemRoot, "layers",
+										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+									)
+									h := fmt.Sprintf("sha256:%s%s%s%s",
+										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+									)
+									completeFile := filepath.Join(d, "complete.json")
+									if _, err = os.Stat(completeFile); err != nil {
+										_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
+											d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+										))
+										log.G(c.ctx).WithField("digest", h).Info("removed incomplete layer")
+									} else {
+										x1, x2, x3 = true, true, true
+										c.existingLayers[h] = &MountPoint{
+											mount:     "",
+											snapshots: make([]*snapshots.Info, 0),
+										}
+										log.G(c.ctx).WithField("digest", h).Info("found layer")
+									}
+								}
+							}
+						}
+						if !x3 {
+							_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
+								d1.Name(), d2.Name(), d3.Name(),
+							))
+						}
+					}
+				}
+				if !x2 {
+					_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
+						d1.Name(), d2.Name(),
+					))
+				}
+			}
+		}
+		if !x1 {
+			_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
+				d1.Name(),
+			))
+		}
+	}
+
+	return
+}
+
+func (c *Client) scanSnapshots() (err error) {
+	ct, t, err := c.sn.ms.TransactionContext(c.sn.ctx, false)
+	if err != nil {
+		return err
+	}
+	defer t.Rollback()
+	return storage.WalkInfo(ct, func(ctx context.Context, info snapshots.Info) error {
+		// find snapshots and mount them
+		ctxInner, t, err := c.sn.ms.TransactionContext(c.sn.ctx, false)
+		if err != nil {
+			return err
+		}
+		defer t.Rollback()
+		idx, _, _, err := storage.GetInfo(ctxInner, info.Name)
+		if err != nil {
+			return err
+		}
+		log.G(c.ctx).
+			WithField("snapshot", info.Name).
+			WithField("parent", info.Parent).
+			WithField("index", idx).
+			WithField("labels", info.Labels).
+			Info("found snapshot")
+
+		// TODO: Remount instance if it is not mounted
+
+		return nil
+	})
+}
+
+func (c *Client) InitSnapshotter() (err error) {
+
+	log.G(c.ctx).
+		Info("starlight snapshotter service starting")
+
+	c.server = grpc.NewServer()
+
 	c.sn, err = NewSnapshotter(c.ctx, c.cfg)
 	if err != nil {
-		log.G(c.ctx).WithError(err).Errorf("failed to create snapshotter")
-		os.Exit(1)
-		return
+		return errors.Wrapf(err, "failed to create snapshotter")
 	}
 
 	svc := snapshotservice.FromSnapshotter(c.sn)
 	if err = os.MkdirAll(filepath.Dir(c.cfg.Socket), 0700); err != nil {
-		log.G(c.ctx).WithError(err).Fatalf("failed to create directory %q for socket\n", filepath.Dir(c.cfg.Socket))
-		os.Exit(1)
-		return
+		return errors.Wrapf(err, "failed to create directory %q for socket", filepath.Dir(c.cfg.Socket))
 	}
 
 	// Try to remove the socket file to avoid EADDRINUSE
 	if err = os.RemoveAll(c.cfg.Socket); err != nil {
-		log.G(c.ctx).WithError(err).Fatalf("failed to remove %q\n", c.cfg.Socket)
-		os.Exit(1)
-		return
+		return errors.Wrapf(err, "failed to remove %q", c.cfg.Socket)
 	}
-	snapshotsapi.RegisterSnapshotsServer(rpc, svc)
 
+	snapshotsapi.RegisterSnapshotsServer(c.server, svc)
+	return nil
+}
+
+func (c *Client) StartSnapshotter() (err error) {
 	// Listen and serve
 	var l net.Listener
 	l, err = net.Listen("unix", c.cfg.Socket)
 	if err != nil {
-		log.G(c.ctx).WithError(err).Fatal("unix listen")
-		os.Exit(1)
-		return
+		return errors.Wrapf(err, "failed to listen on %q", c.cfg.Socket)
 	}
+
+	if err := c.server.Serve(l); err != nil {
+		return errors.Wrapf(err, "failed to serve snapshotter")
+	}
+
+	c.scanExistingFilesystems()
+
+	if err = c.scanSnapshots(); err != nil {
+		return errors.Wrapf(err, "failed to scan existing snapshots")
+	}
+
 	log.G(c.ctx).
 		WithField("addr", c.cfg.Socket).
 		Info("starlight snapshotter service started")
 
-	if err := rpc.Serve(l); err != nil {
-		log.G(c.ctx).WithError(err).Fatal("rpc serve")
-		os.Exit(1)
-		return
-	}
-
-	// Remount existing snapshot instances
+	return nil
 }
 
 func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
@@ -427,6 +569,8 @@ func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 		cfg:    cfg,
 		client: nil,
 		server: nil,
+
+		existingLayers: make(map[string]*MountPoint),
 	}
 
 	// containerd client
@@ -435,7 +579,7 @@ func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 		return nil, err
 	}
 
-	///var/lib/containerd/io.containerd.snapshotter.v1.starlight
+	// content store
 	c.cs = c.client.ContentStore()
 
 	return c, nil

@@ -7,7 +7,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -16,12 +15,9 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
 type Snapshotter struct {
@@ -29,47 +25,6 @@ type Snapshotter struct {
 	cfg  *Configuration
 	ms   *storage.MetaStore
 	lock sync.Mutex
-	ls   *LayerStorage
-}
-
-var (
-	letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-)
-
-func randSequence(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
-
-func getRandomId() string {
-	return fmt.Sprintf("starlightfs-%s", randSequence(10))
-}
-
-type LayerStorage struct {
-	Items []layerStorageItem `json:"items"`
-}
-
-type layerStorageItem struct {
-	Digest       string `json:"digest"`
-	Completed    string `json:"completed"`
-	completeTime time.Time
-}
-
-func (s *Snapshotter) SaveLayerStore() (err error) {
-	var buf []byte
-	buf, err = json.Marshal(s)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(filepath.Join(s.cfg.FileSystemRoot, "layers.json"), buf, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewSnapshotter(ctx context.Context, cfg *Configuration) (s *Snapshotter, err error) {
@@ -108,59 +63,87 @@ func (s *Snapshotter) getSnapshot(name string) (p string, err error) {
 	return "", nil
 }
 
-func (s *Snapshotter) addSnapshot(key, parent string) (err error) {
-	ctx, t, err := s.ms.TransactionContext(s.ctx, true)
+func (s *Snapshotter) addSnapshot(name, key, parent, fp string, ops ...snapshots.Opt) (sn *snapshots.Info, id string, err error) {
+	var (
+		ctx context.Context
+		t   storage.Transactor
+		du  fs.Usage
+		snn snapshots.Info
+	)
+	ctx, t, err = s.ms.TransactionContext(s.ctx, true)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create transaction context")
+		return nil, "", errors.Wrapf(err, "failed to create transaction context")
 	}
 	defer t.Rollback()
-	var ss storage.Snapshot
-	// parent --> key
-	ss, err = storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent)
-	log.G(s.ctx).WithFields(logrus.Fields{
-		"ID":     ss.ID,
-		"Kind":   ss.Kind,
-		"Parent": ss.ParentIDs,
-	}).Info("create snapshot")
-
+	// parent -> key
+	_, err = storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create snapshot")
+		return nil, "", errors.Wrapf(err, "failed to create snapshot")
 	}
-
-	if err = t.Commit(); err != nil {
-		return errors.Wrapf(err, "failed to commit transaction")
-	}
-	return nil
-}
-
-func (s *Snapshotter) commitSnapshot(name, key string) (err error) {
-	ctx, t, err := s.ms.TransactionContext(s.ctx, true)
+	du, err = fs.DiskUsage(ctx, fp)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create transaction context")
-	}
-	defer t.Rollback()
-
-	du, err := fs.DiskUsage(ctx, s.cfg.FileSystemRoot)
-	if err != nil {
-		return err
+		return nil, "", errors.Wrapf(err, "failed to get disk usage")
 	}
 	usage := snapshots.Usage(du)
-
-	var ss string
-	// key --> name
-	ss, err = storage.CommitActive(ctx, key, name, usage)
-	log.G(s.ctx).WithFields(logrus.Fields{
-		"ID": ss,
-	}).Info("commit snapshot")
-
+	// key -> name
+	id, err = storage.CommitActive(ctx, key, name, usage, ops...)
 	if err != nil {
-		return errors.Wrapf(err, "failed to commit snapshot")
+		return nil, "", errors.Wrapf(err, "failed to commit snapshot")
+	}
+	// get name
+	id, snn, _, err = storage.GetInfo(ctx, name)
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "failed to get snapshot info")
 	}
 
 	if err = t.Commit(); err != nil {
-		return errors.Wrapf(err, "failed to commit transaction")
+		return nil, "", errors.Wrapf(err, "failed to commit transaction")
 	}
-	return nil
+
+	return &snn, id, nil
+	/*
+		var (
+			ctx    context.Context
+			t1, t2 storage.Transactor
+		)
+		ctx, t1, err = s.ms.TransactionContext(s.ctx, true)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to create transaction context")
+		}
+		defer t1.Rollback()
+		// parent --> key
+		_, err = storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to create snapshot")
+		}
+		if err = t1.Commit(); err != nil {
+			return nil, "", errors.Wrapf(err, "failed to commit transaction")
+		}
+
+		ctx, t2, err = s.ms.TransactionContext(s.ctx, true)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to create transaction context")
+		}
+		defer t2.Rollback()
+
+		du, err := fs.DiskUsage(ctx, fp)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to get disk usage")
+		}
+		usage := snapshots.Usage(du)
+		// key --> name
+		id, err = storage.CommitActive(ctx, key, name, usage)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to commit snapshot")
+		}
+
+		if err = t2.Commit(); err != nil {
+			return nil, "", errors.Wrapf(err, "failed to commit transaction")
+		}
+
+		return nil, id, nil
+
+	*/
 }
 
 func (s *Snapshotter) removeSnapshot(key string) (err error) {
@@ -187,6 +170,8 @@ func (s *Snapshotter) removeSnapshot(key string) (err error) {
 	}
 	return nil
 }
+
+//////////////////////////////////////////////////////////////////////
 
 // Stat returns the info for an active or committed snapshot by name or
 // key.

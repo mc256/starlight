@@ -8,15 +8,19 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/snapshots"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/mc256/starlight/client/fs"
+	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/receive"
 	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,12 +38,17 @@ type Manager struct {
 
 	cfg *Configuration
 
-	layers         map[int64]*receive.ImageLayer
-	stackSerialMap []int64
+	//layers is a map from filesystem serial to receive.ImageLayer object
+	layers map[int64]*receive.ImageLayer
 
-	image       *images.Image
-	imageConfig *v1.Image
-	manifest    *v1.Manifest
+	//stackSerialMap is a map convert stack to filesystem serial (on the proxy side),
+	// it then can be use by layers to get the receive.ImageLayer object
+	stackSerialMap []int64
+	completedStack []bool
+
+	imageConfig    *v1.Image
+	manifest       *v1.Manifest
+	manifestDigest digest.Digest
 
 	fileLookUpMap []map[string]fs.ReceivedFile
 
@@ -47,14 +56,20 @@ type Manager struct {
 	fs     map[int64]*fs.Instance
 }
 
+type completionMessage struct {
+	Start    time.Time `json:"start"`
+	Complete time.Time `json:"complete"`
+}
+
 func (m *Manager) getDirectory(layerHash string) string {
 	return filepath.Join(m.cfg.FileSystemRoot, "layers", layerHash[7:8], layerHash[8:10], layerHash[10:12], layerHash[12:])
 }
 
+func (m *Manager) ignoreStack(stack int64) bool {
+	return m.completedStack[stack]
+}
+
 func (m *Manager) getPathByStack(stack int64) string {
-	if stack < 0 || stack >= int64(len(m.stackSerialMap)) {
-		panic("stack lookup out of range")
-	}
 	return m.layers[m.stackSerialMap[stack]].Local
 }
 
@@ -83,20 +98,26 @@ func (m *Manager) getPathBySerial(serial int64) string {
 }
 
 func (m *Manager) Extract(r *io.ReadCloser) error {
+	start := time.Now()
 	if r == nil {
 		return fmt.Errorf("cannot call extract if it has completed")
 	}
 
-	// create directories
-	for _, layer := range m.Destination.Layers {
-		err := os.MkdirAll(layer.Local, 0755)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Extract Contents
 	for i, c := range m.Contents {
+		// skip the layer if it already exists
+		if m.ignoreStack(c.Stack) {
+			totalCompressedSize := int64(0)
+			for _, ch := range c.Chunks {
+				totalCompressedSize += ch.CompressedSize
+			}
+			if n, err := io.CopyN(io.Discard, *r, totalCompressedSize); err != nil || n != totalCompressedSize {
+				return errors.Wrapf(err, "failed to discard %d bytes", totalCompressedSize)
+			}
+			continue
+		}
+
+		// regular extraction
 		p := m.getPathByStack(c.Stack)
 		if err := os.MkdirAll(filepath.Join(p, c.GetBaseDir()), 0755); err != nil {
 			return errors.Wrapf(err, "failed to create directory %s", filepath.Join(p, c.GetBaseDir()))
@@ -129,6 +150,66 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 		close(c.Signal) // send out signal that this content is ready
 	}
 
+	complete := time.Now()
+	for idx, layer := range m.Destination.Layers {
+		msg := &completionMessage{
+			Start:    start,
+			Complete: complete,
+		}
+		buf, _ := json.Marshal(msg)
+		if err := ioutil.WriteFile(filepath.Join(layer.Local, "completed.json"), buf, 0644); err != nil {
+			return errors.Wrapf(err, "failed to mark layer %d-%s as completed", idx, layer.Hash)
+		}
+		m.completedStack[idx] = true
+	}
+
+	return nil
+}
+
+func (m *Manager) PrepareDirectories() error {
+	// create directories
+	m.completedStack = make([]bool, len(m.stackSerialMap))
+	for idx, layer := range m.Destination.Layers {
+		if _, err := os.Stat(filepath.Join(layer.Local, "completed.json")); err == nil {
+			m.completedStack[idx] = true
+			continue
+		}
+		err := os.MkdirAll(layer.Local, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) CreateSnapshots(c *Client) (err error) {
+	diffs := m.imageConfig.RootFS.DiffIDs
+	chainIds := identity.ChainIDs(diffs)
+	prev := ""
+	for idx, chain := range chainIds {
+		d := m.layers[m.stackSerialMap[idx]].Hash
+		var (
+			info *snapshots.Info
+		)
+		info, _, err = c.sn.addSnapshot(chain.String(), d, prev, m.getPathByStack(int64(idx)),
+			snapshots.WithLabels(map[string]string{
+				util.SnapshotLabelRefImage: m.manifestDigest.String(),
+				util.SnapshotLabelRefLayer: fmt.Sprintf("%d", idx),
+			}))
+		if err != nil {
+			return errors.Wrapf(err, "failed prepare new image snapshots %s", chain.String())
+		}
+		prev = chain.String()
+
+		if v, has := c.existingLayers[d]; has {
+			v.snapshots = append(v.snapshots, info)
+		} else {
+			c.existingLayers[d] = &MountPoint{
+				mount:     "",
+				snapshots: []*snapshots.Info{info},
+			}
+		}
+	}
 	return nil
 }
 
@@ -137,16 +218,17 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 // - ready: if set to false, we will then use Extract() to get the content of the file
 // - cfg: configuration of the client
 // - image, manifest, imageConfig: information about the image (maybe we don't need this)
-func (m *Manager) Init(cfg *Configuration, ready bool, image *images.Image, manifest *v1.Manifest, imageConfig *v1.Image) {
+func (m *Manager) Init(cfg *Configuration, ready bool,
+	manifest *v1.Manifest, imageConfig *v1.Image, manifestDigest digest.Digest) {
 	// init variables
 	m.cfg = cfg
 	m.stackSerialMap = make([]int64, 0, len(m.Destination.Layers))
 	m.layers = make(map[int64]*receive.ImageLayer)
 	m.fs = make(map[int64]*fs.Instance)
 
-	m.image = image
 	m.manifest = manifest
 	m.imageConfig = imageConfig
+	m.manifestDigest = manifestDigest
 
 	// populate directory fields
 	for _, layer := range m.Destination.Layers {
@@ -216,10 +298,8 @@ func (m *Manager) Init(cfg *Configuration, ready bool, image *images.Image, mani
 					f.(*receive.ReferencedFile).Mode = 0x2000
 				}
 			}
-
 		}
 	}
-
 }
 
 func (m *Manager) SetOptimizerOn(optimizeGroup, imageDigest string) (err error) {

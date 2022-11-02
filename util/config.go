@@ -48,8 +48,9 @@ const (
 	ContentLabelStarlightMediaType = "mediaType.starlight.mc256.dev"
 	// ContentLabelContainerdGC prevents containerd from removing the content
 	ContentLabelContainerdGC = "containerd.io/gc.ref.content"
-	// ContentLabelTraceCollect is set to true if we want to collect traces from the filesystem
-	ContentLabelTraceCollect = "trace-collect.starlight.mc256.dev"
+
+	SnapshotLabelRefImage = "starlight.mc256.dev/ref.image"
+	SnapshotLabelRefLayer = "starlight.mc256.dev/ref.layer"
 
 	// ---------------------------------------------------------------------------------
 	// Switch to false in `Makefile` when build for production environment

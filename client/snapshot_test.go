@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"testing"
@@ -34,44 +35,6 @@ func Test_diffIds2(t *testing.T) {
 	fmt.Println(chainId)
 }
 
-func Test_SnapshotCommit(t *testing.T) {
-	cfg, _, _, _ := LoadConfig("/root/daemon.json")
-	ctx := context.TODO()
-	sn, err := NewSnapshotter(ctx, cfg)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	tempId := "alpha-test"
-	chainId := "sha256:bad4c2b21ac784690edb9fab9336c06f429523122db8258386b0816ea9ccff13"
-	err = sn.addSnapshot(tempId, "")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	err = sn.commitSnapshot(chainId, tempId)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	info, err := sn.Stat(ctx, chainId)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	fmt.Println(info)
-
-	/*
-		err = sn.removeSnapshot(chainId)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-	*/
-}
-
 func Test_SnapshotCommit2(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	ctx := context.TODO()
@@ -91,35 +54,17 @@ func Test_SnapshotCommit2(t *testing.T) {
 	chainIds := identity.ChainIDs(diffs)
 	prev := ""
 	for _, id := range chainIds {
-		tempId := getRandomId()
-		err = sn.addSnapshot(tempId, prev)
+		tempId := util.GetRandomId("starlightfs")
+		ss, _, err := sn.addSnapshot(id.String(), tempId, prev, "/tmp/starlightfs")
 		if err != nil {
 			t.Error(err)
 			return
 		}
 		prev = id.String()
 
-		err = sn.commitSnapshot(id.String(), tempId)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		info, err := sn.Stat(ctx, id.String())
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		fmt.Println(info)
+		fmt.Println(ss)
 	}
 
-	/*
-		err = sn.removeSnapshot(chainId)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-	*/
 }
 
 func Test_SnapshotWalk(t *testing.T) {
@@ -132,7 +77,12 @@ func Test_SnapshotWalk(t *testing.T) {
 	}
 
 	err = sn.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+		info, err := sn.Stat(ctx, info.Name)
+		if err != nil {
+			return err
+		}
 		fmt.Println(info)
+		fmt.Println(info.Labels)
 
 		return nil
 	})
