@@ -13,7 +13,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/mc256/starlight/client/fs"
-	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/receive"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -54,6 +53,10 @@ type Manager struct {
 
 	tracer *fs.Tracer
 	fs     map[int64]*fs.Instance
+}
+
+func (m *Manager) String() string {
+	return fmt.Sprintf("Manager{Image: %s, Layers: %d}", m.manifestDigest, len(m.layers))
 }
 
 type completionMessage struct {
@@ -191,24 +194,31 @@ func (m *Manager) CreateSnapshots(c *Client) (err error) {
 		var (
 			info *snapshots.Info
 		)
-		info, _, err = c.sn.addSnapshot(chain.String(), d, prev, m.getPathByStack(int64(idx)),
-			snapshots.WithLabels(map[string]string{
-				util.SnapshotLabelRefImage: m.manifestDigest.String(),
-				util.SnapshotLabelRefLayer: fmt.Sprintf("%d", idx),
-			}))
+		info, err = c.operator.AddSnapshot(
+			chain.String(), prev, m.manifestDigest.String(), d, int64(idx),
+		)
 		if err != nil {
 			return errors.Wrapf(err, "failed prepare new image snapshots %s", chain.String())
 		}
 		prev = chain.String()
 
-		if v, has := c.existingLayers[d]; has {
-			v.snapshots = append(v.snapshots, info)
-		} else {
-			c.existingLayers[d] = &MountPoint{
-				mount:     "",
-				snapshots: []*snapshots.Info{info},
+		idx := idx
+		go func() {
+			c.layerMapLock.Lock()
+			defer c.layerMapLock.Unlock()
+			if v, has := c.layerMap[d]; has {
+				v.snapshots[info.Name] = info
+			} else {
+				c.layerMap[d] = &mountPoint{
+					fs:        nil,
+					manager:   m,
+					stack:     int64(idx),
+					completed: false,
+
+					snapshots: map[string]*snapshots.Info{info.Name: info},
+				}
 			}
-		}
+		}()
 	}
 	return nil
 }

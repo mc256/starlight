@@ -18,7 +18,8 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/mc256/starlight/client/fs"
+	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
 	"github.com/opencontainers/go-digest"
@@ -26,31 +27,42 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"io"
-	"io/fs"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
-type MountPoint struct {
+type mountPoint struct {
 	// active mount point for snapshots
-	mount string
+	fs        *fs.Instance
+	manager   *Manager
+	stack     int64
+	completed bool
+
+	// filesystem
+
 	// chainIDs that are using the mount point
-	snapshots []*snapshots.Info
+	snapshots map[string]*snapshots.Info
 }
 
 type Client struct {
-	ctx    context.Context
-	cfg    *Configuration
-	client *containerd.Client
-	server *grpc.Server
-	sn     *Snapshotter
-	cs     content.Store
+	ctx context.Context
+	cfg *Configuration
+	cs  content.Store
 
-	existingLayers map[string]*MountPoint
+	client   *containerd.Client
+	server   *grpc.Server
+	listener net.Listener
+
+	operator *snapshotter.Operator
+	plugin   *snapshotter.Plugin
+
+	layerMapLock sync.Mutex
+	layerMap     map[string]*mountPoint
 }
 
 func escapeSlashes(s string) string {
@@ -69,6 +81,9 @@ func getImageFilter(ref string) string {
 func getDistributionSource(cfg string) string {
 	return fmt.Sprintf("starlight.mc256.dev/distribution.source.%s", cfg)
 }
+
+// -----------------------------------------------------------------------------
+// Base Image Searching
 
 func (c *Client) findImage(filter string) (img containerd.Image, err error) {
 	var list []containerd.Image
@@ -119,6 +134,9 @@ func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err erro
 	return img, nil
 }
 
+// -----------------------------------------------------------------------------
+// Image Pulling
+
 func (c *Client) readBody(body io.ReadCloser, s int64) (*bytes.Buffer, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, s))
 	m, err := io.CopyN(buf, body, s)
@@ -167,6 +185,27 @@ func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (e
 	if err != nil {
 		return errors.Wrapf(err, "failed to open writer for manifest")
 	}
+	return nil
+}
+
+func (c *Client) updateManifest(d string) (err error) {
+	pd := digest.Digest(d)
+	cs := c.client.ContentStore()
+
+	var info content.Info
+
+	info, err = cs.Info(c.ctx, pd)
+	if err != nil {
+		return err
+	}
+
+	info.Labels[util.ContentLabelCompletion] = time.Now().Format(time.RFC3339)
+	info, err = cs.Update(c.ctx, info)
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to mark manifest as completed")
+	}
+	log.G(c.ctx).WithField("digest", info.Digest).Debug("download completed")
 	return nil
 }
 
@@ -373,9 +412,11 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		return nil, errors.Wrapf(err, "failed to initialize directories")
 	}
 
-	if err = star.CreateSnapshots(c); err != nil {
-		return nil, errors.Wrapf(err, "failed to create snapshots")
-	}
+	/*
+		if err = star.CreateSnapshots(c); err != nil {
+			return nil, errors.Wrapf(err, "failed to create snapshots")
+		}
+	*/
 
 	// Image is ready (content is still on the way)
 	close(*ready)
@@ -385,7 +426,60 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		return nil, errors.Wrapf(err, "failed to extract starlight image")
 	}
 
+	// mark as completed
+	if err = c.updateManifest(md); err != nil {
+		return nil, errors.Wrapf(err, "failed to update manifest")
+	}
+
 	return
+}
+
+func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error) {
+
+	var (
+		buf  []byte
+		man  *v1.Manifest
+		cfg  *v1.Image
+		ii   content.Info
+		star Manager
+	)
+
+	cs := c.client.ContentStore()
+	ii, err = cs.Info(c.ctx, manifest)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get manifest info")
+	}
+
+	if len(ii.Labels[util.ContentLabelCompletion]) == 0 {
+		return nil, errors.New("image is not completed, remove and pull again")
+	}
+
+	starlight := digest.Digest(ii.Labels[fmt.Sprintf("%s.starlight", util.ContentLabelContainerdGC)])
+
+	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: manifest}); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(buf, &man); err != nil {
+		return nil, err
+	}
+
+	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: starlight}); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(buf, &star); err != nil {
+		return nil, err
+	}
+
+	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: man.Config.Digest}); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(buf, &cfg); err != nil {
+		return nil, err
+	}
+
+	star.Init(c.cfg, true, man, cfg, manifest)
+
+	return &star, nil
 }
 
 func (c *Client) Close() {
@@ -396,135 +490,90 @@ func (c *Client) Close() {
 	os.Exit(1)
 }
 
-func (c *Client) scanExistingFilesystems() {
-	var (
-		err                    error
-		dir1, dir2, dir3, dir4 []fs.FileInfo
-		x1, x2, x3             bool
-	)
-	dir1, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers"))
-	if err != nil {
-		return
-	}
-	for _, d1 := range dir1 {
-		x1 = false
-		if d1.IsDir() && len(d1.Name()) == 1 {
-			dir2, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
-				d1.Name(),
-			))
-			if err != nil {
-				continue
-			}
-			for _, d2 := range dir2 {
-				x2 = false
-				if d2.IsDir() && len(d2.Name()) == 2 {
-					dir3, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
-						d1.Name(), d2.Name(),
-					))
-					if err != nil {
-						continue
-					}
-					for _, d3 := range dir3 {
-						x3 = false
-						if d3.IsDir() && len(d3.Name()) == 2 {
-							dir4, err = ioutil.ReadDir(filepath.Join(c.cfg.FileSystemRoot, "layers",
-								d1.Name(), d2.Name(), d3.Name(),
-							))
-							if err != nil {
-								continue
-							}
-							for _, d4 := range dir4 {
-								if d4.IsDir() {
-									d := filepath.Join(c.cfg.FileSystemRoot, "layers",
-										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-									)
-									h := fmt.Sprintf("sha256:%s%s%s%s",
-										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-									)
-									completeFile := filepath.Join(d, "complete.json")
-									if _, err = os.Stat(completeFile); err != nil {
-										_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
-											d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-										))
-										log.G(c.ctx).WithField("digest", h).Info("removed incomplete layer")
-									} else {
-										x1, x2, x3 = true, true, true
-										c.existingLayers[h] = &MountPoint{
-											mount:     "",
-											snapshots: make([]*snapshots.Info, 0),
-										}
-										log.G(c.ctx).WithField("digest", h).Info("found layer")
-									}
-								}
-							}
-						}
-						if !x3 {
-							_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
-								d1.Name(), d2.Name(), d3.Name(),
-							))
-						}
-					}
-				}
-				if !x2 {
-					_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
-						d1.Name(), d2.Name(),
-					))
-				}
-			}
-		}
-		if !x1 {
-			_ = os.RemoveAll(filepath.Join(c.cfg.FileSystemRoot, "layers",
-				d1.Name(),
-			))
-		}
-	}
+// -----------------------------------------------------------------------------
+// Operator interface
 
-	return
+func (c *Client) GetFilesystemRoot() string {
+	return c.cfg.FileSystemRoot
 }
 
-func (c *Client) scanSnapshots() (err error) {
-	ct, t, err := c.sn.ms.TransactionContext(c.sn.ctx, false)
-	if err != nil {
+func (c *Client) AddMountingPoint(compressedLayerDigest string) {
+	c.layerMapLock.Lock()
+	defer c.layerMapLock.Unlock()
+
+	if _, has := c.layerMap[compressedLayerDigest]; !has {
+		c.layerMap[compressedLayerDigest] = &mountPoint{
+			fs:        nil,
+			manager:   nil,
+			stack:     -1,
+			completed: true,
+			snapshots: make(map[string]*snapshots.Info),
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Plugin interface
+
+func (c *Client) GetFilesystemPath(cd string) string {
+	return filepath.Join(c.cfg.FileSystemRoot, "layers", cd[7:8], cd[8:10], cd[10:12], cd[12:])
+}
+
+func (c *Client) GetMountingPoint(ssId string) string {
+	return filepath.Join(c.cfg.FileSystemRoot, "mnt", ssId)
+}
+
+func (c *Client) RemoveMounting(cd, sn string) error {
+	c.layerMapLock.Lock()
+	defer c.layerMapLock.Unlock()
+
+	// found the layer
+	layer, has := c.layerMap[cd]
+	if !has {
+		return nil
+	}
+
+	// found the snapshot
+	if _, has = layer.snapshots[sn]; !has {
+		return nil
+	}
+
+	// if there exists other snapshots, do not remove the layer
+	delete(layer.snapshots, sn)
+	if len(layer.snapshots) > 0 {
+		return nil
+	}
+
+	// otherwise, remove the layer
+	if layer.fs == nil {
+		return nil
+	}
+
+	if err := layer.fs.Teardown(); err != nil {
 		return err
 	}
-	defer t.Rollback()
-	return storage.WalkInfo(ct, func(ctx context.Context, info snapshots.Info) error {
-		// find snapshots and mount them
-		ctxInner, t, err := c.sn.ms.TransactionContext(c.sn.ctx, false)
-		if err != nil {
-			return err
-		}
-		defer t.Rollback()
-		idx, _, _, err := storage.GetInfo(ctxInner, info.Name)
-		if err != nil {
-			return err
-		}
-		log.G(c.ctx).
-			WithField("snapshot", info.Name).
-			WithField("parent", info.Parent).
-			WithField("index", idx).
-			WithField("labels", info.Labels).
-			Info("found snapshot")
 
-		// TODO: Remount instance if it is not mounted
+	// remove the mounting directory
+	_ = os.RemoveAll(layer.fs.GetMountPoint())
 
-		return nil
-	})
+	return nil
 }
 
-func (c *Client) InitSnapshotter() (err error) {
+// -----------------------------------------------------------------------------
+// Snapshotter related
 
+// InitSnapshotter initializes the snapshotter service
+func (c *Client) InitSnapshotter() (err error) {
 	log.G(c.ctx).
 		Info("starlight snapshotter service starting")
-
 	c.server = grpc.NewServer()
 
-	c.sn, err = NewSnapshotter(c.ctx, c.cfg)
+	c.plugin, err = snapshotter.NewPlugin(c.ctx, c, c.cfg.Metadata)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create snapshotter")
 	}
 
-	svc := snapshotservice.FromSnapshotter(c.sn)
+	svc := snapshotservice.FromSnapshotter(c.plugin)
 	if err = os.MkdirAll(filepath.Dir(c.cfg.Socket), 0700); err != nil {
 		return errors.Wrapf(err, "failed to create directory %q for socket", filepath.Dir(c.cfg.Socket))
 	}
@@ -538,39 +587,34 @@ func (c *Client) InitSnapshotter() (err error) {
 	return nil
 }
 
+// StartSnapshotter starts the snapshotter service, should be run in a goroutine
 func (c *Client) StartSnapshotter() (err error) {
 	// Listen and serve
-	var l net.Listener
-	l, err = net.Listen("unix", c.cfg.Socket)
+
+	c.listener, err = net.Listen("unix", c.cfg.Socket)
 	if err != nil {
 		return errors.Wrapf(err, "failed to listen on %q", c.cfg.Socket)
 	}
 
-	if err := c.server.Serve(l); err != nil {
-		return errors.Wrapf(err, "failed to serve snapshotter")
-	}
-
-	c.scanExistingFilesystems()
-
-	if err = c.scanSnapshots(); err != nil {
-		return errors.Wrapf(err, "failed to scan existing snapshots")
-	}
-
 	log.G(c.ctx).
-		WithField("addr", c.cfg.Socket).
+		WithField("socket", c.cfg.Socket).
 		Info("starlight snapshotter service started")
 
+	if err := c.server.Serve(c.listener); err != nil {
+		return errors.Wrapf(err, "failed to serve snapshotter")
+	}
 	return nil
 }
+
+// -----------------------------------------------------------------------------
 
 func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 	c = &Client{
 		ctx:    ctx,
 		cfg:    cfg,
 		client: nil,
-		server: nil,
 
-		existingLayers: make(map[string]*MountPoint),
+		layerMap: make(map[string]*mountPoint),
 	}
 
 	// containerd client

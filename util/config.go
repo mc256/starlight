@@ -48,9 +48,15 @@ const (
 	ContentLabelStarlightMediaType = "mediaType.starlight.mc256.dev"
 	// ContentLabelContainerdGC prevents containerd from removing the content
 	ContentLabelContainerdGC = "containerd.io/gc.ref.content"
+	ContentLabelCompletion   = "complete.starlight.mc256.dev"
 
-	SnapshotLabelRefImage = "starlight.mc256.dev/ref.image"
-	SnapshotLabelRefLayer = "starlight.mc256.dev/ref.layer"
+	// ---------------------------------------------------------------------------------
+	// Snapshot labels have a prefix of "containerd.io/snapshot/"
+	// or are the "containerd.io/snapshot.ref" label.
+	// SnapshotLabelRefImage is the digest of the image manifest
+	SnapshotLabelRefImage        = "containerd.io/snapshot/starlight/ref.image"
+	SnapshotLabelRefUncompressed = "containerd.io/snapshot/starlight/ref.uncompressed"
+	SnapshotLabelRefLayer        = "containerd.io/snapshot/starlight/ref.layer"
 
 	// ---------------------------------------------------------------------------------
 	// Switch to false in `Makefile` when build for production environment
