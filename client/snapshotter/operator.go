@@ -19,8 +19,11 @@ import (
 )
 
 type OperatorClient interface {
+	// GetFilesystemRoot gets the directory to store all layers
 	GetFilesystemRoot() string
-	AddMountingPoint(compressedLayerDigest string)
+
+	// AddCompletedLayers find out completed layer and save it to Client's layerMap
+	AddCompletedLayers(compressedLayerDigest string)
 }
 
 // Operator communicates with the containerd interface.
@@ -94,7 +97,7 @@ func (op *Operator) ScanExistingFilesystems() {
 										log.G(op.ctx).WithField("digest", h).Info("removed incomplete layer")
 									} else {
 										x1, x2, x3 = true, true, true
-										op.client.AddMountingPoint(h)
+										op.client.AddCompletedLayers(h)
 										log.G(op.ctx).WithField("digest", h).Info("found layer")
 									}
 								}
@@ -141,6 +144,12 @@ func (op *Operator) AddSnapshot(name, parent, imageDigest, uncompressedDigest st
 	)
 
 	randId := util.GetRandomId("prepare")
+
+	// check name exists or not
+	snn, err = op.sn.Stat(op.ctx, name)
+	if err == nil {
+		return &snn, nil
+	}
 
 	// parent -> key
 	// be aware that the returned mount is Read-Only.

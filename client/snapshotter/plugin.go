@@ -17,13 +17,25 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 type PluginClient interface {
+
+	// GetFilesystemPath only use this for starlightfs' stat
 	GetFilesystemPath(compressDigest string) string
-	RemoveMounting(compressDigest, key string) error
+
+	// GetMountingPoint returns the path of the snapshotter's mounting point, considering
+	// getUpper, getWork, getStarlightFS functions instead of using this function directly
 	GetMountingPoint(ssId string) string
+
+	// Unmount starlightfs
+	Unmount(compressDigest, key string) error
+
+	// Mount starlightfs
+	Mount(md, ld, ssId string, sn *snapshots.Info) (mnt string, err error)
 }
 
 type Plugin struct {
@@ -52,13 +64,22 @@ func NewPlugin(ctx context.Context, client PluginClient, metadataDB string) (s *
 	return
 }
 
+func (s *Plugin) getUpper(ssId string) string {
+	return filepath.Join(s.client.GetMountingPoint(ssId), "upper")
+}
+func (s *Plugin) getWork(ssId string) string {
+	return filepath.Join(s.client.GetMountingPoint(ssId), "work")
+}
+func (s *Plugin) getStarlightFS(ssId string) string {
+	return filepath.Join(s.client.GetMountingPoint(ssId), "slfs")
+}
+
+func (s *Plugin) getMountingPoint(ssId string) string {
+	return s.client.GetMountingPoint(ssId)
+}
+
 //////////////////////////////////////////////////////////////////////
 
-// Stat returns the info for an active or committed snapshot by name or
-// key.
-//
-// Should be used for parent resolution, existence checks and to discern
-// the kind of snapshot.
 func (s *Plugin) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	c, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
@@ -69,12 +90,13 @@ func (s *Plugin) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 	if err != nil {
 		return snapshots.Info{}, err
 	}
+
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"name": info.Name,
+	}).Info("stat")
 	return info, nil
 }
 
-// Update updates the info for a snapshot.
-//
-// Only mutable properties of a snapshot may be updated.
 func (s *Plugin) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	c, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
@@ -90,87 +112,69 @@ func (s *Plugin) Update(ctx context.Context, info snapshots.Info, fieldpaths ...
 	if err = t.Commit(); err != nil {
 		return snapshots.Info{}, err
 	}
+
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"name":  info.Name,
+		"usage": fieldpaths,
+	}).Info("updated")
 	return info, nil
 }
 
-// Usage returns the resource usage of an active or committed snapshot
-// excluding the usage of parent snapshots.
-//
-// The running time of this call for active snapshots is dependent on
-// implementation, but may be proportional to the size of the resource.
-// Callers should take this into consideration. Implementations should
-// attempt to honer context cancellation and avoid taking locks when making
-// the calculation.
-func (s *Plugin) Usage(ctx context.Context, key string) (usage snapshots.Usage, err error) {
+func (s *Plugin) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
 	c, t, err := s.ms.TransactionContext(ctx, false)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 	defer t.Rollback()
-	_, info, _, err := storage.GetInfo(c, key)
+	snId, inf, usage, err := storage.GetInfo(c, key)
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
 
-	unId := info.Labels[util.SnapshotLabelRefUncompressed]
-	if unId == "" {
-		return snapshots.Usage{}, fmt.Errorf("uncompressed snapshot id not found")
-	}
-
-	var u fs.Usage
-	u, err = fs.DiskUsage(c, s.client.GetFilesystemPath(unId))
-	if err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+	if _, usingSL := inf.Labels[util.SnapshotLabelRefUncompressed]; !usingSL {
+		if inf.Kind == snapshots.KindActive {
+			var du fs.Usage
+			du, err = fs.DiskUsage(c, s.getUpper(snId))
+			usage = snapshots.Usage(du)
 		}
-		return snapshots.Usage{}, err
 	}
 
-	return snapshots.Usage(u), nil
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"key":   key,
+		"usage": usage,
+	}).Info("usage")
+	return usage, nil
 }
 
-// Mounts returns the mounts for the active snapshot transaction identified
-// by key. Can be called on an read-write or readonly transaction. This is
-// available only for active snapshots.
-//
-// This can be used to recover mounts after calling View or Prepare.
 func (s *Plugin) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	return nil, nil
+	c, t, err := s.ms.TransactionContext(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	defer t.Rollback()
+	var (
+		ssId string
+		info snapshots.Info
+	)
+	ssId, info, _, err = storage.GetInfo(c, key)
+	if err != nil {
+		return nil, err
+	}
+	mnt, err := s.mounts(c, ssId, &info)
+	if err != nil {
+		return nil, err
+	}
+	log.G(ctx).WithFields(logrus.Fields{
+		"key": key,
+		"mnt": mnt,
+	}).Info("mount")
+	return mnt, nil
 }
 
-// Prepare creates an active snapshot identified by key descending from the
-// provided parent.  The returned mounts can be used to mount the snapshot
-// to capture changes.
-//
-// If a parent is provided, after performing the mounts, the destination
-// will start with the content of the parent. The parent must be a
-// committed snapshot. Changes to the mounted destination will be captured
-// in relation to the parent. The default parent, "", is an empty
-// directory.
-//
-// The changes may be saved to a committed snapshot by calling Commit. When
-// one is done with the transaction, Remove should be called on the key.
-//
-// Multiple calls to Prepare or View with the same key should fail.
-//
-// using diff_ids in config.json
 func (s *Plugin) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	return s.newSnapshot(ctx, key, parent, false, opts...)
 }
 
-// View behaves identically to Prepare except the result may not be
-// committed back to the snapshot snapshotter. View returns a readonly view on
-// the parent, with the active snapshot being tracked by the given key.
-//
-// This method operates identically to Prepare, except that Mounts returned
-// may have the readonly flag set. Any modifications to the underlying
-// filesystem will be ignored. Implementations may perform this in a more
-// efficient manner that differs from what would be attempted with
-// `Prepare`.
-//
-// Commit may not be called on the provided key and will return an error.
-// To collect the resources associated with key, Remove must be called with
-// key as the argument.
 func (s *Plugin) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
 	return s.newSnapshot(ctx, key, parent, true, opts...)
 }
@@ -185,6 +189,17 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	if readonly {
 		kind = snapshots.KindView
 	}
+
+	var (
+		info    snapshots.Info
+		usingSL bool
+	)
+	for _, o := range opts {
+		if err = o(&info); err != nil {
+			return nil, err
+		}
+	}
+	// create snapshot
 	ss, err := storage.CreateSnapshot(c, kind, key, parent, opts...)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
@@ -192,34 +207,56 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 		}
 		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
+
+	// create snapshot directories
+	if err = os.MkdirAll(s.getStarlightFS(ss.ID), 0755); err != nil {
+		return nil, err
+	}
+	if err = os.MkdirAll(s.getUpper(ss.ID), 0755); err != nil {
+		return nil, err
+	}
+	if err = os.MkdirAll(s.getWork(ss.ID), 0711); err != nil {
+		return nil, err
+	}
+
+	var inf snapshots.Info
+	_, inf, _, err = storage.GetInfo(c, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// mount snapshot
+	mnt, err := s.mounts(c, ss.ID, &inf)
+	if err != nil {
+		return nil, err
+	}
+
+	// commit changes
 	if err := t.Commit(); err != nil {
 		return nil, fmt.Errorf("commit failed: %w", err)
 	}
 
 	log.G(s.ctx).WithFields(logrus.Fields{
-		"key":      key,
-		"parent":   parent,
-		"readonly": readonly,
-		"id":       ss.ID,
-	}).Info("prepared snapshot")
+		"key":       key,
+		"parent":    parent,
+		"readonly":  readonly,
+		"id":        ss.ID,
+		"starlight": usingSL,
+		"mnt":       mnt,
+	}).Info("prepared")
 
-	return []mount.Mount{}, nil
+	return mnt, nil
 }
 
-// Commit captures the changes between key and its parent into a snapshot
-// identified by name.  The name can then be used with the snapshotter's other
-// methods to create subsequent snapshots.
-//
-// A committed snapshot will be created under name with the parent of the
-// active snapshot.
-//
-// After commit, the snapshot identified by key is removed.
 func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (err error) {
 	var (
-		c     context.Context
-		t     storage.Transactor
-		info  snapshots.Info
-		usage fs.Usage
+		c          context.Context
+		t          storage.Transactor
+		inf        snapshots.Info
+		usage      fs.Usage
+		snId, unId string
+
+		usingSL bool
 	)
 
 	c, t, err = s.ms.TransactionContext(ctx, true)
@@ -227,7 +264,8 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 		return err
 	}
 
-	_, _, _, err = storage.GetInfo(c, key)
+	// Get Snapshot info
+	snId, inf, _, err = storage.GetInfo(c, key)
 	if err != nil {
 		if err = t.Rollback(); err != nil {
 			log.G(ctx).WithError(err).Warn("failed to rollback transaction")
@@ -236,24 +274,31 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 	}
 
 	for _, opt := range opts {
-		if err = opt(&info); err != nil {
+		if err = opt(&inf); err != nil {
 			return err
 		}
 	}
 
-	unId := info.Labels[util.SnapshotLabelRefUncompressed]
-	if unId == "" {
-		return fmt.Errorf("uncompressed snapshot id not found")
-	}
-
-	usage, err = fs.DiskUsage(c, s.client.GetFilesystemPath(unId))
-	if err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+	// Disk Usage
+	if unId, usingSL = inf.Labels[util.SnapshotLabelRefUncompressed]; usingSL {
+		// starlight - the entire decompressed layer count but not accurate because
+		// it might be in the process of being decompressed using the manager.Extract() function
+		usage, err = fs.DiskUsage(c, s.client.GetFilesystemPath(unId))
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			}
+			return err
 		}
-		return err
+	} else {
+		// overlay - only upper layer counts
+		usage, err = fs.DiskUsage(c, s.getUpper(snId))
+		if err != nil {
+			return err
+		}
 	}
 
+	// Commit
 	if _, err = storage.CommitActive(c, key, name, snapshots.Usage(usage), opts...); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
 			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
@@ -262,10 +307,10 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 	}
 
 	log.G(s.ctx).WithFields(logrus.Fields{
-		"name": name,
-		"key":  key,
-	}).Info("committed snapshot")
-
+		"name":  name,
+		"key":   key,
+		"usage": usage,
+	}).Info("committed")
 	return t.Commit()
 }
 
@@ -275,37 +320,61 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 //
 // If the snapshot is a parent of another snapshot, its children must be
 // removed before proceeding.
-func (s *Plugin) Remove(ctx context.Context, key string) error {
-	c, t, err := s.ms.TransactionContext(ctx, true)
+func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
+	var (
+		c          context.Context
+		t          storage.Transactor
+		snId, unId string
+		usingSL    bool
+		info       snapshots.Info
+	)
+	c, t, err = s.ms.TransactionContext(ctx, true)
 	if err != nil {
 		return err
 	}
 	defer t.Rollback()
 
-	// clear directory
-	_, info, _, err := storage.GetInfo(c, key)
+	// Get Snapshot info
+	snId, info, _, err = storage.GetInfo(c, key)
 	if err != nil {
 		return err
 	}
 
-	unId := info.Labels[util.SnapshotLabelRefUncompressed]
-	if unId == "" {
-		return fmt.Errorf("uncompressed snapshot id not found")
-	}
-
-	err = s.client.RemoveMounting(unId, key)
-	if err != nil {
-		log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
-			"key": key,
-		}).Warn("failed to remove snapshot mounting")
-	}
-
-	// remove from dtabase
+	// remove from database
 	_, _, err = storage.Remove(c, key)
-	if err != nil {
-		return fmt.Errorf("failed to remove: %w", err)
+	if err = t.Commit(); err != nil {
+		return err
 	}
-	return t.Commit()
+
+	// Remove Filesystems
+	if unId, usingSL = info.Labels[util.SnapshotLabelRefUncompressed]; usingSL {
+		// starlight
+		err = s.client.Unmount(unId, key)
+		if err != nil {
+			log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
+				"key": key,
+			}).Warn("failed to remove snapshot mounting")
+			return err
+		}
+	} else {
+		// overlay
+		if err = os.RemoveAll(s.getMountingPoint(snId)); err != nil {
+			log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
+				"key": key,
+			}).Warn("failed to remove snapshot mounting")
+			return err
+		}
+	}
+
+	// log
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"key":       key,
+		"id":        info.Name,
+		"parents":   info.Parent,
+		"starlight": usingSL,
+	}).Info("remove")
+
+	return nil
 }
 
 // Walk will call the provided function for each snapshot in the
@@ -333,4 +402,132 @@ func (s *Plugin) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) 
 // Close returns nil when it is already closed.
 func (s *Plugin) Close() error {
 	return nil
+}
+
+func (s *Plugin) getStarlightFeature(info *snapshots.Info) (
+	imageDigest, unDigest string,
+	stack int64,
+	err error) {
+
+	stack, err = strconv.ParseInt(info.Labels[util.SnapshotLabelRefLayer], 10, 64)
+	if err != nil {
+		return "", "", 0, err
+	}
+
+	if info.Labels[util.SnapshotLabelRefImage] == "" || info.Labels[util.SnapshotLabelRefUncompressed] == "" {
+		return "", "", 0, nil
+	}
+
+	return info.Labels[util.SnapshotLabelRefImage],
+		info.Labels[util.SnapshotLabelRefUncompressed],
+		stack, nil
+}
+
+type SnapshotItem struct {
+	ssId string
+	inf  snapshots.Info
+}
+
+func (si SnapshotItem) IsStarlightFS() bool {
+	und, ok := si.inf.Labels[util.SnapshotLabelRefUncompressed]
+	return ok && und != ""
+}
+
+func (si SnapshotItem) GetStarlightFeature() (md, und string, stack int64) {
+	return si.inf.Labels[util.SnapshotLabelRefImage], si.inf.Labels[util.SnapshotLabelRefUncompressed], stack
+}
+
+func (s *Plugin) getFsStack(ctx context.Context, cur *snapshots.Info) (pSi []*SnapshotItem, err error) {
+	pSi = make([]*SnapshotItem, 0)
+	for {
+		if cur.Parent == "" {
+			break
+		}
+		item := &SnapshotItem{}
+		item.ssId, item.inf, _, err = storage.GetInfo(ctx, cur.Parent)
+		if err != nil {
+			return nil, err
+		}
+		cur = &item.inf
+		pSi = append(pSi, item)
+	}
+	return pSi, nil
+}
+
+func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (mnt []mount.Mount, err error) {
+	stack, err := s.getFsStack(ctx, inf) // from upper to lower
+	if err != nil {
+		return nil, err
+	}
+
+	current := SnapshotItem{
+		ssId: ssId,
+		inf:  *inf,
+	}
+
+	if len(stack) == 0 {
+		var m string
+		if current.IsStarlightFS() {
+			md, und, _ := current.GetStarlightFeature()
+			m, err = s.client.Mount(md, und, ssId, inf)
+			if err != nil {
+				return nil, err
+			}
+			return []mount.Mount{
+				{
+					Type:    "bind",
+					Source:  m,
+					Options: []string{"rbind", "ro"},
+				},
+			}, nil
+		} else {
+			return nil, fmt.Errorf("please use native overlayfs")
+		}
+	}
+
+	lower := make([]string, 0)
+	for i := len(stack) - 1; i >= 0; i-- {
+		var m string
+		if stack[i].IsStarlightFS() {
+			// starlight layer
+			md, und, _ := stack[i].GetStarlightFeature()
+			m, err = s.client.Mount(md, und, stack[i].ssId, &stack[i].inf)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// standard overlay fs layer
+			m = s.getUpper(stack[i].ssId)
+		}
+		lower = append(lower, m)
+	}
+
+	var options []string
+	if inf.Kind == snapshots.KindActive {
+		options = append(options,
+			fmt.Sprintf("workdir=%s", s.getWork(ssId)),
+			fmt.Sprintf("upperdir=%s", s.getUpper(ssId)),
+		)
+	} else {
+		var m string
+		if current.IsStarlightFS() {
+			md, und, _ := current.GetStarlightFeature()
+			m, err = s.client.Mount(und, md, ssId, inf)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			m = s.getUpper(ssId)
+		}
+		lower = append(lower, m)
+	}
+
+	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(lower, ":")))
+	return []mount.Mount{
+		{
+			Type:    "overlay",
+			Source:  "overlay",
+			Options: options,
+		},
+	}, nil
 }

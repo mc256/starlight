@@ -8,6 +8,7 @@ package fs
 import (
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
+	"syscall"
 	"time"
 )
 
@@ -67,6 +68,7 @@ func NewInstance(m ImageManager, root ReceivedFile, stack int64, dir string, opt
 		options.Debug = true
 	}
 
+	_ = syscall.Unmount(dir, UnmountFlag)
 	rawFs := fs.NewNodeFS(fi.rootInode, options)
 	fi.server, err = fuse.NewServer(rawFs, dir, &options.MountOptions)
 

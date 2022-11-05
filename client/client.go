@@ -18,6 +18,8 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
+	fusefs "github.com/hanwen/go-fuse/v2/fs"
+	starlight "github.com/mc256/starlight/client/api/v0.2"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/mc256/starlight/proxy"
@@ -25,6 +27,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"io"
 	"io/ioutil"
@@ -38,12 +41,9 @@ import (
 
 type mountPoint struct {
 	// active mount point for snapshots
-	fs        *fs.Instance
-	manager   *Manager
-	stack     int64
-	completed bool
-
-	// filesystem
+	fs      *fs.Instance
+	manager *Manager
+	stack   int64
 
 	// chainIDs that are using the mount point
 	snapshots map[string]*snapshots.Info
@@ -54,9 +54,16 @@ type Client struct {
 	cfg *Configuration
 	cs  content.Store
 
-	client   *containerd.Client
-	server   *grpc.Server
-	listener net.Listener
+	// containerd
+	client *containerd.Client
+
+	// Snapshotter
+	snServer   *grpc.Server
+	snListener net.Listener
+
+	// CLI
+	cliServer   *grpc.Server
+	cliListener net.Listener
 
 	operator *snapshotter.Operator
 	plugin   *snapshotter.Plugin
@@ -408,15 +415,13 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// keep going and download layers
 	star.Init(c.cfg, false, manifest, imageConfig, mdd)
 
-	if err = star.PrepareDirectories(); err != nil {
+	if err = star.PrepareDirectories(c); err != nil {
 		return nil, errors.Wrapf(err, "failed to initialize directories")
 	}
 
-	/*
-		if err = star.CreateSnapshots(c); err != nil {
-			return nil, errors.Wrapf(err, "failed to create snapshots")
-		}
-	*/
+	if err = star.CreateSnapshots(c); err != nil {
+		return nil, errors.Wrapf(err, "failed to create snapshots")
+	}
 
 	// Image is ready (content is still on the way)
 	close(*ready)
@@ -451,7 +456,7 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 	}
 
 	if len(ii.Labels[util.ContentLabelCompletion]) == 0 {
-		return nil, errors.New("image is not completed, remove and pull again")
+		return nil, errors.New("image is incomplete, remove and pull again")
 	}
 
 	starlight := digest.Digest(ii.Labels[fmt.Sprintf("%s.starlight", util.ContentLabelContainerdGC)])
@@ -484,8 +489,11 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 
 func (c *Client) Close() {
 	_ = c.client.Close()
-	if c.server != nil {
-		c.server.Stop()
+	if c.snServer != nil {
+		c.snServer.Stop()
+	}
+	if c.cliServer != nil {
+		c.cliServer.Stop()
 	}
 	os.Exit(1)
 }
@@ -497,7 +505,7 @@ func (c *Client) GetFilesystemRoot() string {
 	return c.cfg.FileSystemRoot
 }
 
-func (c *Client) AddMountingPoint(compressedLayerDigest string) {
+func (c *Client) AddCompletedLayers(compressedLayerDigest string) {
 	c.layerMapLock.Lock()
 	defer c.layerMapLock.Unlock()
 
@@ -506,7 +514,6 @@ func (c *Client) AddMountingPoint(compressedLayerDigest string) {
 			fs:        nil,
 			manager:   nil,
 			stack:     -1,
-			completed: true,
 			snapshots: make(map[string]*snapshots.Info),
 		}
 	}
@@ -523,7 +530,67 @@ func (c *Client) GetMountingPoint(ssId string) string {
 	return filepath.Join(c.cfg.FileSystemRoot, "mnt", ssId)
 }
 
-func (c *Client) RemoveMounting(cd, sn string) error {
+func (c *Client) getStarlightFS(ssId string) string {
+	return filepath.Join(c.GetFilesystemPath(ssId), "slfs")
+}
+
+// Mount returns the mountpoint for the given snapshot
+// - md: manifest digest
+// - ld: uncompressed layer digest
+// - ssId: snapshot id
+func (c *Client) Mount(md, ld, ssId string, sn *snapshots.Info) (mnt string, err error) {
+	c.layerMapLock.Lock()
+	defer c.layerMapLock.Unlock()
+
+	if mp, has := c.layerMap[ld]; has {
+		// fs != nil, fs has already created
+		if mp.fs != nil {
+			mp.snapshots[sn.Name] = sn
+			return mp.fs.GetMountPoint(), nil
+		}
+		// manager != nil but fs == nil
+		// manager has been created but not yet mounted
+		if mp.manager != nil {
+			mnt = filepath.Join(c.GetMountingPoint(ssId), "slfs")
+			mp.fs, err = mp.manager.NewStarlightFS(mnt, mp.stack, &fusefs.Options{}, false)
+			if err != nil {
+				return "", errors.Wrapf(err, "failed to mount filesystem")
+			}
+			go mp.fs.Serve()
+			mp.snapshots[sn.Name] = sn
+			return mnt, nil
+		}
+	}
+
+	// create a new filesystem
+	var man *Manager
+	man, err = c.LoadImage(digest.Digest(md))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to load image manager")
+	}
+
+	// mount manager
+	for idx, layer := range man.Destination.Layers {
+		c.layerMap[layer.Hash] = &mountPoint{
+			fs:        nil,
+			manager:   man,
+			stack:     int64(idx),
+			snapshots: map[string]*snapshots.Info{sn.Name: sn},
+		}
+	}
+
+	mnt = filepath.Join(c.GetMountingPoint(ssId), "slfs")
+	current := c.layerMap[man.Destination.Layers[len(man.Destination.Layers)-1].Hash]
+	current.fs, err = current.manager.NewStarlightFS(mnt, current.stack, &fusefs.Options{}, false)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to mount filesystem")
+	}
+	go current.fs.Serve()
+	current.snapshots[sn.Name] = sn
+	return mnt, nil
+}
+
+func (c *Client) Unmount(cd, sn string) error {
 	c.layerMapLock.Lock()
 	defer c.layerMapLock.Unlock()
 
@@ -566,7 +633,7 @@ func (c *Client) RemoveMounting(cd, sn string) error {
 func (c *Client) InitSnapshotter() (err error) {
 	log.G(c.ctx).
 		Info("starlight snapshotter service starting")
-	c.server = grpc.NewServer()
+	c.snServer = grpc.NewServer()
 
 	c.plugin, err = snapshotter.NewPlugin(c.ctx, c, c.cfg.Metadata)
 	if err != nil {
@@ -583,27 +650,88 @@ func (c *Client) InitSnapshotter() (err error) {
 		return errors.Wrapf(err, "failed to remove %q", c.cfg.Socket)
 	}
 
-	snapshotsapi.RegisterSnapshotsServer(c.server, svc)
+	snapshotsapi.RegisterSnapshotsServer(c.snServer, svc)
 	return nil
 }
 
 // StartSnapshotter starts the snapshotter service, should be run in a goroutine
-func (c *Client) StartSnapshotter() (err error) {
+func (c *Client) StartSnapshotter() {
 	// Listen and serve
-
-	c.listener, err = net.Listen("unix", c.cfg.Socket)
+	var err error
+	c.snListener, err = net.Listen("unix", c.cfg.Socket)
 	if err != nil {
-		return errors.Wrapf(err, "failed to listen on %q", c.cfg.Socket)
+		log.G(c.ctx).WithError(err).Errorf("failed to listen on %q", c.cfg.Socket)
+		return
 	}
 
 	log.G(c.ctx).
 		WithField("socket", c.cfg.Socket).
 		Info("starlight snapshotter service started")
 
-	if err := c.server.Serve(c.listener); err != nil {
-		return errors.Wrapf(err, "failed to serve snapshotter")
+	if err = c.snServer.Serve(c.snListener); err != nil {
+		log.G(c.ctx).WithError(err).Errorf("failed to serve snapshotter")
+		return
 	}
+}
+
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// CLI gRPC server
+
+type CLIServer struct {
+	starlight.UnimplementedClientAPIServer
+	client *Client
+}
+
+func (s *CLIServer) PullImage(ctx context.Context, ref *starlight.ImageReference) (*starlight.ImagePullResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"image": ref.Reference,
+	}).Info("Pull Image!!!")
+	return &starlight.ImagePullResponse{Error: "ok"}, nil
+}
+
+func newCLIServer(client *Client) *CLIServer {
+	c := &CLIServer{client: client}
+	return c
+}
+
+func (c *Client) InitCLIServer() (err error) {
+	log.G(c.ctx).
+		Info("starlight CLI service starting")
+	c.cliServer = grpc.NewServer()
+
+	if err = os.MkdirAll(filepath.Dir(c.cfg.CLI), 0700); err != nil {
+		return errors.Wrapf(err, "failed to create directory %q for socket", filepath.Dir(c.cfg.CLI))
+	}
+
+	// Try to remove the socket file to avoid EADDRINUSE
+	if err = os.RemoveAll(c.cfg.CLI); err != nil {
+		return errors.Wrapf(err, "failed to remove %q", c.cfg.CLI)
+	}
+
+	starlight.RegisterClientAPIServer(c.cliServer, newCLIServer(c))
+
 	return nil
+}
+
+func (c *Client) StartCLIServer() {
+	// Listen and serve
+	var err error
+	c.snListener, err = net.Listen("tcp", c.cfg.CLI)
+	if err != nil {
+		log.G(c.ctx).WithError(err).Errorf("failed to listen on %q", c.cfg.CLI)
+		return
+	}
+
+	log.G(c.ctx).
+		WithField("tcp", c.cfg.CLI).
+		Info("starlight CLI service started")
+
+	if err := c.cliServer.Serve(c.cliListener); err != nil {
+		log.G(c.ctx).WithError(err).Errorf("failed to serve CLI server")
+		return
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -625,6 +753,7 @@ func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 
 	// content store
 	c.cs = c.client.ContentStore()
+	c.operator = snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
 
 	return c, nil
 }

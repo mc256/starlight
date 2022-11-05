@@ -15,6 +15,10 @@
 syntax = "proto3";
 
 option go_package = "github.com/mc256/starlight";
+option java_multiple_files = true;
+option java_package = "dev.mc256.starlight";
+option java_outer_classname = "ClientAPIProto";
+
 
 package api;
 

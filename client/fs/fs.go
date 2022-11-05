@@ -7,8 +7,10 @@ package fs
 
 import (
 	"context"
+	"github.com/containerd/containerd/log"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
+	"github.com/sirupsen/logrus"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -167,7 +169,13 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 		n.WaitForReady()
 	}
 	complete := time.Now()
-	n.log(n.GetName(), access, complete)
+	name := n.GetName()
+	n.log(name, access, complete)
+
+	log.G(ctx).WithFields(logrus.Fields{
+		"f":  name,
+		"_r": r,
+	}).Trace("open")
 
 	fd, err := syscall.Open(r, int(flags), 0)
 	if err != nil {

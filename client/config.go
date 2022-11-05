@@ -30,6 +30,7 @@ type Configuration struct {
 
 	// socket address
 	Socket     string `json:"socket"`
+	CLI        string `json:"cli"`
 	Containerd string `json:"containerd"`
 	Namespace  string `json:"default_namespace"`
 
@@ -126,6 +127,7 @@ func NewConfig() *Configuration {
 		LogLevel:       "debug",
 		Metadata:       "/var/lib/starlight/metadata.db",
 		Socket:         "/run/starlight/starlight-daemon.sock",
+		CLI:            "/run/starlight/starlight-cli.sock",
 		Containerd:     "/run/containerd/containerd.sock",
 		DefaultProxy:   "starlight-shared",
 		FileSystemRoot: "/var/lib/starlight",

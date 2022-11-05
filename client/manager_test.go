@@ -318,7 +318,7 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 
 	// new client
 	cc, err := NewClient(ctx, cfg)
-	err = cc.StartSnapshotter()
+	cc.StartSnapshotter()
 	if err != nil {
 		t.Error(err)
 		return

@@ -169,18 +169,29 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 	return nil
 }
 
-func (m *Manager) PrepareDirectories() error {
+func (m *Manager) PrepareDirectories(c *Client) error {
 	// create directories
 	m.completedStack = make([]bool, len(m.stackSerialMap))
 	for idx, layer := range m.Destination.Layers {
-		if _, err := os.Stat(filepath.Join(layer.Local, "completed.json")); err == nil {
-			m.completedStack[idx] = true
-			continue
+
+		// if it exists in the layerMap, it means the layer exists in the local filesystem, or
+		// another manager process has already created it
+		exists := func() bool {
+			c.layerMapLock.Lock()
+			defer c.layerMapLock.Unlock()
+			if _, has := c.layerMap[layer.Hash]; has {
+				return true
+			}
+			return false
+		}()
+		m.completedStack[idx] = exists
+		if !exists {
+			err := os.MkdirAll(layer.Local, 0755)
+			if err != nil {
+				return err
+			}
 		}
-		err := os.MkdirAll(layer.Local, 0755)
-		if err != nil {
-			return err
-		}
+
 	}
 	return nil
 }
@@ -191,34 +202,30 @@ func (m *Manager) CreateSnapshots(c *Client) (err error) {
 	prev := ""
 	for idx, chain := range chainIds {
 		d := m.layers[m.stackSerialMap[idx]].Hash
-		var (
-			info *snapshots.Info
-		)
-		info, err = c.operator.AddSnapshot(
+
+		idx := idx
+		go func() {
+			c.layerMapLock.Lock()
+			defer c.layerMapLock.Unlock()
+
+			if _, has := c.layerMap[d]; !has {
+				c.layerMap[d] = &mountPoint{
+					fs:      nil,
+					manager: m,
+					stack:   int64(idx),
+
+					snapshots: make(map[string]*snapshots.Info),
+				}
+			}
+		}()
+
+		_, err = c.operator.AddSnapshot(
 			chain.String(), prev, m.manifestDigest.String(), d, int64(idx),
 		)
 		if err != nil {
 			return errors.Wrapf(err, "failed prepare new image snapshots %s", chain.String())
 		}
 		prev = chain.String()
-
-		idx := idx
-		go func() {
-			c.layerMapLock.Lock()
-			defer c.layerMapLock.Unlock()
-			if v, has := c.layerMap[d]; has {
-				v.snapshots[info.Name] = info
-			} else {
-				c.layerMap[d] = &mountPoint{
-					fs:        nil,
-					manager:   m,
-					stack:     int64(idx),
-					completed: false,
-
-					snapshots: map[string]*snapshots.Info{info.Name: info},
-				}
-			}
-		}()
 	}
 	return nil
 }

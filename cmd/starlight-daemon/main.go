@@ -187,8 +187,10 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 		}
 	}
 
-	var slc *client.Client
-
+	// Client
+	var (
+		slc *client.Client
+	)
 	slc, err = client.NewClient(c, cfg)
 	if err != nil {
 		log.G(c).
@@ -198,6 +200,7 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 		return
 	}
 
+	// Snapshotter
 	err = slc.InitSnapshotter()
 	if err != nil {
 		log.G(c).
@@ -206,17 +209,18 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 		os.Exit(1)
 		return
 	}
+	go slc.StartSnapshotter()
 
-	err = slc.StartSnapshotter()
+	// Image Service
+	err = slc.InitCLIServer()
 	if err != nil {
 		log.G(c).
 			WithError(err).
-			Fatal("failed to start snapshotter service")
+			Fatal("failed to initialize CLI service")
 		os.Exit(1)
 		return
 	}
-
-	// TODO: this only starts the snapshotter service, we need to start operator service as well
+	go slc.StartCLIServer()
 
 	wait := make(chan interface{})
 	si := make(chan os.Signal, 1)
