@@ -1,0 +1,105 @@
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+option go_package = "github.com/mc256/starlight/client/api";
+
+package api;
+
+// Interface exported by the server.
+service Daemon {
+  rpc GetVersion(Request) returns (Version) {}
+  rpc AddProxyProfile(AuthRequest) returns (AuthResponse) {}
+  rpc Convert(ConvertRequest) returns (ConvertResponse) {}
+  rpc Notify(NotifyRequest) returns (NotifyResponse) {}
+  rpc PullImage(ImageReference) returns (ImagePullResponse) {}
+  rpc SetOptimize(OptimizeRequest) returns (OptimizeResponse) {}
+  rpc ReportTraces(ReportTracesRequest) returns (ReportTracesResponse) {}
+}
+
+message Request{
+}
+
+message Version{
+  string version = 1;
+}
+
+message AuthRequest {
+  string profileName = 1;
+  string username = 2;
+  string password = 3;
+  string protocol = 4;
+  string address = 5;
+}
+
+message AuthResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ConvertRequest {
+  string from = 1;
+  string to = 2;
+  string proxyConfig = 3;
+  bool insecureSource = 4;
+  bool insecureDestination = 5;
+  bool notify = 6;
+  repeated string platforms = 7;
+}
+
+message ConvertResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message NotifyRequest {
+  string reference = 1;
+  string proxyConfig = 2;
+}
+
+message NotifyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ImageReference {
+  string reference = 1;
+  string base = 2;
+  string proxyConfig = 3;
+}
+
+message ImagePullResponse {
+  bool success = 1;
+  string message = 2;
+  string baseImage = 3;
+}
+
+message OptimizeRequest {
+  string proxyConfig = 1;
+}
+
+message OptimizeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ReportTracesRequest {
+  string proxyConfig = 1;
+}
+
+message ReportTracesResponse {
+  bool success = 1;
+  string message = 2;
+}

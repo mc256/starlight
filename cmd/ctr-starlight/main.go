@@ -26,6 +26,7 @@ import (
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
+	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
 
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
@@ -50,7 +51,13 @@ func NewApp() *cli.App {
 
 	app.Name = "ctr-starlight"
 	app.Version = util.Version
-	app.Usage = `starlight container deployment with remote delta image`
+	app.Usage = `CLI tool for starlight daemon.
+
+This is a CLI tool that controls starlight-daemon. 
+Please make sure that starlight-daemon is running before using this tool.
+For more information, please refer to the README.md file in the project repository.
+https://github.com/mc256/starlight
+`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
@@ -66,11 +73,11 @@ func NewApp() *cli.App {
 		},
 		&cli.StringFlag{
 			Name:        "address",
-			Aliases:     []string{"a"},
-			Value:       "/run/containerd/containerd.sock",
-			DefaultText: "/run/containerd/containerd.sock",
-			EnvVars:     []string{"CONTAINERD_ADDRESS"},
-			Usage:       "address for containerd's GRPC server",
+			Aliases:     []string{"a", "addr"},
+			Value:       "unix:////run/starlight/starlight-daemon.sock",
+			DefaultText: "unix:////run/starlight/starlight-daemon.sock",
+			EnvVars:     []string{"STARLIGHT_ADDRESS"},
+			Usage:       "address to connect to starlight-daemon",
 			Required:    false,
 		},
 		&cli.StringFlag{
@@ -82,7 +89,7 @@ func NewApp() *cli.App {
 		},
 	}
 	app.Commands = append([]*cli.Command{
-		util.VersionCommand(),
+		cmdVersion.Command(),
 		cmdReport.Command(),
 		cmdConvert.Command(),
 		cmdPull.Command(),

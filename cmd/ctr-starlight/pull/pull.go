@@ -8,51 +8,72 @@ package pull
 import (
 	"context"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	starlight "github.com/mc256/starlight/client/api/v0.2"
+	pb "github.com/mc256/starlight/client/api"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"time"
 )
 
-func pullImage(client starlight.ClientAPIClient, ref *starlight.ImageReference) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	resp, err := client.PullImage(ctx, ref)
 	if err != nil {
-		log.G(ctx).WithError(err).Error("pull image failed")
+		fmt.Printf("pull image failed: %v\n", err)
 		return
 	}
-	log.G(ctx).Infof("pull image success: %v", resp)
+	if resp.Success {
+		if !quiet {
+			fmt.Printf("pulling image: %s\n", resp.Message)
+		}
+	} else {
+		fmt.Printf("pull image failed: %s\n", resp.Message)
+	}
 }
 
 func Action(ctx context.Context, c *cli.Context) error {
-	if c.NArg() != 1 {
-		return fmt.Errorf("no image name provided")
+	var base, ref string
+	if c.NArg() == 1 {
+		ref = c.Args().Get(0)
+	} else if c.NArg() == 2 {
+		ref = c.Args().Get(0)
+		base = c.Args().Get(1)
+	} else {
+		return fmt.Errorf("wrong number of arguments, expected 1 or 2, got %d", c.NArg())
 	}
 
-	ref := c.Args().First()
-	conn, err := grpc.Dial("localhost:8899", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Dial to the daemon
+	address := c.String("address")
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(address, opts)
 	if err != nil {
-		return err
+		fmt.Printf("connect to starlight daemon failed: %v\n", err)
+		return nil
 	}
 	defer conn.Close()
 
-	client := starlight.NewClientAPIClient(conn)
-	pullImage(client, &starlight.ImageReference{
-		Reference: ref,
-	})
+	// pull image
+	pullImage(pb.NewDaemonClient(conn), &pb.ImageReference{
+		Reference:   ref,
+		Base:        base,
+		ProxyConfig: c.String("profile"),
+	}, c.Bool("quiet"))
 	return nil
 }
 
 func Command() *cli.Command {
 	ctx := context.Background()
 	return &cli.Command{
-		Name:  "pull",
-		Usage: "pull image from starlight proxy server",
+		Name: "pull",
+		Usage: "pull image from starlight proxy server, if the base image is not provided, it will choose the latest" +
+			" available image with the same name from the same starlight proxy",
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
+		Flags: append(
+			PullImageFlags,
+		),
+		ArgsUsage: "[flags] [BaseImage] PullImage",
 	}
 }

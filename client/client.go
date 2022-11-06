@@ -17,9 +17,10 @@ import (
 	"github.com/containerd/containerd/contrib/snapshotservice"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
-	starlight "github.com/mc256/starlight/client/api/v0.2"
+	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/mc256/starlight/proxy"
@@ -679,20 +680,91 @@ func (c *Client) StartSnapshotter() {
 // -----------------------------------------------------------------------------
 // CLI gRPC server
 
-type CLIServer struct {
-	starlight.UnimplementedClientAPIServer
+type StarlightDaemonAPIServer struct {
+	pb.UnimplementedDaemonServer
 	client *Client
 }
 
-func (s *CLIServer) PullImage(ctx context.Context, ref *starlight.ImageReference) (*starlight.ImagePullResponse, error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"image": ref.Reference,
-	}).Info("Pull Image!!!")
-	return &starlight.ImagePullResponse{Error: "ok"}, nil
+func (s *StarlightDaemonAPIServer) Version(ctx context.Context, req *pb.Request) (*pb.Version, error) {
+	return &pb.Version{
+		Version: util.Version,
+	}, nil
 }
 
-func newCLIServer(client *Client) *CLIServer {
-	c := &CLIServer{client: client}
+func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
+	s.client.cfg.Proxies[req.ProfileName] = &ProxyConfig{
+		Protocol: req.Protocol,
+		Address:  req.Address,
+		Username: req.Username,
+		Password: req.Password,
+	}
+	if err := s.client.cfg.SaveConfig(); err != nil {
+		log.G(s.client.ctx).WithError(err).Errorf("failed to save config")
+		return &pb.AuthResponse{
+			Success: false,
+			Message: "failed to save config",
+		}, nil
+	}
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"protocol": req.Protocol,
+		"address":  req.Address,
+		"username": req.Username,
+	}).Info("add auth profile")
+	return &pb.AuthResponse{
+		Success: true,
+	}, nil
+}
+
+func (s *StarlightDaemonAPIServer) Convert(ctx context.Context, req *pb.ConvertRequest) (*pb.ConvertResponse, error) {
+	// TODO: to be implemented
+	return nil, nil
+}
+
+func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (*pb.ImagePullResponse, error) {
+	base, err := s.client.FindBaseImage(ref.Base, ref.Reference)
+	if err != nil {
+		return &pb.ImagePullResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"ref": ref.Reference,
+	}).Info("pulling image")
+
+	ready := make(chan bool)
+	go func() {
+		_, err = s.client.PullImage(
+			base, ref.Reference,
+			platforms.DefaultString(), ref.ProxyConfig,
+			&ready)
+		if err != nil {
+			log.G(s.client.ctx).WithError(err).Errorf("failed to pull image")
+			close(ready)
+			return
+		}
+	}()
+
+	<-ready
+
+	baseImage := ""
+	if base != nil {
+		baseImage = fmt.Sprintf("%s@%s", base.Name(), base.Target().Digest)
+	}
+
+	if err != nil {
+		return &pb.ImagePullResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: baseImage}, nil
+}
+
+func newStarlightDaemonAPIServer(client *Client) *StarlightDaemonAPIServer {
+	c := &StarlightDaemonAPIServer{client: client}
 	return c
 }
 
@@ -701,31 +773,32 @@ func (c *Client) InitCLIServer() (err error) {
 		Info("starlight CLI service starting")
 	c.cliServer = grpc.NewServer()
 
-	if err = os.MkdirAll(filepath.Dir(c.cfg.CLI), 0700); err != nil {
-		return errors.Wrapf(err, "failed to create directory %q for socket", filepath.Dir(c.cfg.CLI))
+	if strings.HasPrefix(c.cfg.DaemonType, "unix") {
+		if err = os.MkdirAll(filepath.Dir(c.cfg.Daemon), 0700); err != nil {
+			return errors.Wrapf(err, "failed to create directory %q for socket", filepath.Dir(c.cfg.Daemon))
+		}
+
+		// Try to remove the socket file to avoid EADDRINUSE
+		if err = os.RemoveAll(c.cfg.Daemon); err != nil {
+			return errors.Wrapf(err, "failed to remove %q", c.cfg.Daemon)
+		}
 	}
 
-	// Try to remove the socket file to avoid EADDRINUSE
-	if err = os.RemoveAll(c.cfg.CLI); err != nil {
-		return errors.Wrapf(err, "failed to remove %q", c.cfg.CLI)
-	}
-
-	starlight.RegisterClientAPIServer(c.cliServer, newCLIServer(c))
-
+	pb.RegisterDaemonServer(c.cliServer, newStarlightDaemonAPIServer(c))
 	return nil
 }
 
 func (c *Client) StartCLIServer() {
 	// Listen and serve
 	var err error
-	c.snListener, err = net.Listen("tcp", c.cfg.CLI)
+	c.cliListener, err = net.Listen(c.cfg.DaemonType, c.cfg.Daemon)
 	if err != nil {
-		log.G(c.ctx).WithError(err).Errorf("failed to listen on %q", c.cfg.CLI)
+		log.G(c.ctx).WithError(err).Errorf("failed to listen on %s using %s protocol", c.cfg.DaemonType, c.cfg.Daemon)
 		return
 	}
 
 	log.G(c.ctx).
-		WithField("tcp", c.cfg.CLI).
+		WithField(c.cfg.DaemonType, c.cfg.Daemon).
 		Info("starlight CLI service started")
 
 	if err := c.cliServer.Serve(c.cliListener); err != nil {

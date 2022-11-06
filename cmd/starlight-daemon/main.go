@@ -53,8 +53,9 @@ func New() *cli.App {
 	app.Usage = `Daemon for faster container-based application deployment. 
 
 This is a plugin that can be used with containerd to accelerate container-based application deployments.
-To enable the plugin, please add plugin configurations to containerd config.toml. You can also verify the plugin status by
-running "ctr plugins ls". For more information, please refer to the README.md file in the project repository.
+To enable the plugin, please add plugin configurations to containerd config.toml. 
+You can also verify the plugin status by running "ctr plugins ls". 
+For more information, please refer to the README.md file in the project repository.
 https://github.com/mc256/starlight
 
 *CLI options will override values in the config file if specified.`
@@ -188,9 +189,7 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 	}
 
 	// Client
-	var (
-		slc *client.Client
-	)
+	var slc *client.Client
 	slc, err = client.NewClient(c, cfg)
 	if err != nil {
 		log.G(c).
@@ -201,26 +200,31 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 	}
 
 	// Snapshotter
-	err = slc.InitSnapshotter()
-	if err != nil {
-		log.G(c).
-			WithError(err).
-			Fatal("failed to initialize snapshotter service")
-		os.Exit(1)
-		return
-	}
-	go slc.StartSnapshotter()
+	go func() {
+		err = slc.InitSnapshotter()
+		if err != nil {
+			log.G(c).
+				WithError(err).
+				Fatal("failed to initialize snapshotter service")
+			os.Exit(1)
+			return
+		}
+		slc.StartSnapshotter()
+	}()
 
 	// Image Service
-	err = slc.InitCLIServer()
-	if err != nil {
-		log.G(c).
-			WithError(err).
-			Fatal("failed to initialize CLI service")
-		os.Exit(1)
-		return
-	}
-	go slc.StartCLIServer()
+	go func() {
+		err = slc.InitCLIServer()
+		if err != nil {
+			log.G(c).
+				WithError(err).
+				Fatal("failed to initialize CLI service")
+			os.Exit(1)
+			return
+		}
+		slc.StartCLIServer()
+
+	}()
 
 	wait := make(chan interface{})
 	si := make(chan os.Signal, 1)

@@ -35,7 +35,6 @@ build-ctr-starlight:
 	-mkdir ./out 2>/dev/null | true
 	go build -o ./out/ctr-starlight ./cmd/ctr-starlight/main.go
 
-
 .PHONY: build-starlight-proxy-for-alpine
 build-starlight-proxy-for-alpine:
 	-mkdir ./out 2>/dev/null | true
@@ -84,7 +83,7 @@ create-deb-package: change-version-number set-production build-starlight-daemon 
 update-protobuf:
 	protoc --go_out=. --go_opt=paths=source_relative \
     --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-    client/api/v0.2/api.proto
+    client/api/daemon.proto
 
 
 ######################################################################

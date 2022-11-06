@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/platforms"
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -260,4 +261,8 @@ func TestClient_updateManifest(t *testing.T) {
 		t.Error(err)
 		return
 	}
+}
+
+func TestPlatform(t *testing.T) {
+	fmt.Println(platforms.DefaultString())
 }
