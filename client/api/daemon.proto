@@ -22,13 +22,12 @@ package api;
 service Daemon {
   rpc GetVersion(Request) returns (Version) {}
   rpc AddProxyProfile(AuthRequest) returns (AuthResponse) {}
-  rpc Convert(ConvertRequest) returns (ConvertResponse) {}
-  rpc Notify(NotifyRequest) returns (NotifyResponse) {}
   rpc PullImage(ImageReference) returns (ImagePullResponse) {}
-  rpc SetOptimize(OptimizeRequest) returns (OptimizeResponse) {}
+  rpc SetOptimizer(OptimizeRequest) returns (OptimizeResponse) {}
   rpc ReportTraces(ReportTracesRequest) returns (ReportTracesResponse) {}
 }
 
+// GetVersion
 message Request{
 }
 
@@ -36,6 +35,7 @@ message Version{
   string version = 1;
 }
 
+// Add Auth
 message AuthRequest {
   string profileName = 1;
   string username = 2;
@@ -49,31 +49,7 @@ message AuthResponse {
   string message = 2;
 }
 
-message ConvertRequest {
-  string from = 1;
-  string to = 2;
-  string proxyConfig = 3;
-  bool insecureSource = 4;
-  bool insecureDestination = 5;
-  bool notify = 6;
-  repeated string platforms = 7;
-}
-
-message ConvertResponse {
-  bool success = 1;
-  string message = 2;
-}
-
-message NotifyRequest {
-  string reference = 1;
-  string proxyConfig = 2;
-}
-
-message NotifyResponse {
-  bool success = 1;
-  string message = 2;
-}
-
+// Pull Image
 message ImageReference {
   string reference = 1;
   string base = 2;
@@ -86,15 +62,20 @@ message ImagePullResponse {
   string baseImage = 3;
 }
 
+// Optimize
 message OptimizeRequest {
-  string proxyConfig = 1;
+  bool enable = 1;
+  string group = 2;
 }
 
 message OptimizeResponse {
   bool success = 1;
   string message = 2;
+  map<string, string> okay = 3;
+  map<string, string> failed = 4;
 }
 
+// Report Traces
 message ReportTracesRequest {
   string proxyConfig = 1;
 }

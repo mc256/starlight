@@ -24,14 +24,12 @@ type Instance struct {
 	rootInode *StarlightFsNode
 
 	stack      int64
-	rootPath   string
 	mountPoint string
 
 	manager ImageManager
 	server  *fuse.Server
 }
 
-func (fi *Instance) GetRootPath() string     { return fi.rootPath }
 func (fi *Instance) GetMountPoint() string   { return fi.mountPoint }
 func (fi *Instance) GetServer() *fuse.Server { return fi.server }
 

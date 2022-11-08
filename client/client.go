@@ -71,6 +71,10 @@ type Client struct {
 
 	layerMapLock sync.Mutex
 	layerMap     map[string]*mountPoint
+
+	// Optimizer
+	defaultOptimizer     bool
+	defaultOptimizeGroup string
 }
 
 func escapeSlashes(s string) string {
@@ -715,11 +719,6 @@ func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.
 	}, nil
 }
 
-func (s *StarlightDaemonAPIServer) Convert(ctx context.Context, req *pb.ConvertRequest) (*pb.ConvertResponse, error) {
-	// TODO: to be implemented
-	return nil, nil
-}
-
 func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (*pb.ImagePullResponse, error) {
 	base, err := s.client.FindBaseImage(ref.Base, ref.Reference)
 	if err != nil {
@@ -761,6 +760,55 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 	}
 
 	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: baseImage}, nil
+}
+
+func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {
+	okRes, failRes := make(map[string]string), make(map[string]string)
+
+	if req.Enable {
+		s.client.defaultOptimizer = true
+		s.client.defaultOptimizeGroup = req.Group
+
+		s.client.layerMapLock.Lock()
+		defer s.client.layerMapLock.Unlock()
+
+		for _, layer := range s.client.layerMap {
+			if err := layer.manager.SetOptimizerOn(req.Group); err == nil {
+				okRes[layer.manager.manifestDigest.String()] = time.Now().Format(time.RFC3339)
+			} else {
+				failRes[layer.manager.manifestDigest.String()] = err.Error()
+			}
+		}
+	} else {
+		s.client.defaultOptimizer = false
+		s.client.defaultOptimizeGroup = ""
+
+		s.client.layerMapLock.Lock()
+		defer s.client.layerMapLock.Unlock()
+
+		for _, layer := range s.client.layerMap {
+			if err := layer.manager.SetOptimizerOff(); err == nil {
+				okRes[layer.manager.manifestDigest.String()] = time.Now().Format(time.RFC3339)
+			} else {
+				failRes[layer.manager.manifestDigest.String()] = err.Error()
+			}
+		}
+	}
+
+	return &pb.OptimizeResponse{
+		Success: true,
+		Message: "completed request",
+		Okay:    okRes,
+		Failed:  failRes,
+	}, nil
+}
+
+func (s *StarlightDaemonAPIServer) ReportTraces(ctx context.Context, req *pb.ReportTracesRequest) (*pb.ReportTracesResponse, error) {
+
+	return &pb.ReportTracesResponse{
+		Success: true,
+		Message: "to be implemented",
+	}, nil
 }
 
 func newStarlightDaemonAPIServer(client *Client) *StarlightDaemonAPIServer {

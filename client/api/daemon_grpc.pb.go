@@ -24,10 +24,8 @@ const _ = grpc.SupportPackageIsVersion7
 type DaemonClient interface {
 	GetVersion(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Version, error)
 	AddProxyProfile(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
-	Convert(ctx context.Context, in *ConvertRequest, opts ...grpc.CallOption) (*ConvertResponse, error)
-	Notify(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error)
 	PullImage(ctx context.Context, in *ImageReference, opts ...grpc.CallOption) (*ImagePullResponse, error)
-	SetOptimize(ctx context.Context, in *OptimizeRequest, opts ...grpc.CallOption) (*OptimizeResponse, error)
+	SetOptimizer(ctx context.Context, in *OptimizeRequest, opts ...grpc.CallOption) (*OptimizeResponse, error)
 	ReportTraces(ctx context.Context, in *ReportTracesRequest, opts ...grpc.CallOption) (*ReportTracesResponse, error)
 }
 
@@ -57,24 +55,6 @@ func (c *daemonClient) AddProxyProfile(ctx context.Context, in *AuthRequest, opt
 	return out, nil
 }
 
-func (c *daemonClient) Convert(ctx context.Context, in *ConvertRequest, opts ...grpc.CallOption) (*ConvertResponse, error) {
-	out := new(ConvertResponse)
-	err := c.cc.Invoke(ctx, "/api.Daemon/Convert", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *daemonClient) Notify(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error) {
-	out := new(NotifyResponse)
-	err := c.cc.Invoke(ctx, "/api.Daemon/Notify", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *daemonClient) PullImage(ctx context.Context, in *ImageReference, opts ...grpc.CallOption) (*ImagePullResponse, error) {
 	out := new(ImagePullResponse)
 	err := c.cc.Invoke(ctx, "/api.Daemon/PullImage", in, out, opts...)
@@ -84,9 +64,9 @@ func (c *daemonClient) PullImage(ctx context.Context, in *ImageReference, opts .
 	return out, nil
 }
 
-func (c *daemonClient) SetOptimize(ctx context.Context, in *OptimizeRequest, opts ...grpc.CallOption) (*OptimizeResponse, error) {
+func (c *daemonClient) SetOptimizer(ctx context.Context, in *OptimizeRequest, opts ...grpc.CallOption) (*OptimizeResponse, error) {
 	out := new(OptimizeResponse)
-	err := c.cc.Invoke(ctx, "/api.Daemon/SetOptimize", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/api.Daemon/SetOptimizer", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +88,8 @@ func (c *daemonClient) ReportTraces(ctx context.Context, in *ReportTracesRequest
 type DaemonServer interface {
 	GetVersion(context.Context, *Request) (*Version, error)
 	AddProxyProfile(context.Context, *AuthRequest) (*AuthResponse, error)
-	Convert(context.Context, *ConvertRequest) (*ConvertResponse, error)
-	Notify(context.Context, *NotifyRequest) (*NotifyResponse, error)
 	PullImage(context.Context, *ImageReference) (*ImagePullResponse, error)
-	SetOptimize(context.Context, *OptimizeRequest) (*OptimizeResponse, error)
+	SetOptimizer(context.Context, *OptimizeRequest) (*OptimizeResponse, error)
 	ReportTraces(context.Context, *ReportTracesRequest) (*ReportTracesResponse, error)
 	mustEmbedUnimplementedDaemonServer()
 }
@@ -126,17 +104,11 @@ func (UnimplementedDaemonServer) GetVersion(context.Context, *Request) (*Version
 func (UnimplementedDaemonServer) AddProxyProfile(context.Context, *AuthRequest) (*AuthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddProxyProfile not implemented")
 }
-func (UnimplementedDaemonServer) Convert(context.Context, *ConvertRequest) (*ConvertResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Convert not implemented")
-}
-func (UnimplementedDaemonServer) Notify(context.Context, *NotifyRequest) (*NotifyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
-}
 func (UnimplementedDaemonServer) PullImage(context.Context, *ImageReference) (*ImagePullResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PullImage not implemented")
 }
-func (UnimplementedDaemonServer) SetOptimize(context.Context, *OptimizeRequest) (*OptimizeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetOptimize not implemented")
+func (UnimplementedDaemonServer) SetOptimizer(context.Context, *OptimizeRequest) (*OptimizeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetOptimizer not implemented")
 }
 func (UnimplementedDaemonServer) ReportTraces(context.Context, *ReportTracesRequest) (*ReportTracesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportTraces not implemented")
@@ -190,42 +162,6 @@ func _Daemon_AddProxyProfile_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Daemon_Convert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ConvertRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DaemonServer).Convert(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/api.Daemon/Convert",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DaemonServer).Convert(ctx, req.(*ConvertRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Daemon_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NotifyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DaemonServer).Notify(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/api.Daemon/Notify",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DaemonServer).Notify(ctx, req.(*NotifyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Daemon_PullImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ImageReference)
 	if err := dec(in); err != nil {
@@ -244,20 +180,20 @@ func _Daemon_PullImage_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Daemon_SetOptimize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Daemon_SetOptimizer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(OptimizeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DaemonServer).SetOptimize(ctx, in)
+		return srv.(DaemonServer).SetOptimizer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/api.Daemon/SetOptimize",
+		FullMethod: "/api.Daemon/SetOptimizer",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DaemonServer).SetOptimize(ctx, req.(*OptimizeRequest))
+		return srv.(DaemonServer).SetOptimizer(ctx, req.(*OptimizeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -296,20 +232,12 @@ var Daemon_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Daemon_AddProxyProfile_Handler,
 		},
 		{
-			MethodName: "Convert",
-			Handler:    _Daemon_Convert_Handler,
-		},
-		{
-			MethodName: "Notify",
-			Handler:    _Daemon_Notify_Handler,
-		},
-		{
 			MethodName: "PullImage",
 			Handler:    _Daemon_PullImage_Handler,
 		},
 		{
-			MethodName: "SetOptimize",
-			Handler:    _Daemon_SetOptimize_Handler,
+			MethodName: "SetOptimizer",
+			Handler:    _Daemon_SetOptimizer_Handler,
 		},
 		{
 			MethodName: "ReportTraces",

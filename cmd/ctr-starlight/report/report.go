@@ -22,11 +22,30 @@ import (
 	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
+	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/proxy"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"time"
 )
+
+func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	resp, err := client.ReportTraces(ctx, req)
+	if err != nil {
+		fmt.Printf("report traces failed: %v\n", err)
+		return
+	}
+	if resp.Success {
+		if !quiet {
+			fmt.Printf("reported traces: %s\n", resp.Message)
+		}
+	} else {
+		fmt.Printf("report traces failed: %s\n", resp.Message)
+	}
+}
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
 	var tc *fs.TraceCollection
@@ -58,12 +77,6 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	}).Info("uploading data to starlight proxy server")
 
 	p := proxy.NewStarlightProxy(ctx, protocol, c.String("server"))
-
-	/*
-		if err = proxy.Report(ref, tc.ToJSONBuffer()); err != nil {
-			return err
-		}
-	*/
 
 	fmt.Println(p, tc)
 

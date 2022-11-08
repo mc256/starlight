@@ -319,9 +319,19 @@ func (m *Manager) Init(cfg *Configuration, ready bool,
 	}
 }
 
-func (m *Manager) SetOptimizerOn(optimizeGroup, imageDigest string) (err error) {
-	m.tracer, err = fs.NewTracer(optimizeGroup, imageDigest)
+func (m *Manager) SetOptimizerOn(optimizeGroup string) (err error) {
+	if m.tracer == nil {
+		m.tracer, err = fs.NewTracer(optimizeGroup, m.manifestDigest.String())
+	}
 	return
+}
+
+func (m *Manager) SetOptimizerOff() (err error) {
+	if m.tracer != nil {
+		err = m.tracer.Close()
+		m.tracer = nil
+	}
+	return nil
 }
 
 func (m *Manager) Teardown() {
