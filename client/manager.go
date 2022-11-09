@@ -331,7 +331,7 @@ func (m *Manager) SetOptimizerOff() (err error) {
 		err = m.tracer.Close()
 		m.tracer = nil
 	}
-	return nil
+	return
 }
 
 func (m *Manager) Teardown() {

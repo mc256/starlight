@@ -24,6 +24,7 @@ import (
 
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
+	cmdOptimizer "github.com/mc256/starlight/cmd/ctr-starlight/optimizer"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
 	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
@@ -92,6 +93,7 @@ https://github.com/mc256/starlight
 		cmdVersion.Command(),
 		cmdReport.Command(),
 		cmdConvert.Command(),
+		cmdOptimizer.Command(),
 		cmdPull.Command(),
 		cmdNotify.Command(),
 	})

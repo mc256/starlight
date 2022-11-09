@@ -26,6 +26,12 @@ func optimizer(client pb.DaemonClient, req *pb.OptimizeRequest, quiet bool) {
 	if resp.Success {
 		if !quiet {
 			fmt.Printf("set optimizer: %s\n", resp.Message)
+			for k, v := range resp.Okay {
+				fmt.Printf("\t%s: %s - okay \n", k, v)
+			}
+			for k, v := range resp.Failed {
+				fmt.Printf("\t%s: %v \n", k, v)
+			}
 		}
 	} else {
 		fmt.Printf("set optimizer status failed: %s\n", resp.Message)
@@ -71,9 +77,8 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 func Command() *cli.Command {
 	ctx := context.Background()
 	return &cli.Command{
-		Name: "optimize",
-		Usage: `collect filesystem traces to optimize the image.
-To collect traces, turn on the optimizer before 'ctr container create' command`,
+		Name:  "optimizer",
+		Usage: `collect filesystem traces to find out the priorities of files.`,
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},

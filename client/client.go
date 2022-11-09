@@ -73,6 +73,7 @@ type Client struct {
 	layerMap     map[string]*mountPoint
 
 	// Optimizer
+	optimizerLock        sync.Mutex
 	defaultOptimizer     bool
 	defaultOptimizeGroup string
 }
@@ -585,7 +586,7 @@ func (c *Client) Mount(md, ld, ssId string, sn *snapshots.Info) (mnt string, err
 	}
 
 	mnt = filepath.Join(c.GetMountingPoint(ssId), "slfs")
-	current := c.layerMap[man.Destination.Layers[len(man.Destination.Layers)-1].Hash]
+	current := c.layerMap[ld]
 	current.fs, err = current.manager.NewStarlightFS(mnt, current.stack, &fusefs.Options{}, false)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to mount filesystem")
@@ -766,6 +767,9 @@ func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.Opt
 	okRes, failRes := make(map[string]string), make(map[string]string)
 
 	if req.Enable {
+		s.client.optimizerLock.Lock()
+		defer s.client.optimizerLock.Unlock()
+
 		s.client.defaultOptimizer = true
 		s.client.defaultOptimizeGroup = req.Group
 
@@ -780,6 +784,9 @@ func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.Opt
 			}
 		}
 	} else {
+		s.client.optimizerLock.Lock()
+		defer s.client.optimizerLock.Unlock()
+
 		s.client.defaultOptimizer = false
 		s.client.defaultOptimizeGroup = ""
 
