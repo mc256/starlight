@@ -72,7 +72,7 @@ func Command() *cli.Command {
 			return Action(ctx, c)
 		},
 		Flags: append(
-			PullImageFlags,
+			ProxyFlags,
 		),
 		ArgsUsage: "[flags] [BaseImage] PullImage",
 	}

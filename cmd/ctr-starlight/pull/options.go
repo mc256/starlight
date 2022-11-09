@@ -8,7 +8,7 @@ package pull
 import "github.com/urfave/cli/v2"
 
 var (
-	PullImageFlags = []cli.Flag{
+	ProxyFlags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "profile",
 			Aliases: []string{"p"},

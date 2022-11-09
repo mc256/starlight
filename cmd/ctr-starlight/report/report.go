@@ -21,12 +21,11 @@ package report
 import (
 	"context"
 	"fmt"
-	"github.com/containerd/containerd/log"
 	pb "github.com/mc256/starlight/client/api"
-	"github.com/mc256/starlight/client/fs"
-	"github.com/mc256/starlight/proxy"
-	"github.com/sirupsen/logrus"
+	"github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"time"
 )
 
@@ -48,38 +47,20 @@ func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
 }
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
-	var tc *fs.TraceCollection
-	tc, err = fs.NewTraceCollection(ctx, c.String("path"))
+	// Dial to the daemon
+	address := c.String("address")
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(address, opts)
 	if err != nil {
-		return err
-	}
-	protocol := "https"
-	if c.Bool("plain-http") {
-		protocol = "http"
-	}
-
-	server := c.String("server")
-	if server == "starlight.yuri.moe" {
-		protocol = "https"
-		log.G(ctx).Warn("using public staging starlight proxy server. " +
-			"the public server may not have your own container image, " +
-			"please set your own starlight server using environment variable STARLIGHT_PROXY or --server flag")
-	}
-
-	if server == "" {
-		log.G(ctx).Fatal("no starlight proxy server address provided")
+		fmt.Printf("connect to starlight daemon failed: %v\n", err)
 		return nil
 	}
+	defer conn.Close()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"server":   server,
-		"protocol": protocol,
-	}).Info("uploading data to starlight proxy server")
-
-	p := proxy.NewStarlightProxy(ctx, protocol, c.String("server"))
-
-	fmt.Println(p, tc)
-
+	// report
+	report(pb.NewDaemonClient(conn), &pb.ReportTracesRequest{
+		ProxyConfig: c.String("profile"),
+	}, c.Bool("quiet"))
 	return nil
 }
 
@@ -91,7 +72,7 @@ func Command() *cli.Command {
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
-		Flags:     Flags,
+		Flags:     pull.ProxyFlags,
 		ArgsUsage: "",
 	}
 	return &cmd

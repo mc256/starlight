@@ -19,7 +19,6 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -235,18 +234,16 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	return resp.Body, manifestSize, configSize, starlightHeaderSize, digest, slDigest, nil
 }
 
-func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
-
+func (a *StarlightProxy) Report(body io.Reader) error {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
 		Path:   path.Join("starlight"),
 	}
 	q := u.Query()
-	q.Set("ref", ref.String())
-	q.Set("action", "report")
+	q.Set("action", "report-traces")
 	u.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
+	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), body)
 	if pwd, isSet := a.auth.Password(); isSet {
 		req.SetBasicAuth(a.auth.Username(), pwd)
 	}
@@ -263,7 +260,6 @@ func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
 		log.G(a.ctx).WithFields(logrus.Fields{
 			"code":     fmt.Sprintf("%d", resp.StatusCode),
 			"version":  version,
-			"ref":      ref.String(),
 			"response": strings.TrimSpace(string(response)),
 		}).Error("server error")
 		return nil
@@ -272,7 +268,6 @@ func (a *StarlightProxy) Report(ref name.Reference, buffer bytes.Buffer) error {
 	log.G(a.ctx).WithFields(logrus.Fields{
 		"code":     200,
 		"version":  version,
-		"ref":      ref.String(),
 		"response": strings.TrimSpace(string(response)),
 	}).Info("server prepared")
 	return nil

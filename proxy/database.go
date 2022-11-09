@@ -13,6 +13,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util/common"
 	"github.com/mc256/starlight/util/send"
 	"github.com/pkg/errors"
@@ -367,6 +368,54 @@ func (d *Database) GetUniqueFiles(layers []*send.ImageLayer) ([]*send.File, erro
 		})
 	}
 	return fl, nil
+}
+
+func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs []int64, err error) {
+	var layersMap []int64
+
+	for _, img := range collection.Groups {
+		// get image serial id
+		i := img.Images[0]
+		var imageSerial, nlayer int64
+		if err = d.db.QueryRow(`
+			SELECT id, nlayer FROM starlight.starlight.image
+			WHERE ready IS NOT NULL AND hash=$1 LIMIT 1`,
+			i).Scan(&imageSerial, &nlayer); err != nil {
+			return nil, err
+		}
+
+		// get layers of the image
+		var rows *sql.Rows
+		rows, err = d.db.Query(`
+				SELECT 
+					L.layer
+				FROM starlight.starlight.layer AS L
+				WHERE L.image=$1
+				ORDER BY "stackIndex" ASC`, imageSerial)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		layersMap = make([]int64, nlayer)
+		idx := 0
+		for rows.Next() {
+			if err = rows.Scan(&layersMap[idx]); err != nil {
+				return nil, err
+			}
+			idx += 1
+		}
+
+		stmt, _ := d.db.Prepare(`
+			UPDATE starlight.starlight.file SET "order" = array_append("order",$1) WHERE fs=$2 and file=$3
+		`)
+		for _, f := range img.History {
+			_, err = stmt.Exec(f.Rank, layersMap[f.Stack], f.FileName)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return layersMap, nil
 }
 
 func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*send.RankedFile, error) {

@@ -22,10 +22,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/platforms"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/mc256/starlight/util"
+	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"sort"
@@ -108,15 +107,12 @@ func (t *Tracer) Close() error {
 	return t.fh.Close()
 }
 
-func NewTracer(optimizeGroup, digest string) (*Tracer, error) {
-	rand.Seed(time.Now().UnixNano())
-
-	r := rand.Intn(99999)
-	err := os.MkdirAll(path.Join(os.TempDir(), "starlight-optimizer"), 0775)
+func NewTracer(optimizeGroup, digest, outputDir string) (*Tracer, error) {
+	err := os.MkdirAll(outputDir, 0775)
 	if err != nil {
 		return nil, err
 	}
-	logPath := path.Join(os.TempDir(), "starlight-optimizer", fmt.Sprintf("%05d.json", r))
+	logPath := path.Join(outputDir, fmt.Sprintf("%s.json", util.GetRandomId("trace-")))
 
 	fh, err := os.Create(logPath)
 	if err != nil {
@@ -153,7 +149,6 @@ type OptimizedGroup struct {
 type TraceCollection struct {
 	tracerMap map[string][]Tracer
 	Groups    []*OptimizedGroup
-	Platform  v1.Platform `json:"platform"`
 }
 
 func (tc TraceCollection) ToJSONBuffer() []byte {
@@ -161,9 +156,9 @@ func (tc TraceCollection) ToJSONBuffer() []byte {
 	return buf
 }
 
-func NewTraceCollectionFromBuffer(buf []byte) (*TraceCollection, error) {
+func NewTraceCollectionFromBuffer(buf io.ReadCloser) (*TraceCollection, error) {
 	tc := &TraceCollection{}
-	err := json.Unmarshal(buf, tc)
+	err := json.NewDecoder(buf).Decode(tc)
 	if err != nil {
 		return nil, err
 	}
@@ -175,29 +170,19 @@ func clearTraceCollection(f string) error {
 }
 
 func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error) {
-	pp := path.Join(p, "starlight-optimizer")
-	files, err := ioutil.ReadDir(pp)
+	files, err := ioutil.ReadDir(p)
 	if err != nil {
 		return nil, err
 	}
 
-	platform := platforms.DefaultSpec()
-
 	tc := &TraceCollection{
 		tracerMap: make(map[string][]Tracer),
 		Groups:    make([]*OptimizedGroup, 0),
-		Platform: v1.Platform{
-			Architecture: platform.Architecture,
-			OS:           platform.OS,
-			OSVersion:    platform.OSVersion,
-			OSFeatures:   platform.OSFeatures,
-			Variant:      platform.Variant,
-		},
 	}
 
 	for _, f := range files {
 		if path.Ext(f.Name()) == ".json" {
-			buf, err := ioutil.ReadFile(path.Join(pp, f.Name()))
+			buf, err := ioutil.ReadFile(path.Join(p, f.Name()))
 			if err != nil {
 				log.G(ctx).WithField("file", f.Name()).Error("cannot read file")
 				continue
@@ -215,7 +200,7 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 				"image": t.Image,
 			}).Info("parsed file")
 
-			_ = clearTraceCollection(path.Join(pp, f.Name()))
+			_ = clearTraceCollection(path.Join(p, f.Name()))
 
 			if _, ok := tc.tracerMap[t.OptimizeGroup]; ok {
 				tc.tracerMap[t.OptimizeGroup] = append(tc.tracerMap[t.OptimizeGroup], t)

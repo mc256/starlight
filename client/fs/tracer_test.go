@@ -30,7 +30,7 @@ import (
 
 func TestLoadTraces(t *testing.T) {
 	ctx := util.ConfigLogger()
-	tc, err := NewTraceCollection(ctx, "/mnt/sandbox2")
+	tc, err := NewTraceCollection(ctx, "/tmp")
 	if err != nil {
 		t.Fatal(err)
 	}

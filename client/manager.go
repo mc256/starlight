@@ -321,7 +321,7 @@ func (m *Manager) Init(cfg *Configuration, ready bool,
 
 func (m *Manager) SetOptimizerOn(optimizeGroup string) (err error) {
 	if m.tracer == nil {
-		m.tracer, err = fs.NewTracer(optimizeGroup, m.manifestDigest.String())
+		m.tracer, err = fs.NewTracer(optimizeGroup, m.manifestDigest.String(), m.cfg.TracesDir)
 	}
 	return
 }

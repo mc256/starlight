@@ -78,9 +78,12 @@ message OptimizeResponse {
 // Report Traces
 message ReportTracesRequest {
   string proxyConfig = 1;
+  bool remove = 2;
 }
 
 message ReportTracesResponse {
   bool success = 1;
   string message = 2;
+  map<string, string> okay = 3;
+  map<string, string> failed = 4;
 }

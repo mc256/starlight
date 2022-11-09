@@ -34,6 +34,7 @@ type Configuration struct {
 	Daemon     string `json:"daemon"`
 	Containerd string `json:"containerd"`
 	Namespace  string `json:"default_namespace"`
+	TracesDir  string `json:"traces_dir"`
 
 	// registry + proxy
 	DefaultProxy   string `json:"default_proxy"`
@@ -133,6 +134,7 @@ func NewConfig() *Configuration {
 		Containerd:     "/run/containerd/containerd.sock",
 		DefaultProxy:   "starlight-shared",
 		FileSystemRoot: "/var/lib/starlight",
+		TracesDir:      "/var/lib/starlight/traces",
 		Namespace:      "default",
 		ClientId:       uuid.New().String(),
 

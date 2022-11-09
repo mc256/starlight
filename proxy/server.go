@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
@@ -177,34 +178,31 @@ func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
 		return
 
 	case "report-traces":
-		i := q.Get("image")
-		fmt.Println(i)
+		tc, err := fs.NewTraceCollectionFromBuffer(req.Body)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
+			a.error(w, req, err.Error())
+			return
+		}
 
-		// tc, err := fs.NewTraceCollectionFromBuffer(buf)
-		/*
-					tc, err := fs.NewTraceCollectionFromBuffer(buf)
-			if err != nil {
-				log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
-				return err
-			}
+		arr, err := a.db.UpdateFileRanks(tc)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Info("cannot update file ranks")
+			a.error(w, req, err.Error())
+			return
+		}
 
-			for _, grp := range tc.Groups {
-				log.G(a.ctx).WithField("collection", grp.Images)
-				fso, err := LoadCollection(a.ctx, a.database, grp.Images)
-				if err != nil {
-					return err
-				}
+		log.G(a.ctx).
+			WithField("ip", ip).
+			WithField("layers", arr).
+			Info("received traces")
 
-				fso.AddOptimizeTrace(grp)
+		a.respond(w, req, &ApiResponse{
+			Status:  "OK",
+			Code:    http.StatusOK,
+			Message: "Starlight Proxy",
+		})
 
-				if err := fso.SaveMergedApp(); err != nil {
-					return err
-				}
-				_, _ = fmt.Fprintf(w, "Optimized: %s \n", grp.Images)
-			}
-		*/
-
-		a.error(w, req, "not implemented yet!")
 		return
 
 	default:

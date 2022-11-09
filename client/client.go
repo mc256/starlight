@@ -292,6 +292,28 @@ func (c *Client) storeStarlightHeader(cfgName, ref, sld string, h []byte) (err e
 	return nil
 }
 
+func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
+	// connect to proxy
+	pc, _ := c.cfg.getProxy(proxyCfg)
+	p := proxy.NewStarlightProxy(c.ctx, pc.Protocol, pc.Address)
+	if pc.Username != "" {
+		p.SetAuth(pc.Username, pc.Password)
+	}
+
+	// upload traces
+	buf, err := json.Marshal(tc)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal trace collection")
+	}
+
+	err = p.Report(bytes.NewBuffer(buf))
+	if err != nil {
+		return errors.Wrapf(err, "failed to upload trace collection")
+	}
+
+	return nil
+}
+
 func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, err error) {
 	// check local image
 	reqFilter := getImageFilter(ref)
@@ -420,6 +442,12 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 
 	// keep going and download layers
 	star.Init(c.cfg, false, manifest, imageConfig, mdd)
+
+	if c.defaultOptimizer {
+		if err = star.SetOptimizerOn(c.defaultOptimizeGroup); err != nil {
+			return nil, errors.Wrapf(err, "failed to enable optimizer")
+		}
+	}
 
 	if err = star.PrepareDirectories(c); err != nil {
 		return nil, errors.Wrapf(err, "failed to initialize directories")
@@ -811,10 +839,25 @@ func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.Opt
 }
 
 func (s *StarlightDaemonAPIServer) ReportTraces(ctx context.Context, req *pb.ReportTracesRequest) (*pb.ReportTracesResponse, error) {
+	tc, err := fs.NewTraceCollection(s.client.ctx, s.client.cfg.TracesDir)
+	if err != nil {
+		return &pb.ReportTracesResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	err = s.client.UploadTraces(req.ProxyConfig, tc)
+	if err != nil {
+		return &pb.ReportTracesResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
 
 	return &pb.ReportTracesResponse{
 		Success: true,
-		Message: "to be implemented",
+		Message: "uploaded traces",
 	}, nil
 }
 
