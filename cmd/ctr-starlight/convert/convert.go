@@ -21,17 +21,19 @@ package convert
 import (
 	"context"
 	"errors"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/mc256/starlight/cmd/ctr-starlight/notify"
+	"github.com/mc256/starlight/cmd/ctr-starlight/report"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
-func Action(c *cli.Context) error {
+func Action(ctx context.Context, c *cli.Context) error {
 	// [flags] SourceImage StarlightImage
 	if c.Args().Len() != 2 {
 		return errors.New("wrong number of arguments")
@@ -46,8 +48,9 @@ func Action(c *cli.Context) error {
 	// logger
 	ns := c.String("namespace")
 	util.ConfigLoggerWithLevel(c.String("log-level"))
-	ctx := namespaces.WithNamespace(context.Background(), ns)
+	ctx = namespaces.WithNamespace(ctx, ns)
 
+	// source
 	srcOptions := []name.Option{}
 	if srcInsecure {
 		srcOptions = append(srcOptions, name.Insecure)
@@ -57,16 +60,17 @@ func Action(c *cli.Context) error {
 		dstOptions = append(dstOptions, name.Insecure)
 	}
 
-	convertor, err := proxy.NewConvertor(srcImg, slImg, srcOptions, dstOptions)
+	// auth
+	remoteOptions := []remote.Option{remote.WithAuthFromKeychain(authn.DefaultKeychain)}
+
+	// config
+	convertor, err := util.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions, c.String("platform"))
 	if err != nil {
-		log.G(ctx).WithError(err).Error("fail to create the convertor")
+		log.G(ctx).WithError(err).Error("illegal image reference")
 		return nil
 	}
-	log.G(ctx).WithFields(logrus.Fields{
-		"from": convertor.GetSrc(),
-		"to":   convertor.GetDst(),
-	}).Info("convert container image to Starlight format")
 
+	// convert
 	err = convertor.ToStarlightImage()
 	if err != nil {
 		log.G(ctx).WithError(err).Error("fail to convert the container image")
@@ -74,17 +78,42 @@ func Action(c *cli.Context) error {
 	}
 	log.G(ctx).Info("conversion completed")
 
+	// notify
+	if c.Bool("notify") {
+		err = notify.SharedAction(ctx, c, convertor.GetDst())
+		if err != nil {
+			log.G(ctx).WithError(err).Error("fail to notify the converted image")
+			return nil
+		}
+	}
+
 	return nil
 }
 
 func Command() *cli.Command {
+	ctx := context.Background()
 	cmd := cli.Command{
 		Name:  "convert",
-		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image",
+		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image format",
 		Action: func(c *cli.Context) error {
-			return Action(c)
+			return Action(ctx, c)
 		},
-		Flags:     append(RegistryFlags),
+		Flags: append(
+
+			// Convert Flags
+			Flags,
+
+			// Report Flags
+			append(
+				report.Flags,
+				&cli.BoolFlag{
+					Name:     "notify",
+					Usage:    "notify the converted image to the Starlight Proxy",
+					Value:    false,
+					Required: false,
+				},
+			)...,
+		),
 		ArgsUsage: "[flags] SourceImage StarlightImage",
 	}
 	return &cmd

@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	RegistryFlags = []cli.Flag{
+	Flags = []cli.Flag{
 		&cli.BoolFlag{
 			Name:     "insecure-source",
 			Usage:    "use HTTP for the source image",
@@ -34,6 +34,12 @@ var (
 			Name:     "insecure-destination",
 			Usage:    "use HTTP for the destination image",
 			Value:    false,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     "platform",
+			Usage:    "chose what platforms to convert, e.g. 'linux/amd64,linux/arm64', use comma to separate. 'all' means all platforms in the source image",
+			Value:    "all",
 			Required: false,
 		},
 	}

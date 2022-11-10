@@ -25,13 +25,7 @@ registry:
     storageClass: ""
     accessModes: [ReadWriteOnce]
     size: 20Gi
-
-registryUi:
-  enabled: true
-  repository: "joxit/docker-registry-ui"
-  pullPolicy: IfNotPresent
-  tag: "latest"
-
+  # Recommend to use https://goharbor.io/
 
 imagePullSecrets: []
 

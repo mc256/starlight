@@ -23,9 +23,12 @@ import (
 	"os"
 
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
-	cmdCreate "github.com/mc256/starlight/cmd/ctr-starlight/create"
+	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
+	cmdOptimizer "github.com/mc256/starlight/cmd/ctr-starlight/optimizer"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
+	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
+
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 )
@@ -39,7 +42,7 @@ func init() {
 func main() {
 	app := NewApp()
 	if err := app.Run(os.Args); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: \n%v\n", err)
 		os.Exit(1)
 	}
 }
@@ -49,7 +52,13 @@ func NewApp() *cli.App {
 
 	app.Name = "ctr-starlight"
 	app.Version = util.Version
-	app.Usage = `starlight container deployment with remote delta image`
+	app.Usage = `CLI tool for starlight daemon.
+
+This is a CLI tool that controls starlight-daemon. 
+Please make sure that starlight-daemon is running before using this tool.
+For more information, please refer to the README.md file in the project repository.
+https://github.com/mc256/starlight
+`
 	app.Description = fmt.Sprintf("\n%s\n", app.Usage)
 
 	app.EnableBashCompletion = true
@@ -65,11 +74,11 @@ func NewApp() *cli.App {
 		},
 		&cli.StringFlag{
 			Name:        "address",
-			Aliases:     []string{"a"},
-			Value:       "/run/containerd/containerd.sock",
-			DefaultText: "/run/containerd/containerd.sock",
-			EnvVars:     []string{"CONTAINERD_ADDRESS"},
-			Usage:       "address for containerd's GRPC server",
+			Aliases:     []string{"a", "addr"},
+			Value:       "unix:////run/starlight/starlight-daemon.sock",
+			DefaultText: "unix:////run/starlight/starlight-daemon.sock",
+			EnvVars:     []string{"STARLIGHT_ADDRESS"},
+			Usage:       "address to connect to starlight-daemon",
 			Required:    false,
 		},
 		&cli.StringFlag{
@@ -81,11 +90,12 @@ func NewApp() *cli.App {
 		},
 	}
 	app.Commands = append([]*cli.Command{
-		util.VersionCommand(),
-		cmdPull.Command(),
-		cmdCreate.Command(),
+		cmdVersion.Command(),
 		cmdReport.Command(),
 		cmdConvert.Command(),
+		cmdOptimizer.Command(),
+		cmdPull.Command(),
+		cmdNotify.Command(),
 	})
 
 	return app

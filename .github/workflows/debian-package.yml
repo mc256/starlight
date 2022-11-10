@@ -7,7 +7,7 @@ on:
       - 'v*.*.*'
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: self-hosted
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
@@ -18,6 +18,8 @@ jobs:
           sudo apt update -y
           sudo apt upgrade -y
           sudo apt install net-tools
+          curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+          sh /tmp/get-docker.sh
           docker run --privileged --rm tonistiigi/binfmt --install all
           docker build -t helper:latest  -f ./.github/.helper/Dockerfile ./.github/.helper/
           docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw helper:latest

@@ -20,78 +20,59 @@ package report
 
 import (
 	"context"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
-	"github.com/mc256/starlight/grpc"
-	"github.com/sirupsen/logrus"
+	"fmt"
+	pb "github.com/mc256/starlight/client/api"
+	"github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"time"
 )
 
-func Action(c *cli.Context) error {
-	ctx := context.Background()
-	tc, err := fs.NewTraceCollection(ctx, c.String("path"))
+func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	resp, err := client.ReportTraces(ctx, req)
 	if err != nil {
-		return err
+		fmt.Printf("report traces failed: %v\n", err)
+		return
 	}
-	protocol := "https"
-	if c.Bool("plain-http") {
-		protocol = "http"
+	if resp.Success {
+		if !quiet {
+			fmt.Printf("reported traces: %s\n", resp.Message)
+		}
+	} else {
+		fmt.Printf("report traces failed: %s\n", resp.Message)
 	}
+}
 
-	server := c.String("server")
-	if server == "starlight.yuri.moe" {
-		protocol = "https"
-		log.G(ctx).Warn("using public staging starlight proxy server. " +
-			"the public server may not have your own container image, " +
-			"please set your own starlight server using environment variable STARLIGHT_PROXY or --server flag")
-	}
-
-	if server == "" {
-		log.G(ctx).Fatal("no starlight proxy server address provided")
+func Action(ctx context.Context, c *cli.Context) (err error) {
+	// Dial to the daemon
+	address := c.String("address")
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(address, opts)
+	if err != nil {
+		fmt.Printf("connect to starlight daemon failed: %v\n", err)
 		return nil
 	}
+	defer conn.Close()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"server":   server,
-		"protocol": protocol,
-	}).Info("uploading data to starlight proxy server")
-
-	proxy := grpc.NewStarlightProxy(ctx, protocol, c.String("server"))
-	if err := proxy.Report(tc.ToJSONBuffer()); err != nil {
-		return err
-	}
-
+	// report
+	report(pb.NewDaemonClient(conn), &pb.ReportTracesRequest{
+		ProxyConfig: c.String("profile"),
+	}, c.Bool("quiet"))
 	return nil
 }
 
 func Command() *cli.Command {
+	ctx := context.Background()
 	cmd := cli.Command{
 		Name:  "report",
 		Usage: "Upload data collected by the optimizer back to Starlight Proxy to speed up other similar deployment",
 		Action: func(c *cli.Context) error {
-			return Action(c)
+			return Action(ctx, c)
 		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "path",
-				Usage:       "path the the optimizer logs",
-				Value:       "/tmp",
-				DefaultText: "/tmp",
-				Required:    false,
-			},
-			&cli.StringFlag{
-				Name:     "server",
-				Value:    "starlight.yuri.moe", // public starlight proxy server - for testing only
-				Usage:    "starlight proxy address",
-				Required: false,
-				EnvVars:  []string{"STARLIGHT_PROXY"},
-			},
-			&cli.BoolFlag{
-				Name:     "plain-http",
-				Usage:    "use plain http connects to the remote server",
-				Required: false,
-			},
-		},
+		Flags:     pull.ProxyFlags,
 		ArgsUsage: "",
 	}
 	return &cmd

@@ -19,239 +19,278 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/fs"
-	"github.com/mc256/starlight/merger"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
-	bolt "go.etcd.io/bbolt"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync"
+	"time"
 )
 
 type transition struct {
-	tagFrom []*util.ImageRef
-	tagTo   []*util.ImageRef
+	from name.Reference
+	to   name.Reference
 }
 
-type StarlightProxyServer struct {
+type ApiResponse struct {
+	Status string `json:"status"`
+	Code   int    `json:"code"`
+
+	// Common Response
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+
+	// Responses Information
+	Extractor *Extractor `json:"extractor,omitempty"`
+}
+
+type Server struct {
 	http.Server
+	ctx context.Context
 
-	ctx      context.Context
-	database *bolt.DB
+	db     *Database
+	config *Configuration
 
-	containerRegistry string
-
-	builder *DeltaBundleBuilder
+	cache      map[string]*common.LayerCache
+	cacheMutex sync.Mutex
 }
 
-func (a *StarlightProxyServer) getDeltaImage(w http.ResponseWriter, req *http.Request, from string, to string) error {
-	// Parse Image Reference
-	t := &transition{
-		tagFrom: make([]*util.ImageRef, 0),
-		tagTo:   make([]*util.ImageRef, 0),
-	}
-
-	var err error
-	if from != "_" {
-		if t.tagFrom, err = util.NewImageRef(from); err != nil {
-			return err
-		}
-	}
-	if t.tagTo, err = util.NewImageRef(to); err != nil {
-		return err
-	}
-
-	// Load Optimized Merged Image Collections
-	var cTo, cFrom *Collection
-
-	if cTo, err = LoadCollection(a.ctx, a.database, t.tagTo); err != nil {
-		return err
-	}
-	if len(t.tagFrom) != 0 {
-		if cFrom, err = LoadCollection(a.ctx, a.database, t.tagFrom); err != nil {
-			return err
-		}
-		cTo.Minus(cFrom)
-	}
-
-	deltaBundle := cTo.ComposeDeltaBundle()
-
-	buf := bytes.NewBuffer(make([]byte, 0))
-	wg := &sync.WaitGroup{}
-
-	headerSize, contentLength, err := a.builder.WriteHeader(buf, deltaBundle, wg, false)
-	if err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write header cache")
-		return nil
-	}
-
-	header := w.Header()
-	header.Set("Content-Type", "application/octet-stream")
-	header.Set("Content-Length", fmt.Sprintf("%d", contentLength))
-	header.Set("Starlight-Header-Size", fmt.Sprintf("%d", headerSize))
-	header.Set("Starlight-Version", util.Version)
-	header.Set("Content-Disposition", `attachment; filename="starlight.img"`)
-	w.WriteHeader(http.StatusOK)
-
-	if n, err := io.CopyN(w, buf, headerSize); err != nil || n != headerSize {
-		log.G(a.ctx).WithField("err", err).Error("write header error")
-		return nil
-	}
-
-	if err = a.builder.WriteBody(w, deltaBundle, wg); err != nil {
-		log.G(a.ctx).WithField("err", err).Error("write body error")
-		return nil
-	}
-
-	return nil
-}
-
-func (a *StarlightProxyServer) getPrepared(w http.ResponseWriter, req *http.Request, image string) error {
-	arr := strings.Split(strings.Trim(image, ""), ":")
-	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
-		return util.ErrWrongImageFormat
-	}
-
-	err := CacheToc(a.ctx, a.database, arr[0], arr[1], a.containerRegistry)
-	if err != nil {
-		return err
-	}
-
-	ob := merger.NewOverlayBuilder(a.ctx, a.database)
-	if err = ob.AddImage(arr[0], arr[1]); err != nil {
-		return err
-	}
-	if err = ob.SaveMergedImage(); err != nil {
-		return err
-	}
-
-	header := w.Header()
-	header.Set("Content-Type", "text/plain")
-	header.Set("Starlight-Version", util.Version)
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "Cached TOC: %s\n", image)
-	return nil
-}
-
-func (a *StarlightProxyServer) postReport(w http.ResponseWriter, req *http.Request) error {
-	header := w.Header()
-	header.Set("Content-Type", "text/plain")
-	header.Set("Starlight-Version", util.Version)
-	w.WriteHeader(http.StatusOK)
-
-	buf, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return err
-	}
-
-	tc, err := fs.NewTraceCollectionFromBuffer(buf)
-	if err != nil {
-		log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
-		return err
-	}
-
-	for _, grp := range tc.Groups {
-		log.G(a.ctx).WithField("collection", grp.Images)
-		fso, err := LoadCollection(a.ctx, a.database, grp.Images)
-		if err != nil {
-			return err
-		}
-
-		fso.AddOptimizeTrace(grp)
-
-		if err := fso.SaveMergedApp(); err != nil {
-			return err
-		}
-		_, _ = fmt.Fprintf(w, "Optimized: %s \n", grp.Images)
-	}
-
-	return nil
-}
-
-func (a *StarlightProxyServer) getDefault(w http.ResponseWriter, req *http.Request) {
-	_, _ = fmt.Fprint(w, "Starlight Proxy OK!\n")
-}
-
-func (a *StarlightProxyServer) rootFunc(w http.ResponseWriter, req *http.Request) {
-	params := strings.Split(strings.Trim(req.RequestURI, "/"), "/")
+func (a *Server) getIpAddress(req *http.Request) string {
 	remoteAddr := req.RemoteAddr
-
 	if realIp := req.Header.Get("X-Real-IP"); realIp != "" {
 		remoteAddr = realIp
 	}
-	log.G(a.ctx).WithFields(logrus.Fields{
-		"remote": remoteAddr,
-		"params": params,
-	}).Info("request received")
-	var err error
-	switch {
-	case len(params) == 4 && params[0] == "from" && params[2] == "to":
-		err = a.getDeltaImage(w, req, strings.TrimSpace(params[1]), strings.TrimSpace(params[3]))
-		break
-	case len(params) == 2 && params[0] == "prepare":
-		err = a.getPrepared(w, req, params[1])
-		break
-	case len(params) == 1 && params[0] == "report":
-		err = a.postReport(w, req)
-		break
-	default:
-		a.getDefault(w, req)
-	}
-	if err != nil {
-		header := w.Header()
-		header.Set("Content-Type", "text/plain")
-		header.Set("Starlight-Version", util.Version)
-		w.WriteHeader(http.StatusInternalServerError)
-
-		_, _ = fmt.Fprintf(w, "Opoos! Something went wrong: \n\n%s\n", err)
-	} else {
-		log.G(a.ctx).WithFields(logrus.Fields{
-			"remote": remoteAddr,
-			"params": params,
-		}).Info("request sent")
-	}
+	return remoteAddr
 }
 
-func NewServer(registry, logLevel string, wg *sync.WaitGroup) *StarlightProxyServer {
-	ctx := util.ConfigLoggerWithLevel(logLevel)
+func (a *Server) cacheTimeoutValidator() {
+	for k, v := range a.cache {
+		v.Mutex.Lock()
+		// Delete Expired Cache
+		if v.UseCounter <= 0 && time.Now().Add(time.Duration(a.config.CacheTimeout)*time.Second).Before(v.LastUsed) {
+			delete(a.cache, k)
+		}
+		v.Mutex.Unlock()
+	}
+	time.Sleep(time.Second)
+}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"registry":  registry,
-		"log-level": logLevel,
-	}).Info("Starlight Proxy")
+func (a *Server) root(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("root")
 
-	db, err := util.OpenDatabase(ctx, util.DataPath, util.ProxyDbName)
-	if err != nil {
-		log.G(ctx).WithError(err).Error("open database error")
-		return nil
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusOK)
+
+	r := ApiResponse{
+		Status:  "OK",
+		Code:    http.StatusOK,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
+}
+
+func (a *Server) scanner(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("harbor scanner")
+
+	// TODO: implement api hooks
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusNotImplemented)
+
+	r := ApiResponse{
+		Status:  "Not Implemented",
+		Code:    http.StatusNotImplemented,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
+}
+
+func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
+	ip := a.getIpAddress(req)
+	q := req.URL.Query()
+	action := q.Get("action")
+
+	log.G(a.ctx).WithFields(logrus.Fields{"action": action, "ip": ip}).Info("request received")
+
+	switch action {
+	case "delta-image":
+		f, t, plt := q.Get("from"), q.Get("to"), q.Get("platform")
+		if t == "" || plt == "" {
+			a.error(w, req, "missing parameters")
+			return
+		}
+
+		b, err := NewBuilder(a, f, t, plt)
+		if err != nil {
+			a.error(w, req, err.Error())
+			return
+		}
+
+		if err = b.Load(); err != nil {
+			a.error(w, req, err.Error())
+			return
+		}
+
+		if err = b.WriteHeader(w, req); err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to write delta image header")
+			return
+		}
+		if err = b.WriteBody(w, req); err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to write delta image body")
+			return
+		}
+		return
+
+	case "notify":
+		i := q.Get("ref")
+		if i == "" {
+			a.error(w, req, "missing parameters")
+			return
+		}
+
+		extractor, err := NewExtractor(a, i)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+			a.error(w, req, err.Error())
+			return
+		}
+
+		res, err := extractor.SaveToC()
+		if err != nil {
+			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+			a.error(w, req, err.Error())
+			return
+		}
+
+		log.G(a.ctx).WithField("container", i).Info("cached ToC")
+		a.respond(w, req, res)
+		return
+
+	case "report-traces":
+		tc, err := fs.NewTraceCollectionFromBuffer(req.Body)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
+			a.error(w, req, err.Error())
+			return
+		}
+
+		arr, err := a.db.UpdateFileRanks(tc)
+		if err != nil {
+			log.G(a.ctx).WithError(err).Info("cannot update file ranks")
+			a.error(w, req, err.Error())
+			return
+		}
+
+		log.G(a.ctx).
+			WithField("ip", ip).
+			WithField("layers", arr).
+			Info("received traces")
+
+		a.respond(w, req, &ApiResponse{
+			Status:  "OK",
+			Code:    http.StatusOK,
+			Message: "Starlight Proxy",
+		})
+
+		return
+
+	default:
+		a.error(w, req, "unknown action ('delta-image', 'notify' or 'report-traces' expected)")
 	}
 
-	server := &StarlightProxyServer{
+	a.error(w, req, "missing parameter")
+}
+
+func (a *Server) error(w http.ResponseWriter, req *http.Request, reason string) {
+	a.respond(w, req, &ApiResponse{
+		Status: "Bad Request",
+		Code:   http.StatusBadRequest,
+		Error:  reason,
+	})
+}
+
+func (a *Server) respond(w http.ResponseWriter, req *http.Request, res *ApiResponse) {
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(res.Code)
+	b, _ := json.Marshal(res)
+	_, _ = w.Write(b)
+}
+
+func (a *Server) healthCheck(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("health check")
+
+	header := w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Starlight-Version", util.Version)
+	w.WriteHeader(http.StatusOK)
+
+	r := ApiResponse{
+		Status:  "OK",
+		Code:    http.StatusOK,
+		Message: "Starlight Proxy",
+	}
+	b, _ := json.Marshal(r)
+	_, _ = w.Write(b)
+}
+
+func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Server, error) {
+
+	server := &Server{
+		ctx: ctx,
 		Server: http.Server{
-			Addr: ":8090",
+			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
 		},
-		database:          db,
-		ctx:               ctx,
-		containerRegistry: registry,
-		builder:           NewBuilder(ctx, registry),
+		config: cfg,
+		cache:  make(map[string]*common.LayerCache),
 	}
-	http.HandleFunc("/", server.rootFunc)
+
+	// connect database
+	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
+	} else {
+		server.db = db
+	}
+
+	// init database
+	err := server.db.InitDatabase()
+	if err != nil {
+		log.G(ctx).Errorf("failed to init database: %v\n", err)
+		return nil, err
+	}
+
+	// create router
+	http.HandleFunc("/scanner", server.scanner)
+	http.HandleFunc("/starlight", server.starlight)
+	http.HandleFunc("/health-check", server.healthCheck)
+	http.HandleFunc("/", server.root)
 
 	go func() {
 		defer wg.Done()
-		defer server.database.Close()
+		defer server.db.Close()
 
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.G(ctx).WithField("error", err).Error("server exit with error")
 		}
 	}()
 
-	return server
+	go func() {
+		for {
+			server.cacheTimeoutValidator()
+		}
+	}()
+
+	return server, nil
 }

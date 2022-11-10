@@ -1,3 +1,4 @@
+
 # Starlight: Fast Container Provisioning
 
 [![Docker Image](https://img.shields.io/github/workflow/status/mc256/starlight/Docker%20Image?label=Proxy%20Docker%20Image&logo=docker&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
@@ -72,35 +73,25 @@ and starting the Starlight snapshotter daemon
    The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
    The **Starlight CLI tool** features the image conversion, example:
    ```shell
-    export REGISTRY=172.18.2.3:5000 && \
-    ctr-starlight convert \
-        --insecure-source --insecure-destination \
-        $REGISTRY/redis:6.2.1 $REGISTRY/redis:6.2.1-starlight
+    ctr-starlight convert --notify harbor.yuri.moe/public/redis:6.2.7 harbor.yuri.moe/starlight/redis:6.2.7
    ```
-   `$REGISTRY` is your container registry (e.g. `172.18.2.3:5000`).
-   
-   In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment.
-   ```shell
-    export STARLIGHT_PROXY=172.18.2.3:8090 && \
-    curl http://$STARLIGHT_PROXY/prepare/redis:6.2.1-starlight
-    #Cached TOC: redis:6.2.1-starlight
-   ```
-   `$STARLIGHT_PROXY` is the address of your Starlight Proxy (e.g. `172.18.2.3:8090`)
+    In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment. 
+    The `--nofity` flag tells the proxy to fetch the metadata from the registry and store it in the metadata database.
+
 
 4) Collect traces on the worker for container startup. 
    This entails starting the container on the worker while collecting file access traces that are sent to the proxy.
    
    The **Starlight CLI tool** features trace collection, example:
    ```shell
-   sudo ctr-starlight pull redis:6.2.1-starlight && \
+   sudo ctr-starlight optimizer on
+   sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:6.2.7 && \
    mkdir /tmp/test-redis-data && \
-   sudo ctr-starlight create --optimize \
-          --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-       --env-file ./demo/config/all.env \
-       --net-host \
-       redis:6.2.1-starlight \
-       redis:6.2.1-starlight \
-       instance1 && \
+   sudo ctr create --snapshotter=starlight \
+        --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+        --env-file ./demo/config/all.env --net-host \
+        harbor.yuri.moe/starlight/redis:6.2.7
+        instance1 && \
    sudo ctr task start instance1
    ```
    
@@ -108,11 +99,11 @@ and starting the Starlight snapshotter daemon
    ```shell
    sudo ctr container rm instance1
    ```
-   Traces will be saved to `/tmp/starlight-optimizer` folder.
    
    After finished running the container several times, then we can report all the traces to the proxy, using:
    ```shell
-   ctr-starlight report --plain-http
+   sudo ctr-starlight optimizer off
+   sudo ctr-starlight report
    ```
 
 5) Reset `containerd` and `starlight`. Clean up all the downloaded containers and cache.
@@ -129,27 +120,25 @@ The good news is that they should be quick, a few minutes for each container.
 
 Start a container using Starlight
 ```shell
-sudo ctr-starlight pull redis:6.2.1-starlight && \
+sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:6.2.7 && \
 mkdir /tmp/test-redis-data && \
-sudo ctr-starlight create \
-	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-	--env-file ./demo/config/all.env \
-	--net-host \
-	redis:6.2.1-starlight \
-	redis:6.2.1-starlight \
+sudo ctr container create --snapshotter=starlight \
+    --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+    --env-file ./demo/config/all.env \
+    --net-host \
+    harbor.yuri.moe/starlight/redis:6.2.7 \
     instance3 && \
 sudo ctr task start instance3
 ```
 
-Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:6.2.2`)
+Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:7.0.5`)
 ```shell
-sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
-sudo ctr-starlight create \
-	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-	--env-file ./demo/config/all.env \
-	--net-host \
-	redis:6.2.2-starlight \
-	redis:6.2.2-starlight \
+sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:7.0.5 && \
+sudo ctr container create --snapshotter=starlight  \
+    --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+    --env-file ./demo/config/all.env \
+    --net-host \
+    harbor.yuri.moe/starlight/redis:7.0.5 \
     instance4 && \
 sudo ctr task start instance4
 ```
@@ -171,17 +160,18 @@ If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 }
 ```
 
+
 ## Roadmap
 Starlight is not complete. Our roadmap:
 
+| Version                                                  | Status      | Scheduled Release |
+|----------------------------------------------------------|-------------|-------------------|
+| [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) | stable      |                   |
+| [v0.2.0](https://github.com/mc256/starlight)             | development |                   |
+| v0.3.0                                                   |             | 2022-12-01        |
+| v0.4.0                                                   |             | 2023-01-01        |
 
-| Version                                                     | Scheduled Release |
-|-------------------------------------------------------------|-------------------|
-| [v0.2.0](https://github.com/mc256/starlight/tree/v2_master) | 2022-11-01        |
-| v0.3.0                                                      | 2022-12-01        |
-| v0.4.0                                                      | 2023-01-01        |
-
-
+Feature List:
 - [x] Scalable database backend (v0.2)
   - [x] Postgres Database Schema (v0.2)
   - [x] Starlight Proxy Server (v0.2)
@@ -189,14 +179,11 @@ Starlight is not complete. Our roadmap:
   - [x] Starlight Proxy (v0.2)
     - [x] Helm Chart (v0.2)
     - [x] Starlight Proxy authentication (v0.2)
-  - [ ] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
-  - [ ] Kubernetes CRD for more flexible container image pulling strategies in challenging network condition (v0.3)
-    - [ ] Sidecar container/DaemonSet for container image pulling (v0.3)
-    - [ ] Speed up multi-container image pulling (v0.4)
+  - [x] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
+  - [ ] initContainer tool (v0.3)
 - [ ] OCI container registry support (v0.3)
   - [x] Goharbor support (v0.2)
   - [x] Multiple platforms image support (v0.2) 
   - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.3)
   - [ ] Jointly optimizing multiple containers deployments (v0.4)
   - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.4)
-  

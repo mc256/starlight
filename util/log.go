@@ -39,7 +39,7 @@ func ConfigLoggerWithLevel(level string) (ctx context.Context) {
 		FullTimestamp:   true,
 		TimestampFormat: time.StampNano,
 		//ForceColors:     true,
-		DisableColors: true,
+		//DisableColors: false,
 	})
 
 	switch level {

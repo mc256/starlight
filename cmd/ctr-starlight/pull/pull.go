@@ -1,85 +1,79 @@
 /*
-   Copyright The starlight Authors.
+   file created by Junlin Chen in 2022
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-   file created by maverick in 2021
 */
 
 package pull
 
 import (
-	"errors"
-	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/ctr"
-	"github.com/sirupsen/logrus"
+	"context"
+	"fmt"
+	pb "github.com/mc256/starlight/client/api"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"time"
 )
 
-func Action(c *cli.Context) error {
-	var fromImages, toImages string
-	if c.Args().Len() == 1 {
-		fromImages = ""
-		toImages = c.Args().First()
-	} else if c.Args().Len() == 2 {
-		fromImages = c.Args().Get(0)
-		toImages = c.Args().Get(1)
-	} else {
-		return errors.New("wrong arguments")
-	}
-
-	ns := c.String("namespace")
-	socket := c.String("address")
-
-	// Connect to containerd
-	t, ctx, err := ctr.NewContainerdClient(ns, socket, c.String("log-level"))
+func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	resp, err := client.PullImage(ctx, ref)
 	if err != nil {
-		log.G(ctx).WithError(err).Error("containerd client")
-		return nil
+		fmt.Printf("pull image failed: %v\n", err)
+		return
+	}
+	if resp.Success {
+		if !quiet {
+			fmt.Printf("pulling image: %s\n", resp.Message)
+		}
+	} else {
+		fmt.Printf("pull image failed: %s\n", resp.Message)
+	}
+}
+
+func Action(ctx context.Context, c *cli.Context) error {
+	var base, ref string
+	if c.NArg() == 1 {
+		ref = c.Args().Get(0)
+	} else if c.NArg() == 2 {
+		ref = c.Args().Get(0)
+		base = c.Args().Get(1)
+	} else {
+		return fmt.Errorf("wrong number of arguments, expected 1 or 2, got %d", c.NArg())
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"from": fromImages,
-		"to":   toImages,
-	}).Info("preparing delta image")
-
-	// Prepare delta image
-	if err = t.Sn.PrepareDeltaImage(fromImages, toImages); err != nil {
-		log.G(ctx).WithError(err).Error("prepare delta image")
+	// Dial to the daemon
+	address := c.String("address")
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(address, opts)
+	if err != nil {
+		fmt.Printf("connect to starlight daemon failed: %v\n", err)
 		return nil
 	}
-	log.G(ctx).Info("prepared delta image")
+	defer conn.Close()
 
+	// pull image
+	pullImage(pb.NewDaemonClient(conn), &pb.ImageReference{
+		Reference:   ref,
+		Base:        base,
+		ProxyConfig: c.String("profile"),
+	}, c.Bool("quiet"))
 	return nil
 }
 
 func Command() *cli.Command {
-	cmd := cli.Command{
-		Name:  "pull",
-		Usage: "Launch background fetcher to load the delta image",
+	ctx := context.Background()
+	return &cli.Command{
+		Name: "pull",
+		Usage: "pull image from starlight proxy server, if the base image is not provided, it will choose the latest" +
+			" available image with the same name from the same starlight proxy",
 		Action: func(c *cli.Context) error {
-			return Action(c)
+			return Action(ctx, c)
 		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "optimize-group",
-				Usage:    "label of this workflow",
-				Value:    "",
-				Aliases:  []string{"app", "workload"},
-				Required: false,
-			},
-		},
-		ArgsUsage: "[FromImages] ToImages",
+		Flags: append(
+			ProxyFlags,
+		),
+		ArgsUsage: "[flags] [BaseImage] PullImage",
 	}
-	return &cmd
 }

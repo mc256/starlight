@@ -1,0 +1,89 @@
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+option go_package = "github.com/mc256/starlight/client/api";
+
+package api;
+
+// Interface exported by the server.
+service Daemon {
+  rpc GetVersion(Request) returns (Version) {}
+  rpc AddProxyProfile(AuthRequest) returns (AuthResponse) {}
+  rpc PullImage(ImageReference) returns (ImagePullResponse) {}
+  rpc SetOptimizer(OptimizeRequest) returns (OptimizeResponse) {}
+  rpc ReportTraces(ReportTracesRequest) returns (ReportTracesResponse) {}
+}
+
+// GetVersion
+message Request{
+}
+
+message Version{
+  string version = 1;
+}
+
+// Add Auth
+message AuthRequest {
+  string profileName = 1;
+  string username = 2;
+  string password = 3;
+  string protocol = 4;
+  string address = 5;
+}
+
+message AuthResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Pull Image
+message ImageReference {
+  string reference = 1;
+  string base = 2;
+  string proxyConfig = 3;
+}
+
+message ImagePullResponse {
+  bool success = 1;
+  string message = 2;
+  string baseImage = 3;
+}
+
+// Optimize
+message OptimizeRequest {
+  bool enable = 1;
+  string group = 2;
+}
+
+message OptimizeResponse {
+  bool success = 1;
+  string message = 2;
+  map<string, string> okay = 3;
+  map<string, string> failed = 4;
+}
+
+// Report Traces
+message ReportTracesRequest {
+  string proxyConfig = 1;
+  bool remove = 2;
+}
+
+message ReportTracesResponse {
+  bool success = 1;
+  string message = 2;
+  map<string, string> okay = 3;
+  map<string, string> failed = 4;
+}

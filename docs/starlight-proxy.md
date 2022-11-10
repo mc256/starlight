@@ -67,19 +67,6 @@ We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
 But for simplicity, this part is ignored in this example.
 Please add port 8090 and 5000 to the firewall whitelist, the worker has to access these ports.
 
-3. Upload a few container images to the registry for testing
-
-```shell
-docker pull redis:6.2.1 && \
-docker pull redis:6.2.2 && \
-docker tag redis:6.2.1 localhost:5000/redis:6.2.1 && \
-docker tag redis:6.2.2 localhost:5000/redis:6.2.2 && \
-docker push localhost:5000/redis:6.2.1 && \
-docker push localhost:5000/redis:6.2.2
-```
-
-You could upload other container images to the registry if you like.
-
 🙌 That's it. Please obtain the IP address of the server and proceed to the **Step 2**.
 
 ```shell
@@ -218,9 +205,3 @@ export REGISTRY=<ip address of your server>:5000
 ```
 
 [⬅️ Back to README.md](https://github.com/mc256/starlight#getting-started)
-
----
-## Known Issues
-
-1) Authentication is not supported yet. But will be implemented very soon.
-2) We should switch to `nerdctl` ASAP.
