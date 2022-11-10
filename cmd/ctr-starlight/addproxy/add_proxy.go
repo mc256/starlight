@@ -15,6 +15,7 @@ import (
 	"time"
 )
 
+// addProxyProfile adds a proxy profile to the Starlight daemon configuration
 func addProxyProfile(client pb.DaemonClient, name, protocol, address, username, password string, quiet bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -112,7 +113,7 @@ func Command() *cli.Command {
 				Usage:   "do not print any message unless error occurs",
 			},
 		},
-		ArgsUsage: "[flags] proxy-name (http|https) proxy-address [username]",
+		ArgsUsage: "proxy-name (http|https) proxy-address [username]",
 	}
 	return &cmd
 }

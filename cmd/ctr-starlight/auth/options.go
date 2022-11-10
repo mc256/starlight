@@ -3,7 +3,7 @@
 
 */
 
-package pull
+package auth
 
 import "github.com/urfave/cli/v2"
 

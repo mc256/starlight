@@ -50,7 +50,8 @@ func (c *Configuration) getProxy(name string) (pc *ProxyConfig, key string) {
 	if p, has := c.Proxies[name]; has {
 		return p, name
 	}
-	panic(fmt.Sprintf("proxy config '%s' not found", name))
+	name = c.DefaultProxy
+	return c.Proxies[name], name
 }
 
 func ParseProxyStrings(v string) (name string, c *ProxyConfig, err error) {
@@ -82,7 +83,7 @@ func LoadConfig(cfgPath string) (c *Configuration, p string, n bool, error error
 			return
 		}
 
-		p = path.Join(etcPath, "starlight_snapshotter.json")
+		p = path.Join(etcPath, "starlight-daemon.json")
 
 	} else {
 		p = cfgPath
@@ -113,7 +114,7 @@ func (c *Configuration) SaveConfig() error {
 		return errors.Wrapf(err, "cannot create config folder")
 	}
 
-	p := path.Join(etcPath, "starlight_snapshotter.json")
+	p := path.Join(etcPath, "starlight-daemon.json")
 	buf, _ := json.MarshalIndent(c, " ", " ")
 	err := ioutil.WriteFile(p, buf, 0644)
 	if err == nil {
@@ -126,7 +127,7 @@ func (c *Configuration) SaveConfig() error {
 func NewConfig() *Configuration {
 	uuid.EnableRandPool()
 	return &Configuration{
-		LogLevel:       "debug",
+		LogLevel:       "info",
 		Metadata:       "/var/lib/starlight/metadata.db",
 		Socket:         "/run/starlight/starlight-snapshotter.sock",
 		DaemonType:     "unix",

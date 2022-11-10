@@ -94,7 +94,7 @@ func NewConfig() *Configuration {
 		ListenPort:               8090,
 		ListenAddress:            "0.0.0.0",
 		LogLevel:                 "info",
-		PostgresConnectionString: "postgres://starlight:password@localhost/starlight?sslmode=disable",
+		PostgresConnectionString: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
 		PostgresDBSchema:         "starlight",
 		DefaultRegistry:          "127.0.0.1:9000",
 		EnableHarborScanner:      false,

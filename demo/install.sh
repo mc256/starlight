@@ -6,10 +6,10 @@ read yn_response
 if [[ ! $yn_response =~ ^[Yy]$ ]]
 then
   # NO
-  sed "s/STARLIGHT_PROXY/--plain-http --server=$proxy_address/" demo/deb-package/debian/starlight-snapshotter.service > /lib/systemd/system/starlight.service
+  sed "s/STARLIGHT_PROXY/--plain-http --server=$proxy_address/" demo/deb-package/debian/starlight.service > /lib/systemd/system/starlight.service
 else
   # YES
-  sed "s/STARLIGHT_PROXY/--server=$proxy_address/" demo/deb-package/debian/starlight-snapshotter.service > /lib/systemd/system/starlight.service
+  sed "s/STARLIGHT_PROXY/--server=$proxy_address/" demo/deb-package/debian/starlight.service > /lib/systemd/system/starlight.service
 fi
 printf "created systemd service file (\033[92m/lib/systemd/system/starlight.service\033[0m) \n"
 

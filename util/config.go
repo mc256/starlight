@@ -92,7 +92,7 @@ func FindProjectRoot() string {
 
 // GetEtcConfigPath return a path to the configuration json
 func GetEtcConfigPath() string {
-	if production {
+	if production || os.Getenv("PRODUCTION") != "" {
 		return "/etc/starlight/"
 	} else {
 		return filepath.Join(FindProjectRoot(), "sandbox", "etc", "starlight")

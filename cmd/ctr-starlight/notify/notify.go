@@ -8,12 +8,50 @@ package notify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/proxy"
-	"github.com/sirupsen/logrus"
+	pb "github.com/mc256/starlight/client/api"
+	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+func notify(client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) {
+	resp, err := client.NotifyProxy(context.Background(), req)
+	if err != nil {
+		fmt.Printf("notify starlight proxy server failed: %v\n", err)
+		return
+	}
+	if resp.Success {
+		if !quiet {
+			fmt.Printf("notify starlight proxy server success: converted %s\n", resp.GetMessage())
+		}
+	} else {
+		fmt.Printf("notify starlight proxy server failed: %v\n", resp)
+	}
+}
+
+func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference) (err error) {
+	// Dial to the daemon
+	address := c.String("address")
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(address, opts)
+	if err != nil {
+		fmt.Printf("connect to starlight daemon failed: %v\n", err)
+		return nil
+	}
+	defer conn.Close()
+
+	// notify
+	notify(pb.NewDaemonClient(conn), &pb.NotifyRequest{
+		ProxyConfig: c.String("profile"),
+		Reference:   reference.String(),
+	}, c.Bool("quiet"))
+
+	return nil
+}
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
 	options := []name.Option{}
@@ -32,38 +70,6 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	return SharedAction(ctx, c, reference)
 }
 
-func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference) (err error) {
-	protocol := "https"
-	if c.Bool("plain-http") {
-		protocol = "http"
-	}
-
-	server := c.String("server")
-	if server == "starlight.yuri.moe" {
-		protocol = "https"
-		log.G(ctx).Warn("using public staging starlight proxy server. " +
-			"the public server may not have your own container image, " +
-			"please set your own starlight server using environment variable STARLIGHT_PROXY or --server flag")
-	}
-
-	if server == "" {
-		log.G(ctx).Fatal("no starlight proxy server address provided")
-		return nil
-	}
-
-	log.G(ctx).WithFields(logrus.Fields{
-		"server":   server,
-		"protocol": protocol,
-	}).Info("notify starlight proxy server")
-
-	proxy := proxy.NewStarlightProxy(ctx, protocol, c.String("server"))
-	if err = proxy.Notify(reference); err != nil {
-		log.G(ctx).WithError(err).Error("failed to notify starlight proxy server")
-		return nil
-	}
-	return nil
-}
-
 func Command() *cli.Command {
 	ctx := context.Background()
 	cmd := cli.Command{
@@ -72,9 +78,7 @@ func Command() *cli.Command {
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
-		Flags: append(
-			Flags,
-		),
+		Flags:     auth.ProxyFlags,
 		ArgsUsage: "[flags] SourceImage StarlightImage",
 	}
 	return &cmd

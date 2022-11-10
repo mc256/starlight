@@ -266,3 +266,16 @@ func TestClient_updateManifest(t *testing.T) {
 func TestPlatform(t *testing.T) {
 	fmt.Println(platforms.DefaultString())
 }
+
+/*
+	// for debug purpose
+	_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
+	f, err := os.OpenFile("/tmp/starlight-test.tar.gz", os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open file")
+	}
+	defer f.Close()
+	_, err = io.Copy(f, body)
+
+	_, _ = config, star
+*/

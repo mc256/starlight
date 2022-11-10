@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	pb "github.com/mc256/starlight/client/api"
+	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -72,7 +73,7 @@ func Command() *cli.Command {
 			return Action(ctx, c)
 		},
 		Flags: append(
-			ProxyFlags,
+			auth.ProxyFlags,
 		),
 		ArgsUsage: "[flags] [BaseImage] PullImage",
 	}

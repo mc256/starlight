@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// api is the interface between the Starlight client and the CLI tool.
+// use `make update-protobuf` to update the generated code.
 syntax = "proto3";
 
 option go_package = "github.com/mc256/starlight/client/api";
@@ -21,7 +23,9 @@ package api;
 // Interface exported by the server.
 service Daemon {
   rpc GetVersion(Request) returns (Version) {}
+  rpc PingTest(PingRequest) returns (PingResponse) {}
   rpc AddProxyProfile(AuthRequest) returns (AuthResponse) {}
+  rpc NotifyProxy(NotifyRequest) returns (NotifyResponse) {}
   rpc PullImage(ImageReference) returns (ImagePullResponse) {}
   rpc SetOptimizer(OptimizeRequest) returns (OptimizeResponse) {}
   rpc ReportTraces(ReportTracesRequest) returns (ReportTracesResponse) {}
@@ -33,6 +37,17 @@ message Request{
 
 message Version{
   string version = 1;
+}
+
+// Ping Test
+message PingRequest{
+  string proxyConfig = 1;
+}
+
+message PingResponse{
+  bool success = 1;
+  string message = 2;
+  int64 latency = 3;
 }
 
 // Add Auth
@@ -48,6 +63,18 @@ message AuthResponse {
   bool success = 1;
   string message = 2;
 }
+
+// Notify Proxy
+message NotifyRequest {
+  string reference = 1;
+  string proxyConfig = 2;
+}
+
+message NotifyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 
 // Pull Image
 message ImageReference {

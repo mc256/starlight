@@ -270,6 +270,7 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 		log.G(ctx).Errorf("failed to init database: %v\n", err)
 		return nil, err
 	}
+	log.G(ctx).Debug("database initialized")
 
 	// create router
 	http.HandleFunc("/scanner", server.scanner)

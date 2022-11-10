@@ -23,7 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DaemonClient interface {
 	GetVersion(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Version, error)
+	PingTest(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	AddProxyProfile(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	NotifyProxy(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error)
 	PullImage(ctx context.Context, in *ImageReference, opts ...grpc.CallOption) (*ImagePullResponse, error)
 	SetOptimizer(ctx context.Context, in *OptimizeRequest, opts ...grpc.CallOption) (*OptimizeResponse, error)
 	ReportTraces(ctx context.Context, in *ReportTracesRequest, opts ...grpc.CallOption) (*ReportTracesResponse, error)
@@ -46,9 +48,27 @@ func (c *daemonClient) GetVersion(ctx context.Context, in *Request, opts ...grpc
 	return out, nil
 }
 
+func (c *daemonClient) PingTest(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, "/api.Daemon/PingTest", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *daemonClient) AddProxyProfile(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
 	out := new(AuthResponse)
 	err := c.cc.Invoke(ctx, "/api.Daemon/AddProxyProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonClient) NotifyProxy(ctx context.Context, in *NotifyRequest, opts ...grpc.CallOption) (*NotifyResponse, error) {
+	out := new(NotifyResponse)
+	err := c.cc.Invoke(ctx, "/api.Daemon/NotifyProxy", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +107,9 @@ func (c *daemonClient) ReportTraces(ctx context.Context, in *ReportTracesRequest
 // for forward compatibility
 type DaemonServer interface {
 	GetVersion(context.Context, *Request) (*Version, error)
+	PingTest(context.Context, *PingRequest) (*PingResponse, error)
 	AddProxyProfile(context.Context, *AuthRequest) (*AuthResponse, error)
+	NotifyProxy(context.Context, *NotifyRequest) (*NotifyResponse, error)
 	PullImage(context.Context, *ImageReference) (*ImagePullResponse, error)
 	SetOptimizer(context.Context, *OptimizeRequest) (*OptimizeResponse, error)
 	ReportTraces(context.Context, *ReportTracesRequest) (*ReportTracesResponse, error)
@@ -101,8 +123,14 @@ type UnimplementedDaemonServer struct {
 func (UnimplementedDaemonServer) GetVersion(context.Context, *Request) (*Version, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetVersion not implemented")
 }
+func (UnimplementedDaemonServer) PingTest(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PingTest not implemented")
+}
 func (UnimplementedDaemonServer) AddProxyProfile(context.Context, *AuthRequest) (*AuthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddProxyProfile not implemented")
+}
+func (UnimplementedDaemonServer) NotifyProxy(context.Context, *NotifyRequest) (*NotifyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyProxy not implemented")
 }
 func (UnimplementedDaemonServer) PullImage(context.Context, *ImageReference) (*ImagePullResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PullImage not implemented")
@@ -144,6 +172,24 @@ func _Daemon_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Daemon_PingTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).PingTest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Daemon/PingTest",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).PingTest(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Daemon_AddProxyProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AuthRequest)
 	if err := dec(in); err != nil {
@@ -158,6 +204,24 @@ func _Daemon_AddProxyProfile_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DaemonServer).AddProxyProfile(ctx, req.(*AuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Daemon_NotifyProxy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).NotifyProxy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Daemon/NotifyProxy",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).NotifyProxy(ctx, req.(*NotifyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -228,8 +292,16 @@ var Daemon_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Daemon_GetVersion_Handler,
 		},
 		{
+			MethodName: "PingTest",
+			Handler:    _Daemon_PingTest_Handler,
+		},
+		{
 			MethodName: "AddProxyProfile",
 			Handler:    _Daemon_AddProxyProfile_Handler,
+		},
+		{
+			MethodName: "NotifyProxy",
+			Handler:    _Daemon_NotifyProxy_Handler,
 		},
 		{
 			MethodName: "PullImage",

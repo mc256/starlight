@@ -22,13 +22,15 @@ import (
 	"context"
 	"fmt"
 	pb "github.com/mc256/starlight/client/api"
-	"github.com/mc256/starlight/cmd/ctr-starlight/pull"
+	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"time"
 )
 
+// report uses the daemon client to report traces, it does not report directly to the proxy
+// Because it does not handle the credential and authentication of the proxy.
 func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -68,11 +70,11 @@ func Command() *cli.Command {
 	ctx := context.Background()
 	cmd := cli.Command{
 		Name:  "report",
-		Usage: "Upload data collected by the optimizer back to Starlight Proxy to speed up other similar deployment",
+		Usage: "Report filesystem traces back to Starlight Proxy to speed up other similar deployment",
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
-		Flags:     pull.ProxyFlags,
+		Flags:     auth.ProxyFlags,
 		ArgsUsage: "",
 	}
 	return &cmd

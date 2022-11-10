@@ -46,7 +46,7 @@ type StarlightProxy struct {
 	auth url.Userinfo
 }
 
-func (a *StarlightProxy) Ping() error {
+func (a *StarlightProxy) Ping() (int64, string, string, error) {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
@@ -63,7 +63,7 @@ func (a *StarlightProxy) Ping() error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return err
+		return -1, "", "", err
 	}
 
 	response, err := ioutil.ReadAll(resp.Body)
@@ -76,7 +76,7 @@ func (a *StarlightProxy) Ping() error {
 			"version":  version,
 			"response": strings.TrimSpace(string(response)),
 		}).WithError(err).Error("unknown response error")
-		return nil
+		return -1, "", "", err
 	}
 
 	if resp.StatusCode != 200 && r.Message != "Starlight Proxy" {
@@ -85,16 +85,21 @@ func (a *StarlightProxy) Ping() error {
 			"version":  version,
 			"response": strings.TrimSpace(string(response)),
 		}).Error("server error")
-		return nil
+		return -1, "", "", err
 	}
+
+	rtt := time.Now().Sub(t).Milliseconds()
 
 	log.G(a.ctx).WithFields(logrus.Fields{
 		"code":    200,
 		"version": version,
-		"rtt":     time.Now().Sub(t).Milliseconds(),
+		"rtt":     rtt,
 		"unit":    "ms",
+
+		"scheme": a.protocol,
+		"host":   a.serverAddress,
 	}).Info("server is okay")
-	return nil
+	return rtt, a.protocol, a.serverAddress, nil
 }
 
 func (a *StarlightProxy) Notify(ref name.Reference) error {

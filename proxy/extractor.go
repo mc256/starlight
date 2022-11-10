@@ -186,7 +186,7 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 			"tag":      ex.ParsedTag,
 			"hash":     m.Digest.String(),
 			"platform": pltStr,
-		}).Info("found image")
+		}).Trace("found image")
 
 		// Layers
 		layers, err := img.Layers()
@@ -233,7 +233,7 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 			"hash":     m.Digest.String(),
 			"serial":   serial,
 			"platform": pltStr,
-		}).Info("saved ToC")
+		}).Debug("saved ToC")
 
 	}
 

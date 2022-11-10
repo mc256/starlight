@@ -19,6 +19,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/google/go-containerregistry/pkg/name"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/client/fs"
@@ -292,6 +293,37 @@ func (c *Client) storeStarlightHeader(cfgName, ref, sld string, h []byte) (err e
 	return nil
 }
 
+func (c *Client) Notify(proxyCfg string, reference name.Reference) error {
+	pc, _ := c.cfg.getProxy(proxyCfg)
+	p := proxy.NewStarlightProxy(c.ctx, pc.Protocol, pc.Address)
+	if pc.Username != "" {
+		p.SetAuth(pc.Username, pc.Password)
+	}
+
+	// send message
+	if err := p.Notify(reference); err != nil {
+		return errors.Wrapf(err, "failed to notify proxy")
+	}
+
+	return nil
+}
+
+func (c *Client) Ping(proxyCfg string) (int64, string, string, error) {
+	pc, _ := c.cfg.getProxy(proxyCfg)
+	p := proxy.NewStarlightProxy(c.ctx, pc.Protocol, pc.Address)
+	if pc.Username != "" {
+		p.SetAuth(pc.Username, pc.Password)
+	}
+
+	// send message
+	rtt, proto, url, err := p.Ping()
+	if err != nil {
+		return -1, "", "", errors.Wrapf(err, "failed to ping proxy")
+	}
+
+	return rtt, proto, url, nil
+}
+
 func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
 	// connect to proxy
 	pc, _ := c.cfg.getProxy(proxyCfg)
@@ -424,21 +456,6 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		UpdatedAt: time.Now(),
 	})
 	log.G(c.ctx).WithField("image", ctrImg.Name).Debugf("created image")
-
-	// send a ready signal
-
-	/*
-		// for debug purpose
-		_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
-		f, err := os.OpenFile("/tmp/starlight-test.tar.gz", os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to open file")
-		}
-		defer f.Close()
-		_, err = io.Copy(f, body)
-
-		_, _ = config, star
-	*/
 
 	// keep going and download layers
 	star.Init(c.cfg, false, manifest, imageConfig, mdd)
@@ -666,7 +683,7 @@ func (c *Client) Unmount(cd, sn string) error {
 // InitSnapshotter initializes the snapshotter service
 func (c *Client) InitSnapshotter() (err error) {
 	log.G(c.ctx).
-		Info("starlight snapshotter service starting")
+		Debug("starlight snapshotter service starting")
 	c.snServer = grpc.NewServer()
 
 	c.plugin, err = snapshotter.NewPlugin(c.ctx, c, c.cfg.Metadata)
@@ -725,6 +742,12 @@ func (s *StarlightDaemonAPIServer) Version(ctx context.Context, req *pb.Request)
 }
 
 func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"protocol": req.Protocol,
+		"address":  req.Address,
+		"username": req.Username,
+	}).Trace("grpc: add proxy profile")
+
 	s.client.cfg.Proxies[req.ProfileName] = &ProxyConfig{
 		Protocol: req.Protocol,
 		Address:  req.Address,
@@ -749,6 +772,11 @@ func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.
 }
 
 func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (*pb.ImagePullResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"base": ref.Base,
+		"ref":  ref.Reference,
+	}).Trace("grpc: pull image")
+
 	base, err := s.client.FindBaseImage(ref.Base, ref.Reference)
 	if err != nil {
 		return &pb.ImagePullResponse{
@@ -793,6 +821,9 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 
 func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {
 	okRes, failRes := make(map[string]string), make(map[string]string)
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"enable": req.Enable,
+	}).Trace("grpc: set optimizer")
 
 	if req.Enable {
 		s.client.optimizerLock.Lock()
@@ -839,6 +870,10 @@ func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.Opt
 }
 
 func (s *StarlightDaemonAPIServer) ReportTraces(ctx context.Context, req *pb.ReportTracesRequest) (*pb.ReportTracesResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"profile": req.ProxyConfig,
+	}).Trace("grpc: report")
+
 	tc, err := fs.NewTraceCollection(s.client.ctx, s.client.cfg.TracesDir)
 	if err != nil {
 		return &pb.ReportTracesResponse{
@@ -861,6 +896,53 @@ func (s *StarlightDaemonAPIServer) ReportTraces(ctx context.Context, req *pb.Rep
 	}, nil
 }
 
+func (s *StarlightDaemonAPIServer) NotifyProxy(ctx context.Context, req *pb.NotifyRequest) (*pb.NotifyResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"profile": req.ProxyConfig,
+	}).Trace("grpc: notify")
+
+	reference, err := name.ParseReference(req.Reference)
+	if err != nil {
+		return &pb.NotifyResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	err = s.client.Notify(req.Reference, reference)
+	if err != nil {
+		return &pb.NotifyResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.NotifyResponse{
+		Success: true,
+		Message: reference.String(),
+	}, nil
+}
+
+func (s *StarlightDaemonAPIServer) PingTest(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
+	log.G(s.client.ctx).WithFields(logrus.Fields{
+		"profile": req.ProxyConfig,
+	}).Trace("grpc: ping test")
+
+	rtt, proto, server, err := s.client.Ping(req.ProxyConfig)
+	if err != nil {
+		return &pb.PingResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.PingResponse{
+		Success: true,
+		Message: fmt.Sprintf("ok! - %s://%s", proto, server),
+		Latency: rtt,
+	}, nil
+}
+
 func newStarlightDaemonAPIServer(client *Client) *StarlightDaemonAPIServer {
 	c := &StarlightDaemonAPIServer{client: client}
 	return c
@@ -868,7 +950,7 @@ func newStarlightDaemonAPIServer(client *Client) *StarlightDaemonAPIServer {
 
 func (c *Client) InitCLIServer() (err error) {
 	log.G(c.ctx).
-		Info("starlight CLI service starting")
+		Debug("starlight CLI service starting")
 	c.cliServer = grpc.NewServer()
 
 	if strings.HasPrefix(c.cfg.DaemonType, "unix") {
@@ -925,6 +1007,9 @@ func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 	// content store
 	c.cs = c.client.ContentStore()
 	c.operator = snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
+
+	// scan existing filesystems
+	c.operator.ScanExistingFilesystems()
 
 	return c, nil
 }

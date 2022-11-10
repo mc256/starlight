@@ -21,18 +21,18 @@ package convert
 import (
 	"context"
 	"errors"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/mc256/starlight/cmd/ctr-starlight/notify"
-	"github.com/mc256/starlight/cmd/ctr-starlight/report"
-
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
+	"github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 )
 
+// Action - This Action does not require communicates to the Starlight daemon.
 func Action(ctx context.Context, c *cli.Context) error {
 	// [flags] SourceImage StarlightImage
 	if c.Args().Len() != 2 {
@@ -93,8 +93,9 @@ func Action(ctx context.Context, c *cli.Context) error {
 func Command() *cli.Command {
 	ctx := context.Background()
 	cmd := cli.Command{
-		Name:  "convert",
-		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image format",
+		Name: "convert",
+		Usage: "Convert typical container image (in .tar.gz or .tar format) to Starlight image format. " +
+			"Credentials for private registry can be configured in $DOCKER_CONFIG.",
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
@@ -105,7 +106,7 @@ func Command() *cli.Command {
 
 			// Report Flags
 			append(
-				report.Flags,
+				auth.ProxyFlags,
 				&cli.BoolFlag{
 					Name:     "notify",
 					Usage:    "notify the converted image to the Starlight Proxy",

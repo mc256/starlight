@@ -44,12 +44,19 @@ func NewOperator(ctx context.Context, client OperatorClient, sn snapshots.Snapsh
 	}
 }
 
+// ScanExistingFilesystems scans place where the extracted file content is stored
+// in case the file system has not extracted fully (without the `complete.json` file),
+// we will remove the directory.
 func (op *Operator) ScanExistingFilesystems() {
 	var (
 		err                    error
 		dir1, dir2, dir3, dir4 []fs.FileInfo
 		x1, x2, x3             bool
 	)
+	log.G(op.ctx).
+		WithField("root", op.client.GetFilesystemRoot()).
+		Debug("scanning existing filesystems")
+
 	dir1, err = ioutil.ReadDir(filepath.Join(op.client.GetFilesystemRoot(), "layers"))
 	if err != nil {
 		return
@@ -94,11 +101,11 @@ func (op *Operator) ScanExistingFilesystems() {
 										_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
 											d1.Name(), d2.Name(), d3.Name(), d4.Name(),
 										))
-										log.G(op.ctx).WithField("digest", h).Info("removed incomplete layer")
+										log.G(op.ctx).WithField("digest", h).Warn("removed incomplete layer")
 									} else {
 										x1, x2, x3 = true, true, true
 										op.client.AddCompletedLayers(h)
-										log.G(op.ctx).WithField("digest", h).Info("found layer")
+										log.G(op.ctx).WithField("digest", h).Debug("found layer")
 									}
 								}
 							}
@@ -133,7 +140,7 @@ func (op *Operator) ScanSnapshots() (err error) {
 			WithField("snapshot", info.Name).
 			WithField("parent", info.Parent).
 			WithField("labels", info.Labels).
-			Info("found snapshot")
+			Debug("found snapshot")
 		return
 	})
 }

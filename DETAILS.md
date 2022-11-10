@@ -56,7 +56,7 @@ make && sudo make install
 ```shell
 starlight-grpc run --server $STARLIGHT_PROXY_ADDRESS --socket /run/starlight-grpc/starlight-snapshotter.socket
 ```
-or uses systemd service in `./demo/deb-package/debian/starlight-snapshotter.service`
+or uses systemd service in `./demo/deb-package/debian/starlight.service`
 
 ---
 
