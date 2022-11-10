@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 )
@@ -65,7 +64,7 @@ func Action(ctx context.Context, c *cli.Context) error {
 	remoteOptions := []remote.Option{remote.WithAuthFromKeychain(authn.DefaultKeychain)}
 
 	// config
-	convertor, err := proxy.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions, c.String("platform"))
+	convertor, err := util.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions, c.String("platform"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("illegal image reference")
 		return nil

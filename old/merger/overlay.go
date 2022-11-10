@@ -284,7 +284,7 @@ func (ov *Overlay) AddImage(imageName, imageTag string) error {
 	for i := 0; i < n; i++ {
 		hash := bucket.Get(util.Int32ToB(uint32(i)))
 		if hash == nil {
-			return util.ErrLayerNotFound
+			return common.ErrLayerNotFound
 		}
 		d, err := digest.Parse(string(hash[:]))
 		if err != nil {
@@ -309,7 +309,7 @@ func (ov *Overlay) SaveMergedImage() error {
 	}).Info("save merged image to directory db")
 
 	if len(ov.DigestList) == 0 {
-		return util.ErrImageNotFound
+		return common.ErrImageNotFound
 	}
 
 	// Database
@@ -388,7 +388,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 
 	merged := bucket.Bucket([]byte("merged"))
 	if merged == nil {
-		return nil, util.ErrMergedImageNotFound
+		return nil, common.ErrMergedImageNotFound
 	}
 
 	// 1. Add Entry
@@ -414,7 +414,7 @@ func LoadMergedImage(ctx context.Context, db *bolt.DB, imageName, imageTag strin
 	for i := 0; i < n; i++ {
 		hash := bucket.Get(util.Int32ToB(uint32(i)))
 		if hash == nil {
-			return nil, util.ErrLayerNotFound
+			return nil, common.ErrLayerNotFound
 		}
 		d, err := digest.Parse(string(hash[:]))
 		if err != nil {

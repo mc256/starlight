@@ -176,7 +176,7 @@ func (d *Delta) setConsolidated() {
 
 func (d *Delta) PopulateOffset() error {
 	if d.consolidated {
-		return util.ErrAlreadyConsolidated
+		return common.ErrAlreadyConsolidated
 	}
 
 	offset := int64(0)
@@ -213,7 +213,7 @@ func (d *Delta) PopulateOffset() error {
 // It must runs after the delta image has been consolidated (so that we have the correct offset point to the gzip chunks)
 func (d *Delta) ExportTOC(w io.Writer, beautify bool) error {
 	if d.consolidated == false && beautify == false {
-		return util.ErrNotConsolidated
+		return common.ErrNotConsolidated
 	}
 
 	encoder := json.NewEncoder(w)
@@ -228,7 +228,7 @@ func (d *Delta) ExportTOC(w io.Writer, beautify bool) error {
 // It must runs after the delta image has been consolidated (so that we have the correct offset point to the gzip chunks)
 func (d *Delta) OutputHeader(w io.Writer) (headerSize int64, err error) {
 	if d.consolidated == false {
-		return 0, util.ErrNotConsolidated
+		return 0, common.ErrNotConsolidated
 	}
 
 	cw := util.NewCountWriter(w)

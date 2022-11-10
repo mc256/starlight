@@ -246,7 +246,7 @@ func (a *Server) healthCheck(w http.ResponseWriter, req *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) *Server {
+func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Server, error) {
 
 	server := &Server{
 		ctx: ctx,
@@ -264,6 +264,14 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) *Ser
 		server.db = db
 	}
 
+	// init database
+	err := server.db.InitDatabase()
+	if err != nil {
+		log.G(ctx).Errorf("failed to init database: %v\n", err)
+		return nil, err
+	}
+
+	// create router
 	http.HandleFunc("/scanner", server.scanner)
 	http.HandleFunc("/starlight", server.starlight)
 	http.HandleFunc("/health-check", server.healthCheck)
@@ -284,5 +292,5 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) *Ser
 		}
 	}()
 
-	return server
+	return server, nil
 }

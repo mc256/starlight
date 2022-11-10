@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/mc256/starlight/client"
 	fs3 "github.com/mc256/starlight/old/fs"
+	"github.com/mc256/starlight/util/common"
 	"io/ioutil"
 	"os"
 	"path"
@@ -199,13 +200,13 @@ func (o *snapshotter) pullImage(ctx context.Context, key, parent, _key, _parent 
 	} else if strings.HasPrefix(parentBase, "accelerated(") && strings.HasSuffix(parentBase, ")") {
 		sourceImage = strings.TrimSuffix(strings.TrimPrefix(parentBase, "accelerated("), ")")
 	} else {
-		return nil, util.ErrUnknownSnapshotParameter
+		return nil, common.ErrUnknownSnapshotParameter
 	}
 
 	if strings.HasPrefix(keyBase, "target(") && strings.HasSuffix(keyBase, ")") {
 		targetImage = strings.TrimSuffix(strings.TrimPrefix(keyBase, "target("), ")")
 	} else {
-		return nil, util.ErrUnknownSnapshotParameter
+		return nil, common.ErrUnknownSnapshotParameter
 	}
 
 	sn, err := storage.CreateSnapshot(ctx, snapshots.KindActive, key, parent, opts...)
@@ -317,7 +318,7 @@ func (o *snapshotter) createContainer(ctx context.Context, key, parent, _key, _p
 			log.G(ctx).WithField("mnt", mnt).Info("fs mounted")
 
 		} else {
-			return nil, util.ErrTocUnknown
+			return nil, common.ErrTocUnknown
 		}
 	}
 	return mnt, nil
@@ -432,7 +433,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 			},
 		}}, nil
 	} else {
-		return nil, util.ErrMountingPointNotFound
+		return nil, common.ErrMountingPointNotFound
 	}
 }
 

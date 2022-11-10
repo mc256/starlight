@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -119,7 +118,7 @@ func (c *Consolidator) GetOutputQueue() *[]*OutputEntry {
 
 func (c *Consolidator) PopulateOffset() error {
 	if c.consolidated {
-		return util.ErrAlreadyConsolidated
+		return common.ErrAlreadyConsolidated
 	}
 	c.consolidated = true
 
@@ -146,7 +145,7 @@ func (c *Consolidator) PopulateOffset() error {
 				log.G(c.ctx).WithFields(logrus.Fields{
 					"hash": k,
 				}).Error("found same hash but different size")
-				return util.ErrHashCollision
+				return common.ErrHashCollision
 			}
 		}
 	}
@@ -268,7 +267,7 @@ func (c *Consolidator) PopulateOffset() error {
 func (c *Consolidator) AddDelta(delta *Delta) error {
 	// lock the delta image
 	if c.consolidated {
-		return util.ErrAlreadyConsolidated
+		return common.ErrAlreadyConsolidated
 	}
 	delta.setConsolidated()
 
@@ -341,7 +340,7 @@ func (c *Consolidator) AddDelta(delta *Delta) error {
 
 func (c *Consolidator) ExportTOC(w io.Writer, beautified bool) error {
 	if c.consolidated == false {
-		return util.ErrNotConsolidated
+		return common.ErrNotConsolidated
 	}
 
 	encoder := json.NewEncoder(w)

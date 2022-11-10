@@ -30,7 +30,6 @@ import (
 
 	fuseFs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/mc256/starlight/util"
 	"golang.org/x/sys/unix"
 )
 
@@ -241,13 +240,13 @@ func (fe *FsEntry) AtomicGetRealPath() string {
 	case EnRoLayer:
 		layer := fe.GetSourceLayer() - 1
 		if layer < 0 || layer > len(*fe.fi.layerLookupMap) {
-			panic(util.ErrNoRoPath)
+			panic(common.ErrNoRoPath)
 		}
 		return path.Join((*fe.fi.layerLookupMap)[layer].GetAbsPath(), fe.Name)
 	case EnEmpty:
 		return ""
 	default:
-		panic(util.ErrLayerNotFound)
+		panic(common.ErrLayerNotFound)
 	}
 }
 
@@ -262,7 +261,7 @@ func (fe *FsEntry) GetRwLayerPath() string {
 func (fe *FsEntry) GetRoLayerPath() string {
 	layer := fe.GetSourceLayer() - 1
 	if layer < 0 || layer > len(*fe.fi.layerLookupMap) {
-		panic(util.ErrNoRoPath)
+		panic(common.ErrNoRoPath)
 	}
 	return path.Join((*fe.fi.layerLookupMap)[layer].GetAbsPath(), fe.Name)
 }

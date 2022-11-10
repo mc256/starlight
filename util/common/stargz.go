@@ -36,7 +36,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/mc256/starlight/util"
 	"hash"
 	"io"
 	"io/ioutil"
@@ -815,7 +814,7 @@ func parseFooter(p []byte) (tocOffset int64, footerSize int64, rErr error) {
 	if err == nil {
 		return tocOffset, legacyFooterSize, nil
 	}
-	return 0, 0, util.ErrorAggregate(append(allErr, err))
+	return 0, 0, ErrorAggregate(append(allErr, err))
 }
 
 func parseEStargzFooter(p []byte) (tocOffset int64, err error) {

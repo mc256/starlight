@@ -113,7 +113,7 @@ func (r *Receiver) NewFsInstance(imageName, imageTag, snapshotId string, optimiz
 	// Build Fs Tree (deep copy)
 	idx, hasImage := r.imageMap[imageName+":"+imageTag]
 	if !hasImage {
-		return nil, util.ErrImageNotFound
+		return nil, common.ErrImageNotFound
 	}
 	fsi := newFsInstance(r, &r.layerMap, d, lm.absPath, imageName, imageTag)
 
@@ -456,7 +456,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 	for _, d := range header.DigestList {
 		var layer *LayerMeta
 		layer, err = layerStore.FindLayer(*d)
-		if err == util.ErrLayerNotFound {
+		if err == common.ErrLayerNotFound {
 			count++
 			layer, err = layerStore.RegisterLayerWithPrefix(prefix, count, *d, false, false)
 			if err != nil {
@@ -551,7 +551,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 			}
 			dir := path.Dir(fileName)
 			if parent, exist := dirBuffer[dir]; !exist {
-				return nil, util.ErrOrphanNode
+				return nil, common.ErrOrphanNode
 			} else {
 				base := path.Base(fileName)
 				parent.AddChild(base, ent)
@@ -562,7 +562,7 @@ func NewReceiver(ctx context.Context, layerStore *LayerStore, reader io.Reader, 
 		for _, ent := range entBuffer {
 			dir := path.Dir(ent.Name)
 			if parent, exist := dirBuffer[dir]; !exist {
-				return nil, util.ErrOrphanNode
+				return nil, common.ErrOrphanNode
 			} else {
 				base := path.Base(ent.Name)
 				parent.AddChild(base, ent)

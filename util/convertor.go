@@ -1,4 +1,4 @@
-package proxy
+package util
 
 import (
 	"compress/gzip"
@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
 )
 
@@ -201,9 +200,9 @@ func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
 		Layer:   sll,
 		History: history,
 		Annotations: map[string]string{
-			util.StarlightTOCDigestAnnotation:       tocDigest.String(),
-			util.StarlightTOCCreationTimeAnnotation: time.Now().Format(time.RFC3339Nano),
-			common.TOCJSONDigestAnnotation:          tocDigest.String(),
+			StarlightTOCDigestAnnotation:       tocDigest.String(),
+			StarlightTOCCreationTimeAnnotation: time.Now().Format(time.RFC3339Nano),
+			common.TOCJSONDigestAnnotation:     tocDigest.String(),
 		},
 	}
 

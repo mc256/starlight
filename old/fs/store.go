@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
-	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	bolt "go.etcd.io/bbolt"
 )
@@ -237,12 +236,12 @@ func (s *LayerStore) FindLayer(digest common.TraceableBlobDigest) (*LayerMeta, e
 
 	layers := tx.Bucket([]byte("layers"))
 	if layers == nil {
-		return nil, util.ErrLayerNotFound
+		return nil, common.ErrLayerNotFound
 	}
 
 	p := layers.Get([]byte(digest.String()))
 	if p == nil {
-		return nil, util.ErrLayerNotFound
+		return nil, common.ErrLayerNotFound
 	}
 
 	lay := newLayerMetaFromByte(p, s, digest)
@@ -279,7 +278,7 @@ func (s *LayerStore) RemoveLayer(digest common.TraceableBlobDigest, removeFile b
 
 	p := layers.Get([]byte(digest.String()))
 	if p == nil {
-		return util.ErrLayerNotFound
+		return common.ErrLayerNotFound
 	}
 	pp := newLayerMetaFromByte(p, s, digest)
 

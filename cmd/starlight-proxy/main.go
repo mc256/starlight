@@ -192,7 +192,10 @@ func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
 	httpServerExitDone := &sync.WaitGroup{}
 	httpServerExitDone.Add(1)
 
-	_ = proxy.NewServer(c, httpServerExitDone, cfg)
+	_, err = proxy.NewServer(c, httpServerExitDone, cfg)
+	if err != nil {
+		return err
+	}
 
 	wait := make(chan interface{})
 	<-wait

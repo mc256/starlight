@@ -16,7 +16,7 @@
    file created by maverick in 2021
 */
 
-package util
+package common
 
 import (
 	"errors"

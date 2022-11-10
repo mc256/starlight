@@ -38,23 +38,104 @@ func NewDatabase(conStr string) (*Database, error) {
 	return &Database{db: d}, nil
 }
 
-func (d *Database) InitDatabase() {
-	// TODO: initialize database
+func (d *Database) InitDatabase() error {
+	if _, err := d.db.Exec(`
+		create table if not exists image
+		(
+			id       serial,
+			image    varchar not null,
+			hash     varchar not null,
+			config   json,
+			manifest json,
+			ready    timestamp with time zone,
+			nlayer   integer not null,
+			primary key (id),
+			constraint unique_image_hash
+				unique (image, hash)
+		);
+		
+		comment on column image.nlayer is 'number of the non-empty layers';
+		
+		create table if not exists layer
+		(
+			id           serial,
+			size         bigint,
+			image        integer not null,
+			"stackIndex" integer,
+			layer        integer not null,
+			primary key (id),
+			constraint unique_image_stack_index
+				unique (image, "stackIndex"),
+			foreign key (image) references image
+				on delete cascade
+		);
+		
+		create table if not exists filesystem
+		(
+			id     serial,
+			digest varchar not null,
+			size   bigint,
+			ready  timestamp with time zone,
+			primary key (id),
+			constraint layer_digest_size
+				unique (digest, size)
+		);
+		
+		comment on table filesystem is 'Each row represents a filesystem layer where (hash, size) is unique. Each file references back to the id column of this table.';
 
+		
+		create table if not exists file
+		(
+			id       bigserial,
+			hash     varchar,
+			size     bigint,
+			file     varchar,
+			"offset" bigint,
+			fs       integer,
+			"order"  integer[],
+			metadata json,
+			primary key (id),
+			constraint unique_file
+				unique (file, fs),
+			constraint filesystem_fk
+				foreign key (fs) references filesystem
+					on delete cascade
+		);
+		
+		create index if not exists fki_filesystem_fk
+			on file (fs);
+		
+		create index if not exists deduplicate_index
+			on file (hash, size);
+		
+		create table if not exists tag
+		(
+			name      varchar not null,
+			tag       varchar not null,
+			platform  varchar not null,
+			"imageId" bigint  not null,
+			constraint "primary"
+				primary key (name, tag, platform)
+		);
+
+	`); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (d *Database) SetImageReady(ready bool, serial int64) error {
 	var id int64
 	if ready {
 		if err := d.db.QueryRow(
-			`UPDATE starlight.starlight.image SET ready=$2 WHERE id=$1 RETURNING id`,
+			`UPDATE image SET ready=$2 WHERE id=$1 RETURNING id`,
 			serial, time.Now().Format(time.RFC3339Nano),
 		).Scan(&id); err != nil {
 			return err
 		}
 	} else {
 		if err := d.db.QueryRow(
-			`UPDATE starlight.starlight.image SET ready=null WHERE id=$1 RETURNING id`,
+			`UPDATE image SET ready=null WHERE id=$1 RETURNING id`,
 			serial,
 		).Scan(&id); err != nil {
 			return err
@@ -70,7 +151,7 @@ func (d *Database) SetImageTag(name, tag, platform string, serial int64) error {
 	}
 
 	if _, err = txn.Exec(`
-		INSERT INTO starlight.starlight.tag (name, tag, platform, "imageId") VALUES ($1,$2,$3,$4) 
+		INSERT INTO tag (name, tag, platform, "imageId") VALUES ($1,$2,$3,$4) 
 		ON CONFLICT ON CONSTRAINT "primary"
 			DO UPDATE SET  "imageId"=$4`,
 		name, tag, platform, serial,
@@ -96,7 +177,7 @@ func (d *Database) InsertImage(image, hash string,
 		ts *time.Time
 	)
 	if err = d.db.QueryRow(`
-			SELECT id, ready FROM starlight.starlight.image
+			SELECT id, ready FROM image
 			WHERE image.image=$1 AND image.hash=$2`,
 		image, hash).Scan(&serial, &ts); err != nil && err != sql.ErrNoRows {
 		return 0, false, err
@@ -118,7 +199,7 @@ func (d *Database) InsertImage(image, hash string,
 	}
 
 	if err = d.db.QueryRow(`
-		INSERT INTO starlight.starlight.image(image, hash, config, manifest, ready, nlayer) 
+		INSERT INTO image(image, hash, config, manifest, ready, nlayer) 
 		VALUES ($1, $2, $3, $4, null, $5)
 		ON CONFLICT ON CONSTRAINT unique_image_hash DO NOTHING 
 		RETURNING id;`,
@@ -135,7 +216,7 @@ func (d *Database) InsertLayer(
 	fsId int64, existing bool, err error) {
 
 	if err = d.db.QueryRow(`
-			SELECT id FROM starlight.starlight.filesystem
+			SELECT id FROM filesystem
 			WHERE filesystem.digest=$1 AND filesystem.size=$2`,
 		layerDigest, size).Scan(&fsId); err != nil && err != sql.ErrNoRows {
 		return 0, false, err
@@ -146,7 +227,7 @@ func (d *Database) InsertLayer(
 
 	if !existing {
 		if err = txn.QueryRow(`
-				INSERT INTO starlight.starlight.filesystem(digest, size, ready) 
+				INSERT INTO filesystem(digest, size, ready) 
 				VALUES ($1, $2, $3)
 				RETURNING id;`,
 			layerDigest, size, time.Now().Format(time.RFC3339Nano),
@@ -159,7 +240,7 @@ func (d *Database) InsertLayer(
 	var id int64
 	if err := txn.QueryRow(
 		`
-		INSERT INTO starlight.starlight.layer(size, image, "stackIndex", layer) 
+		INSERT INTO layer(size, image, "stackIndex", layer) 
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT ON CONSTRAINT unique_image_stack_index
 			DO UPDATE SET size=$1, layer=$4
@@ -174,7 +255,7 @@ func (d *Database) InsertLayer(
 }
 
 func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*common.TraceableEntry) (err error) {
-	if _, err = txn.Exec(`DELETE FROM starlight.starlight.file WHERE fs=$1`, fsId); err != nil {
+	if _, err = txn.Exec(`DELETE FROM file WHERE fs=$1`, fsId); err != nil {
 		return err
 	}
 
@@ -211,7 +292,7 @@ func (d *Database) InsertFiles(txn *sql.Tx, fsId int64, entries map[string]*comm
 
 func (d *Database) GetImage(image, identifier, platform string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
-		SELECT "imageId" FROM starlight.starlight.tag
+		SELECT "imageId" FROM tag
 		WHERE name=$1 AND tag=$2 AND platform=$3 LIMIT 1`,
 		image, identifier, platform).Scan(&serial); err != nil && err != sql.ErrNoRows {
 		return 0, err
@@ -220,7 +301,7 @@ func (d *Database) GetImage(image, identifier, platform string) (serial int64, e
 	}
 
 	if err = d.db.QueryRow(`
-		SELECT id FROM starlight.starlight.image
+		SELECT id FROM image
 		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
 		image, identifier).Scan(&serial); err != nil {
 		return 0, err
@@ -230,7 +311,7 @@ func (d *Database) GetImage(image, identifier, platform string) (serial int64, e
 
 func (d *Database) GetImageByDigest(image, digest string) (serial int64, err error) {
 	if err = d.db.QueryRow(`
-		SELECT id FROM starlight.starlight.image
+		SELECT id FROM image
 		WHERE ready IS NOT NULL AND image=$1 AND hash=$2 LIMIT 1`,
 		image, digest).Scan(&serial); err != nil {
 		return 0, err
@@ -240,7 +321,7 @@ func (d *Database) GetImageByDigest(image, digest string) (serial int64, err err
 
 func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, digest string, err error) {
 	if err = d.db.QueryRow(`
-		SELECT config, manifest, hash FROM starlight.starlight.image
+		SELECT config, manifest, hash FROM image
 		WHERE id=$1 LIMIT 1`,
 		serial).Scan(&config, &manifest, &digest); err != nil {
 		return nil, nil, "", err
@@ -251,8 +332,8 @@ func (d *Database) GetManifestAndConfig(serial int64) (config, manifest []byte, 
 func (d *Database) GetLayers(imageSerial int64) ([]*send.ImageLayer, error) {
 	rows, err := d.db.Query(`
 		SELECT FIS."id", "stackIndex", "digest", FIS."size"
-		FROM starlight.starlight.layer AS L
-		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
+		FROM layer AS L
+		LEFT JOIN filesystem AS FIS ON FIS.id = L.layer
 		WHERE image=$1
 		ORDER BY "stackIndex"`, imageSerial)
 	if err != nil {
@@ -284,9 +365,9 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*se
 			SELECT 
 				L."stackIndex", 
 				FI.file, FI.hash, FI.size, FI.metadata 
-			FROM starlight.starlight.layer AS L
-			LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
-			RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+			FROM layer AS L
+			LEFT JOIN filesystem AS FIS ON FIS.id = L.layer
+			RIGHT JOIN file AS FI ON FI.fs = FIS.id
 			WHERE FI.hash!='' AND image=$1
 		),
 		BETA AS (
@@ -294,9 +375,9 @@ func (d *Database) GetRoughDeduplicatedLayers(fromSerial, toSerial int64) ([]*se
 				L."stackIndex", 
 			    FIS."digest" as "filesystemDigest", FIS."size" as "filesystemSize",
 				FI.file, FI.hash, FI.size, FI.metadata, FI.id
-			FROM starlight.starlight.layer AS L
-			LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
-			RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+			FROM layer AS L
+			LEFT JOIN filesystem AS FIS ON FIS.id = L.layer
+			RIGHT JOIN file AS FI ON FI.fs = FIS.id
 			WHERE FI.hash!='' AND image=$2
 		),
 		ALPHA_UNIQUE AS (
@@ -342,7 +423,7 @@ func (d *Database) GetUniqueFiles(layers []*send.ImageLayer) ([]*send.File, erro
 	rows, err := d.db.Query(`
 		SELECT 
 			FI.fs, FI.metadata
-		FROM starlight.starlight.file AS FI
+		FROM file AS FI
 		WHERE FI.fs = ANY($1) AND FI.hash != ''`, pq.Array(lids))
 	if err != nil {
 		return nil, err
@@ -378,7 +459,7 @@ func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs []int64, 
 		i := img.Images[0]
 		var imageSerial, nlayer int64
 		if err = d.db.QueryRow(`
-			SELECT id, nlayer FROM starlight.starlight.image
+			SELECT id, nlayer FROM image
 			WHERE ready IS NOT NULL AND hash=$1 LIMIT 1`,
 			i).Scan(&imageSerial, &nlayer); err != nil {
 			return nil, err
@@ -389,7 +470,7 @@ func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs []int64, 
 		rows, err = d.db.Query(`
 				SELECT 
 					L.layer
-				FROM starlight.starlight.layer AS L
+				FROM layer AS L
 				WHERE L.image=$1
 				ORDER BY "stackIndex" ASC`, imageSerial)
 		if err != nil {
@@ -406,7 +487,7 @@ func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs []int64, 
 		}
 
 		stmt, _ := d.db.Prepare(`
-			UPDATE starlight.starlight.file SET "order" = array_append("order",$1) WHERE fs=$2 and file=$3
+			UPDATE file SET "order" = array_append("order",$1) WHERE fs=$2 and file=$3
 		`)
 		for _, f := range img.History {
 			_, err = stmt.Exec(f.Rank, layersMap[f.Stack], f.FileName)
@@ -425,9 +506,9 @@ func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*send.RankedFile, err
 		    FIS.id,
 			(SELECT AVG(o) FROM UNNEST("order") o) as "avgRank", 
 			FI.metadata
-		FROM starlight.starlight.layer AS L
-		LEFT JOIN starlight.starlight.filesystem AS FIS ON FIS.id = L.layer
-		RIGHT JOIN starlight.starlight.file AS FI ON FI.fs = FIS.id
+		FROM layer AS L
+		LEFT JOIN filesystem AS FIS ON FIS.id = L.layer
+		RIGHT JOIN file AS FI ON FI.fs = FIS.id
 		WHERE image=$1
 		ORDER BY L."stackIndex" ASC`, imageSerial)
 	if err != nil {

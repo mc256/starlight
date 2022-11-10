@@ -28,6 +28,20 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func TestDatabase_Init(t *testing.T) {
+	db, err := NewDatabase("postgres://postgres:example@172.18.1.61:5432/postgres?sslmode=disable")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err = db.InitDatabase(); err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println("done")
+}
+
 func TestDatabase_GetFiles(t *testing.T) {
 	// TOCEntry to
 	fl, err := db.GetUniqueFiles([]*send.ImageLayer{{Serial: 201}, {Serial: 211}, {Serial: 203}})
