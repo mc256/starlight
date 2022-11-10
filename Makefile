@@ -131,17 +131,17 @@ create-deb-package.arm64: change-version-number set-production build-starlight-d
 .PHONY: upload-deb-package.amd64
 upload-deb-package.amd64:
 	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' $(UPLOAD_URL)
-	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
+	#curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_amd64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
 
 .PHONY: upload-deb-package.armv6l
 upload-deb-package.armv6l:
 	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' $(UPLOAD_URL)
-	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
+	#curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_armhf.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
 
 .PHONY: upload-deb-package.amd64
 upload-deb-package.arm64:
 	curl --form uploadfile='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb' $(UPLOAD_URL)
-	curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
+	#curl -X POST -u $(APT_UPLOAD_AUTH) -F starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb='@./sandbox/starlight-snapshotter_$(VERSIONNUMBER)_arm64.deb' https://repo.yuri.moe/api/files/starlight-snapshotter
 
 ######################################################################
 .PHONY: docker-buildx-multi-arch
@@ -151,18 +151,21 @@ docker-buildx-multi-arch:
 		--build-arg ARCH=amd64 \
 		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
  		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		--network=host \
  		-f ./demo/deb-package/Dockerfile .
 	docker buildx build \
         --platform linux/arm/v7 \
 		--build-arg ARCH=armv6l \
 		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
  		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		--network=host \
  		-f ./demo/deb-package/Dockerfile .
 	docker buildx build \
         --platform linux/arm64/v8 \
 		--build-arg ARCH=arm64 \
 		--build-arg UPLOAD_URL=$(UPLOAD_URL) \
  		--build-arg APT_UPLOAD_AUTH=$(APT_UPLOAD_AUTH)  \
+ 		--network=host \
  		-f ./demo/deb-package/Dockerfile .
 
 ######################################################################
