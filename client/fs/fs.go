@@ -174,6 +174,7 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 
 	log.G(ctx).WithFields(logrus.Fields{
 		"f":  name,
+		"_s": n.instance.stack,
 		"_r": r,
 	}).Trace("open")
 

@@ -18,9 +18,11 @@ import (
 )
 
 type ImageLayer struct {
-	Size   int64  `json:"s"`
-	Serial int64  `json:"f"`
-	Hash   string `json:"h"`
+	Size   int64 `json:"s"`
+	Serial int64 `json:"f"`
+
+	// Hash is the digest of the compressed layer
+	Hash string `json:"h"`
 
 	// path to the local storage
 	Local string

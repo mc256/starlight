@@ -48,6 +48,7 @@ const (
 	ContentLabelStarlightMediaType = "mediaType.starlight.mc256.dev"
 	// ContentLabelContainerdGC prevents containerd from removing the content
 	ContentLabelContainerdGC = "containerd.io/gc.ref.content"
+	ContentLabelSnapshotGC   = "containerd.io/gc.ref.snapshot.starlight"
 	ContentLabelCompletion   = "complete.starlight.mc256.dev"
 
 	// ---------------------------------------------------------------------------------

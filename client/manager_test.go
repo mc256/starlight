@@ -22,6 +22,18 @@ import (
 	"time"
 )
 
+var (
+	ctx = context.Background()
+)
+
+func TestMain(m *testing.M) {
+	// setup code here
+	ctx = context.Background()
+	code := m.Run()
+	// teardown code here
+	os.Exit(code)
+}
+
 func TestManager_Extract(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
@@ -51,7 +63,7 @@ func TestManager_Extract(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
+	m.Init(ctx, cfg, true, nil, nil, md)
 
 	err = m.Extract(&rc)
 	if err != nil {
@@ -86,7 +98,7 @@ func TestManager_Init(t *testing.T) {
 	*/
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
+	m.Init(ctx, cfg, true, nil, nil, md)
 
 }
 
@@ -109,7 +121,7 @@ func TestManager_NewStarlightFS(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
+	m.Init(ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 	stack := int64(2)
 	f, err := m.NewStarlightFS("/opt/test", stack, &opt, true)
@@ -144,7 +156,7 @@ func TestManager_NewStarlightFSMultiple(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
+	m.Init(ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 
 	fss := make([]*fs.Instance, 0)
@@ -191,7 +203,7 @@ func TestManager_NewStarlightFSMultiple2(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
+	m.Init(ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 
 	fss := make([]*fs.Instance, 0)
@@ -238,8 +250,8 @@ func TestManager_NewStarlightFSMultiple3(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, true, nil, nil, md)
-	err = m.SetOptimizerOn("default", "sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
+	m.Init(ctx, cfg, true, nil, nil, md)
+	err = m.SetOptimizerOn("default")
 	if err != nil {
 		t.Error(err)
 		return
@@ -326,8 +338,8 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(cfg, false, manifest, configFile, md)
-	_ = m.CreateSnapshots(cc)
+	m.Init(ctx, cfg, false, manifest, configFile, md)
+	_, _ = m.CreateSnapshots(cc)
 
 }
 

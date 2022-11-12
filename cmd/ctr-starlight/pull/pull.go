@@ -17,7 +17,7 @@ import (
 )
 
 func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*30)
 	defer cancel()
 	resp, err := client.PullImage(ctx, ref)
 	if err != nil {

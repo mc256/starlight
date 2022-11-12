@@ -70,6 +70,8 @@ func (bo ByAccessTimeOptimized) Swap(i, j int) {
 }
 
 type Tracer struct {
+	ctx context.Context
+
 	// label could be the name of the application or the workload.
 	// Different workload might have
 	OptimizeGroup string    `json:"group"`
@@ -104,10 +106,16 @@ func (t *Tracer) Close() error {
 	b, _ := json.Marshal(t)
 	_, _ = t.fh.Write(b)
 
+	log.G(t.ctx).WithFields(logrus.Fields{
+		"optimizeGroup": t.OptimizeGroup,
+		"digest":        t.Image,
+		"logPath":       t.logPath,
+	}).Info("tracer: stopped")
+
 	return t.fh.Close()
 }
 
-func NewTracer(optimizeGroup, digest, outputDir string) (*Tracer, error) {
+func NewTracer(ctx context.Context, optimizeGroup, digest, outputDir string) (*Tracer, error) {
 	err := os.MkdirAll(outputDir, 0775)
 	if err != nil {
 		return nil, err
@@ -119,7 +127,14 @@ func NewTracer(optimizeGroup, digest, outputDir string) (*Tracer, error) {
 		return nil, err
 	}
 
+	log.G(ctx).WithFields(logrus.Fields{
+		"optimizeGroup": optimizeGroup,
+		"digest":        digest,
+		"logPath":       logPath,
+	}).Info("tracer: started")
+
 	return &Tracer{
+		ctx:           ctx,
 		OptimizeGroup: optimizeGroup,
 		StartTime:     time.Now(),
 		Image:         digest,

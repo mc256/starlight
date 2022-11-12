@@ -231,8 +231,8 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 	signal.Notify(si, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	go func() {
 		<-si
-		close(wait)
 		slc.Close()
+		close(wait)
 	}()
 	<-wait
 	return nil

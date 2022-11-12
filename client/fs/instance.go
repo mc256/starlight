@@ -34,6 +34,7 @@ func (fi *Instance) GetMountPoint() string   { return fi.mountPoint }
 func (fi *Instance) GetServer() *fuse.Server { return fi.server }
 
 // Teardown unmounts the file system and close the logging file if there is one writing
+// should you need this function, please consider using Manager.Teardown instead.
 func (fi *Instance) Teardown() error {
 	return fi.GetServer().Unmount()
 }

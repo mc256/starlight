@@ -126,7 +126,7 @@ sudo ctr container create --snapshotter=starlight \
     --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
     --env-file ./demo/config/all.env \
     --net-host \
-    harbor.yuri.moe/starlight/redis:6.2.7 \
+    harbor.yuri.moe/x/redis:6.2.7 \
     instance3 && \
 sudo ctr task start instance3
 ```

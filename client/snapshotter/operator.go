@@ -96,7 +96,7 @@ func (op *Operator) ScanExistingFilesystems() {
 									h := fmt.Sprintf("sha256:%s%s%s%s",
 										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
 									)
-									completeFile := filepath.Join(d, "complete.json")
+									completeFile := filepath.Join(d, "completed.json")
 									if _, err = os.Stat(completeFile); err != nil {
 										_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
 											d1.Name(), d2.Name(), d3.Name(), d4.Name(),

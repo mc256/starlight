@@ -14,6 +14,9 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/mc256/starlight/util"
+	"github.com/mc256/starlight/util/common"
+	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
@@ -31,11 +34,17 @@ type PluginClient interface {
 	// getUpper, getWork, getStarlightFS functions instead of using this function directly
 	GetMountingPoint(ssId string) string
 
+	// PrepareManager inform the client to load specified manager in memory.
+	// It requires the manifest, Starlight Metadatain and image config is present in containerd's content storage.
+	// In case the above requirements are not met, the client should return an error.
+	// The plugin should then try the next referenced manager (manifest digest).
+	PrepareManager(manifest digest.Digest) (err error)
+
 	// Unmount starlightfs
 	Unmount(compressDigest, key string) error
 
 	// Mount starlightfs
-	Mount(md, ld, ssId string, sn *snapshots.Info) (mnt string, err error)
+	Mount(layerDigest digest.Digest, snapshotId string, sn *snapshots.Info) (mnt string, err error)
 }
 
 type Plugin struct {
@@ -93,7 +102,7 @@ func (s *Plugin) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name": info.Name,
-	}).Info("stat")
+	}).Debug("stat")
 	return info, nil
 }
 
@@ -116,7 +125,7 @@ func (s *Plugin) Update(ctx context.Context, info snapshots.Info, fieldpaths ...
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name":  info.Name,
 		"usage": fieldpaths,
-	}).Info("updated")
+	}).Debug("updated")
 	return info, nil
 }
 
@@ -142,7 +151,7 @@ func (s *Plugin) Usage(ctx context.Context, key string) (snapshots.Usage, error)
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"key":   key,
 		"usage": usage,
-	}).Info("usage")
+	}).Debug("usage")
 	return usage, nil
 }
 
@@ -167,7 +176,7 @@ func (s *Plugin) Mounts(ctx context.Context, key string) ([]mount.Mount, error) 
 	log.G(ctx).WithFields(logrus.Fields{
 		"key": key,
 		"mnt": mnt,
-	}).Info("mount")
+	}).Debug("mount")
 	return mnt, nil
 }
 
@@ -180,6 +189,12 @@ func (s *Plugin) View(ctx context.Context, key, parent string, opts ...snapshots
 }
 
 func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly bool, opts ...snapshots.Opt) ([]mount.Mount, error) {
+
+	log.G(s.ctx).WithFields(logrus.Fields{
+		"key":       key,
+		"parent":    parent,
+		"_readonly": readonly,
+	}).Debug("prepare")
 
 	c, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
@@ -228,6 +243,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	// mount snapshot
 	mnt, err := s.mounts(c, ss.ID, &inf)
 	if err != nil {
+		log.G(s.ctx).WithError(err).Error("mount failed")
 		return nil, err
 	}
 
@@ -237,13 +253,12 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	}
 
 	log.G(s.ctx).WithFields(logrus.Fields{
-		"key":       key,
-		"parent":    parent,
-		"readonly":  readonly,
-		"id":        ss.ID,
-		"starlight": usingSL,
-		"mnt":       mnt,
-	}).Info("prepared")
+		"key":        key,
+		"parent":     parent,
+		"_readonly":  readonly,
+		"id":         ss.ID,
+		"_starlight": usingSL,
+	}).Debug("prepared")
 
 	return mnt, nil
 }
@@ -310,7 +325,7 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 		"name":  name,
 		"key":   key,
 		"usage": usage,
-	}).Info("committed")
+	}).Debug("committed")
 	return t.Commit()
 }
 
@@ -368,11 +383,10 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 
 	// log
 	log.G(s.ctx).WithFields(logrus.Fields{
-		"key":       key,
-		"id":        info.Name,
-		"parents":   info.Parent,
-		"starlight": usingSL,
-	}).Info("remove")
+		"id":         info.Name,
+		"parents":    info.Parent,
+		"_starlight": usingSL,
+	}).Debug("remove")
 
 	return nil
 }
@@ -433,8 +447,10 @@ func (si SnapshotItem) IsStarlightFS() bool {
 	return ok && und != ""
 }
 
-func (si SnapshotItem) GetStarlightFeature() (md, und string, stack int64) {
-	return si.inf.Labels[util.SnapshotLabelRefImage], si.inf.Labels[util.SnapshotLabelRefUncompressed], stack
+// GetStarlightFeature returns manifest digest, uncompressed digest, and stack number
+func (si SnapshotItem) GetStarlightFeature() (md, und digest.Digest, stack int64) {
+	return digest.Digest(si.inf.Labels[util.SnapshotLabelRefImage]),
+		digest.Digest(si.inf.Labels[util.SnapshotLabelRefUncompressed]), stack
 }
 
 func (s *Plugin) getFsStack(ctx context.Context, cur *snapshots.Info) (pSi []*SnapshotItem, err error) {
@@ -455,7 +471,9 @@ func (s *Plugin) getFsStack(ctx context.Context, cur *snapshots.Info) (pSi []*Sn
 }
 
 func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (mnt []mount.Mount, err error) {
-	stack, err := s.getFsStack(ctx, inf) // from upper to lower
+	stack, err := s.getFsStack(ctx, inf)
+	// from upper to lower, not include current layer
+
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +487,10 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 		var m string
 		if current.IsStarlightFS() {
 			md, und, _ := current.GetStarlightFeature()
-			m, err = s.client.Mount(md, und, ssId, inf)
+			if err = s.client.PrepareManager(md); err != nil {
+				return nil, err
+			}
+			m, err = s.client.Mount(und, ssId, inf)
 			if err != nil {
 				return nil, err
 			}
@@ -485,13 +506,55 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 		}
 	}
 
+	// Looking for manifest digest
+	// manifest digest should be determined by the top layer of the lower dirs.
+	// it is rare that an image's upper layer are reusing other images layer but we cannot avoid this case.
+	// so:
+	// 1. all the referenced manifest will be checked and loaded.
+	// 2. if the referenced manifest does not exists in the content store, labels will be updated
+	mdsm := map[string]bool{}
+	mdsl := make([]digest.Digest, 0)
+	for _, si := range stack {
+		md, _, _ := si.GetStarlightFeature()
+		if _, has := mdsm[md.String()]; !has {
+			mdsm[md.String()] = true
+			mdsl = append(mdsl, md)
+		}
+	}
+	mdsidx := 0
+
+	log.G(s.ctx).
+		WithField("managers", mdsl).
+		Debug("mount: prepare manager")
+
 	lower := make([]string, 0)
 	for i := len(stack) - 1; i >= 0; i-- {
 		var m string
 		if stack[i].IsStarlightFS() {
 			// starlight layer
-			md, und, _ := stack[i].GetStarlightFeature()
-			m, err = s.client.Mount(md, und, stack[i].ssId, &stack[i].inf)
+			_, und, _ := stack[i].GetStarlightFeature()
+			for {
+				m, err = s.client.Mount(und, stack[i].ssId, &stack[i].inf)
+				if err == nil {
+					break
+				} else if err == common.ErrNoManager {
+					// if there is no manager for the layer, prepare a new one
+					// prepare the next available manager
+					for {
+						if mdsidx >= len(mdsl) {
+							return nil, errors.Wrapf(err, "no manager for %s", und)
+						}
+						err = s.client.PrepareManager(mdsl[mdsidx])
+						if err == nil {
+							break
+						}
+						mdsidx += 1
+					}
+				} else {
+					return nil, err
+				}
+			}
+
 			if err != nil {
 				return nil, err
 			}
@@ -508,18 +571,6 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 			fmt.Sprintf("workdir=%s", s.getWork(ssId)),
 			fmt.Sprintf("upperdir=%s", s.getUpper(ssId)),
 		)
-	} else {
-		var m string
-		if current.IsStarlightFS() {
-			md, und, _ := current.GetStarlightFeature()
-			m, err = s.client.Mount(und, md, ssId, inf)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			m = s.getUpper(ssId)
-		}
-		lower = append(lower, m)
 	}
 
 	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(lower, ":")))

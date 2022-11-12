@@ -8,8 +8,10 @@ package client
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/mc256/starlight/client/fs"
@@ -30,10 +32,11 @@ import (
 // Manager should be unmarshalled from a json file and then Populate() should be called to populate other fields
 type Manager struct {
 	receive.DeltaBundle
+	ctx context.Context
 
 	// non-exported fields
-	compressLayerDigest []digest.Digest
-	diffDigest          []digest.Digest
+	// compressLayerDigest []digest.Digest
+	// diffDigest          []digest.Digest
 
 	cfg *Configuration
 
@@ -196,10 +199,13 @@ func (m *Manager) PrepareDirectories(c *Client) error {
 	return nil
 }
 
-func (m *Manager) CreateSnapshots(c *Client) (err error) {
+// CreateSnapshots for chainIds
+// should unlock the managerMapLock before calling CreateSnapshot
+func (m *Manager) CreateSnapshots(c *Client) (chainIds []digest.Digest, err error) {
 	diffs := m.imageConfig.RootFS.DiffIDs
-	chainIds := identity.ChainIDs(diffs)
+	chainIds = identity.ChainIDs(diffs)
 	prev := ""
+
 	for idx, chain := range chainIds {
 		d := m.layers[m.stackSerialMap[idx]].Hash
 
@@ -223,21 +229,25 @@ func (m *Manager) CreateSnapshots(c *Client) (err error) {
 			chain.String(), prev, m.manifestDigest.String(), d, int64(idx),
 		)
 		if err != nil {
-			return errors.Wrapf(err, "failed prepare new image snapshots %s", chain.String())
+			return nil, errors.Wrapf(err, "failed prepare new image snapshots %s", chain.String())
 		}
 		prev = chain.String()
 	}
-	return nil
+	return chainIds, nil
 }
 
 // Init populates the manager with the necessary information and data structures.
 // Use json.Unmarshal to unmarshal the json file from data storage into a Manager struct.
-// - ready: if set to false, we will then use Extract() to get the content of the file
-// - cfg: configuration of the client
-// - image, manifest, imageConfig: information about the image (maybe we don't need this)
-func (m *Manager) Init(cfg *Configuration, ready bool,
+//
+//  - ready: if set to false, we will then use Extract() to get the content of the file
+//  - cfg: configuration of the client
+//  - image, manifest, imageConfig: information about the image (maybe we don't need this)
+//
+// do not change any outside state, only the manager itself
+func (m *Manager) Init(ctx context.Context, cfg *Configuration, ready bool,
 	manifest *v1.Manifest, imageConfig *v1.Image, manifestDigest digest.Digest) {
 	// init variables
+	m.ctx = ctx
 	m.cfg = cfg
 	m.stackSerialMap = make([]int64, 0, len(m.Destination.Layers))
 	m.layers = make(map[int64]*receive.ImageLayer)
@@ -321,13 +331,15 @@ func (m *Manager) Init(cfg *Configuration, ready bool,
 
 func (m *Manager) SetOptimizerOn(optimizeGroup string) (err error) {
 	if m.tracer == nil {
-		m.tracer, err = fs.NewTracer(optimizeGroup, m.manifestDigest.String(), m.cfg.TracesDir)
+		log.G(m.ctx).Debug("manager: start tracer")
+		m.tracer, err = fs.NewTracer(m.ctx, optimizeGroup, m.manifestDigest.String(), m.cfg.TracesDir)
 	}
 	return
 }
 
 func (m *Manager) SetOptimizerOff() (err error) {
 	if m.tracer != nil {
+		log.G(m.ctx).Debug("manager: stop tracer")
 		err = m.tracer.Close()
 		m.tracer = nil
 	}
@@ -336,9 +348,11 @@ func (m *Manager) SetOptimizerOff() (err error) {
 
 func (m *Manager) Teardown() {
 	if m.tracer != nil {
+		log.G(m.ctx).Debug("manager: stop tracer")
 		_ = m.tracer.Close()
 	}
 	for _, v := range m.fs {
+		log.G(m.ctx).WithField("mnt", v.GetMountPoint()).Debug("manager: unmounting filesystem")
 		_ = v.Teardown()
 	}
 }
