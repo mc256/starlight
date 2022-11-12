@@ -202,7 +202,7 @@ cat <<EOT | sudo tee -a /etc/containerd/config.toml > /dev/null
 [proxy_plugins]
   [proxy_plugins.starlight]
     type = "snapshot"
-    address = "/run/starlight-grpc/starlight-snapshotter.socket"
+    address = "/run/starlight/starlight-daemon.sock"
 EOT
 ```
 

@@ -168,8 +168,9 @@ Starlight is not complete. Our roadmap:
 |----------------------------------------------------------|-------------|-------------------|
 | [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) | stable      |                   |
 | [v0.2.0](https://github.com/mc256/starlight)             | development |                   |
-| v0.3.0                                                   |             | 2022-12-01        |
-| v0.4.0                                                   |             | 2023-01-01        |
+| v0.3.0                                                   |             | 2022-12-15        |
+| v0.4.0                                                   |             | 2023-01-15        |
+| v0.5.0                                                   |             | 2023-02-15        |
 
 Feature List:
 - [x] Scalable database backend (v0.2)
@@ -187,3 +188,6 @@ Feature List:
   - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.3)
   - [ ] Jointly optimizing multiple containers deployments (v0.4)
   - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.4)
+- [ ] Starlight new features (v0.5)
+  - [ ] Resume interrupted pull connection (v0.4)
+  - [ ] Garbage Collection (v0.4)

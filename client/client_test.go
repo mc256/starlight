@@ -248,21 +248,6 @@ func TestClient_LoadImage(t *testing.T) {
 	t.Log(m)
 }
 
-func TestClient_updateManifest(t *testing.T) {
-	cfg, _, _, _ := LoadConfig("/root/daemon.json")
-	c, err := NewClient(context.Background(), cfg)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	err = c.updateManifest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-}
-
 func TestPlatform(t *testing.T) {
 	fmt.Println(platforms.DefaultString())
 }

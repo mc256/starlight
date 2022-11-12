@@ -1,4 +1,4 @@
-Source: starlight-snapshotter
+Source: starlight
 Section: devel
 Priority: optional
 Maintainer: Junlin Chen <webmaster@mc256.dev>
@@ -6,7 +6,7 @@ Build-Depends: build-essential, dh-systemd (>= 1.5), debhelper (>=10)
 Standards-Version: 0.0.0
 Homepage: https://github.com/mc256/starlight
 
-Package: starlight-snapshotter
+Package: starlight
 Architecture: amd64
 Depends: containerd (>= 1.4.13), kernel (>= 5.15.0)
 Description: Starlight is an accelerator for provisioning container-based applications.

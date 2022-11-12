@@ -41,6 +41,8 @@ type Manager struct {
 	cfg *Configuration
 
 	//layers is a map from filesystem serial to receive.ImageLayer object
+	//  - should it require files from layers that are not in this image,
+	//    checkout layers using the serial number
 	layers map[int64]*receive.ImageLayer
 
 	//stackSerialMap is a map convert stack to filesystem serial (on the proxy side),
@@ -75,12 +77,12 @@ func (m *Manager) ignoreStack(stack int64) bool {
 	return m.completedStack[stack]
 }
 
-func (m *Manager) getPathByStack(stack int64) string {
-	return m.layers[m.stackSerialMap[stack]].Local
+func (m *Manager) GetPathByStack(stack int64) string {
+	return m.GetPathBySerial(m.stackSerialMap[stack])
 }
 
-func (m *Manager) GetPathByLayer(stack int64) string {
-	return m.getPathByStack(stack)
+func (m *Manager) GetPathBySerial(serial int64) string {
+	return m.layers[serial].Local
 }
 
 func (m *Manager) LookUpFile(stack int64, filename string) fs.ReceivedFile {
@@ -124,7 +126,7 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 		}
 
 		// regular extraction
-		p := m.getPathByStack(c.Stack)
+		p := m.GetPathByStack(c.Stack)
 		if err := os.MkdirAll(filepath.Join(p, c.GetBaseDir()), 0755); err != nil {
 			return errors.Wrapf(err, "failed to create directory %s", filepath.Join(p, c.GetBaseDir()))
 		}

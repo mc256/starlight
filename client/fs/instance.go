@@ -13,7 +13,8 @@ import (
 )
 
 type ImageManager interface {
-	GetPathByLayer(stack int64) string
+	GetPathByStack(stack int64) string
+	GetPathBySerial(stack int64) string
 	LookUpFile(stack int64, filename string) ReceivedFile
 	LogTrace(stack int64, filename string, access, complete time.Time)
 }

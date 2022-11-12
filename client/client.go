@@ -85,6 +85,9 @@ type Client struct {
 	defaultOptimizeGroup string
 }
 
+// -----------------------------------------------------------------------------
+// Base Image Searching
+
 func escapeSlashes(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	return strings.ReplaceAll(s, "/", "\\/")
@@ -92,18 +95,19 @@ func escapeSlashes(s string) string {
 
 func getImageFilter(ref string) string {
 	return fmt.Sprintf(
-		"name~=/^%s.*/,labels.%s==%s",
+		"name~=/^%s.*/,labels.%s==%s,%s",
+		// choose images with the same name (just the tags are different)
 		escapeSlashes(ref),
+		// choose images that are pulled by starlight
 		util.ImageLabelPuller, "starlight",
+		// choose completed images
+		"labels."+util.ContentLabelCompletion,
 	)
 }
 
 func getDistributionSource(cfg string) string {
 	return fmt.Sprintf("starlight.mc256.dev/distribution.source.%s", cfg)
 }
-
-// -----------------------------------------------------------------------------
-// Base Image Searching
 
 func (c *Client) findImage(filter string) (img containerd.Image, err error) {
 	var list []containerd.Image
@@ -126,11 +130,12 @@ func (c *Client) findImage(filter string) (img containerd.Image, err error) {
 			nt = cur
 		}
 	}
+	// get the newest image
 	return newest, nil
 }
 
 // FindBaseImage find the closest available image for the requested image, if user appointed an image, then this
-// function will be used for looking up the appointed image
+// function will be used for confirming the appointed image is available in the local storage
 func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err error) {
 	var baseFilter string
 	if base == "" {
@@ -157,6 +162,7 @@ func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err erro
 // -----------------------------------------------------------------------------
 // Image Pulling
 
+// readBody is a helper function to read the body of a response and return it in a buffer
 func (c *Client) readBody(body io.ReadCloser, s int64) (*bytes.Buffer, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, s))
 	m, err := io.CopyN(buf, body, s)
@@ -169,6 +175,11 @@ func (c *Client) readBody(body io.ReadCloser, s int64) (*bytes.Buffer, error) {
 	return buf, nil
 }
 
+// handleManifest unmarshal the manifest.
+// It returns
+//  - the manifest in object
+//  - the manifest in bytes to store in the content store
+//  - error in case of failure
 func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []byte, err error) {
 	// decompress manifest
 	r, err := gzip.NewReader(buf)
@@ -187,6 +198,7 @@ func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []b
 	return manifest, man, nil
 }
 
+// storeManifest saves the manifest in the content store with necessary labels
 func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (err error) {
 	pd := digest.Digest(d)
 
@@ -195,11 +207,16 @@ func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (e
 		c.ctx, c.cs, pd.Hex(), bytes.NewReader(man),
 		v1.Descriptor{Size: int64(len(man)), Digest: pd},
 		content.WithLabels(map[string]string{
-			util.ImageLabelPuller:                                      "starlight",
-			util.ContentLabelStarlightMediaType:                        "manifest",
+			// identifier
+			util.ImageLabelPuller:               "starlight",
+			util.ContentLabelStarlightMediaType: "manifest",
+
+			// garbage collection
 			fmt.Sprintf("%s.config", util.ContentLabelContainerdGC):    cfgd,
 			fmt.Sprintf("%s.starlight", util.ContentLabelContainerdGC): sld,
-			getDistributionSource(cfgName):                             ref,
+
+			// multiple starlight proxy support
+			getDistributionSource(cfgName): ref,
 		}))
 	if err != nil {
 		return errors.Wrapf(err, "failed to open writer for manifest")
@@ -207,7 +224,8 @@ func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (e
 	return nil
 }
 
-func (c *Client) updateManifest(d string, chainIds []digest.Digest) (err error) {
+// updateManifest marks the manifest as completed
+func (c *Client) updateManifest(d string, chainIds []digest.Digest, t time.Time) (err error) {
 	pd := digest.Digest(d)
 	cs := c.client.ContentStore()
 
@@ -218,7 +236,7 @@ func (c *Client) updateManifest(d string, chainIds []digest.Digest) (err error) 
 		return err
 	}
 
-	info.Labels[util.ContentLabelCompletion] = time.Now().Format(time.RFC3339)
+	info.Labels[util.ContentLabelCompletion] = t.Format(time.RFC3339)
 
 	// garbage collection tags, more info:
 	// https://github.com/containerd/containerd/blob/83f44ddab5b17da74c5bd97dad7b2c5fa32871de/docs/garbage-collection.md
@@ -524,8 +542,16 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	}
 
 	// mark as completed
+	t := time.Now()
+
+	// mark image as completed
+	ctrImg.Labels[util.ContentLabelCompletion] = t.Format(time.RFC3339)
+	if ctrImg, err = is.Update(c.ctx, ctrImg, "labels."+util.ContentLabelCompletion); err != nil {
+		return nil, errors.Wrapf(err, "failed to mark image as completed")
+	}
+
 	// update garbage collection labels
-	if err = c.updateManifest(md, chainIds); err != nil {
+	if err = c.updateManifest(md, chainIds, t); err != nil {
 		return nil, errors.Wrapf(err, "failed to update manifest")
 	}
 

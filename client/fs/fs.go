@@ -7,6 +7,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
@@ -32,6 +33,13 @@ type ReceivedFile interface {
 	GetLinkName() string
 	GetRealPath() string
 	WaitForReady()
+
+	// IsReferencingRequestedImage returns stack number where the actual content located
+	// if the file is available in the local filesystem then yes is false
+	IsReferencingRequestedImage() (stack int64, yes bool)
+
+	// IsReferencingLocalFilesystem can not return true if IsReferencingRequestedImage returns true
+	IsReferencingLocalFilesystem() (serial int64, yes bool)
 }
 
 type StarlightFsNode struct {
@@ -44,10 +52,19 @@ func (n *StarlightFsNode) getFile(p string) ReceivedFile {
 	return n.instance.manager.LookUpFile(n.instance.stack, p)
 }
 
-func (n *StarlightFsNode) getRealPath() string {
-	p := n.instance.manager.GetPathByLayer(n.instance.stack)
+func (n *StarlightFsNode) getRealPath() (string, error) {
+	// 1. not available, in the same layer
+	// 2. not available, in other layers
+	// 3. available, in local filesystem
 	pp := n.GetRealPath()
-	return filepath.Join(p, pp)
+	if stack, yes := n.ReceivedFile.IsReferencingRequestedImage(); yes {
+		return filepath.Join(n.instance.manager.GetPathByStack(stack), pp), nil
+	}
+	if serial, yes := n.ReceivedFile.IsReferencingLocalFilesystem(); yes {
+		return filepath.Join(n.instance.manager.GetPathBySerial(serial), pp), nil
+	}
+
+	return "", fmt.Errorf("fsnode: unknown file reference [%s]", n.GetName())
 }
 
 func (n *StarlightFsNode) log(filename string, access, complete time.Time) {
@@ -162,7 +179,14 @@ func (n *StarlightFsNode) Readlink(ctx context.Context) ([]byte, syscall.Errno) 
 var _ = (fs.NodeOpener)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle, uint32, syscall.Errno) {
-	r := n.getRealPath()
+	r, err := n.getRealPath()
+	if err != nil {
+		log.G(ctx).WithFields(logrus.Fields{
+			"_s": n.instance.stack,
+			"_r": r,
+		}).Error("open")
+		return nil, 0, syscall.ENODATA
+	}
 
 	access := time.Now()
 	if !n.IsReady() {
@@ -188,7 +212,29 @@ func (n *StarlightFsNode) Open(ctx context.Context, flags uint32) (fs.FileHandle
 var _ = (fs.NodeFsyncer)((*StarlightFsNode)(nil))
 
 func (n *StarlightFsNode) Fsync(ctx context.Context, f fs.FileHandle, flags uint32) syscall.Errno {
-	r := n.getRealPath()
+	r, err := n.getRealPath()
+	if err != nil {
+		log.G(ctx).WithFields(logrus.Fields{
+			"_s": n.instance.stack,
+			"_r": r,
+		}).Error("fsync")
+		return syscall.ENODATA
+	}
+
+	access := time.Now()
+	if !n.IsReady() {
+		n.WaitForReady()
+	}
+	complete := time.Now()
+	name := n.GetName()
+	n.log(name, access, complete)
+
+	log.G(ctx).WithFields(logrus.Fields{
+		"f":  name,
+		"_s": n.instance.stack,
+		"_r": r,
+	}).Trace("fsync")
+
 	fd, err := syscall.Open(r, int(flags), 0)
 	if err != nil {
 		return fs.ToErrno(err)

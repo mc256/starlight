@@ -69,7 +69,8 @@ type ReferencedFile struct {
 	// (This is Serial not Stack)
 	ReferenceFsId int64 `json:"R,omitempty"`
 
-	// if the file is not available on the client then ReferenceFsId is zero and ReferenceStack is non-zero,
+	// if the file is not available on the client but on other layers in the requested image，
+	// then ReferenceFsId is zero and ReferenceStack is non-zero,
 	// expecting the file content in the delta bundle body
 	// (This is Stack not Serial)
 	ReferenceStack int64 `json:"T,omitempty"`
@@ -159,6 +160,27 @@ func (r *ReferencedFile) GetRealPath() string {
 
 func (r *ReferencedFile) WaitForReady() {
 	<-*r.Ready
+}
+
+func (r *ReferencedFile) IsReferencingRequestedImage() (stack int64, yes bool) {
+	if r.ReferenceFsId != 0 {
+		return 0, false
+	}
+
+	// in the payload
+	if r.ReferenceStack != 0 {
+		// different layer
+		return r.ReferenceStack, true
+	}
+	// same layer
+	return r.Stack, true
+}
+
+func (r *ReferencedFile) IsReferencingLocalFilesystem() (serial int64, yes bool) {
+	if r.ReferenceFsId != 0 {
+		return r.ReferenceFsId, true
+	}
+	return 0, false
 }
 
 // ------------------------------------------

@@ -28,7 +28,7 @@ wget "https://github.com/mc256/starlight/releases/download/v${SL_VERSION}/starli
 sudo apt install -f "./starlight-snapshotter_${SL_VERSION}_$ARCH.deb"
 ```
 
-Update systemd service file `/lib/systemd/system/starlight-snapshotter.service`. 
+Update systemd service file `/lib/systemd/system/starlight.service`. 
 - Change `STARLIGHT_PROXY` to the address of the Starlight Proxy.
 - remove `--plain-http` if the Starlight Proxy is behind a HTTPS reverse proxy.
 ```

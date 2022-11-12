@@ -102,7 +102,7 @@ func (s *Plugin) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name": info.Name,
-	}).Debug("stat")
+	}).Debug("sn: stat")
 	return info, nil
 }
 
@@ -125,7 +125,7 @@ func (s *Plugin) Update(ctx context.Context, info snapshots.Info, fieldpaths ...
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name":  info.Name,
 		"usage": fieldpaths,
-	}).Debug("updated")
+	}).Debug("sn: updated")
 	return info, nil
 }
 
@@ -151,7 +151,7 @@ func (s *Plugin) Usage(ctx context.Context, key string) (snapshots.Usage, error)
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"key":   key,
 		"usage": usage,
-	}).Debug("usage")
+	}).Debug("sn: usage")
 	return usage, nil
 }
 
@@ -176,7 +176,7 @@ func (s *Plugin) Mounts(ctx context.Context, key string) ([]mount.Mount, error) 
 	log.G(ctx).WithFields(logrus.Fields{
 		"key": key,
 		"mnt": mnt,
-	}).Debug("mount")
+	}).Debug("sn: mount")
 	return mnt, nil
 }
 
@@ -194,7 +194,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 		"key":       key,
 		"parent":    parent,
 		"_readonly": readonly,
-	}).Debug("prepare")
+	}).Debug("sn: prepare")
 
 	c, t, err := s.ms.TransactionContext(ctx, true)
 	if err != nil {
@@ -218,7 +218,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	ss, err := storage.CreateSnapshot(c, kind, key, parent, opts...)
 	if err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			log.G(ctx).WithError(rerr).Warn("sn: failed to rollback transaction")
 		}
 		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
@@ -243,7 +243,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	// mount snapshot
 	mnt, err := s.mounts(c, ss.ID, &inf)
 	if err != nil {
-		log.G(s.ctx).WithError(err).Error("mount failed")
+		log.G(s.ctx).WithError(err).Error("sn: mount failed")
 		return nil, err
 	}
 
@@ -258,7 +258,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 		"_readonly":  readonly,
 		"id":         ss.ID,
 		"_starlight": usingSL,
-	}).Debug("prepared")
+	}).Debug("sn: prepared")
 
 	return mnt, nil
 }
@@ -283,7 +283,7 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 	snId, inf, _, err = storage.GetInfo(c, key)
 	if err != nil {
 		if err = t.Rollback(); err != nil {
-			log.G(ctx).WithError(err).Warn("failed to rollback transaction")
+			log.G(ctx).WithError(err).Warn("sn: failed to rollback transaction")
 		}
 		return err
 	}
@@ -301,7 +301,7 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 		usage, err = fs.DiskUsage(c, s.client.GetFilesystemPath(unId))
 		if err != nil {
 			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+				log.G(ctx).WithError(rerr).Warn("sn: failed to rollback transaction")
 			}
 			return err
 		}
@@ -316,7 +316,7 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 	// Commit
 	if _, err = storage.CommitActive(c, key, name, snapshots.Usage(usage), opts...); err != nil {
 		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			log.G(ctx).WithError(rerr).Warn("sn: failed to rollback transaction")
 		}
 		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
@@ -325,7 +325,7 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 		"name":  name,
 		"key":   key,
 		"usage": usage,
-	}).Debug("committed")
+	}).Debug("sn: committed")
 	return t.Commit()
 }
 
@@ -368,7 +368,7 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 		if err != nil {
 			log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
 				"key": key,
-			}).Warn("failed to remove snapshot mounting")
+			}).Warn("sn: failed to remove snapshot mounting")
 			return err
 		}
 	} else {
@@ -376,7 +376,7 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 		if err = os.RemoveAll(s.getMountingPoint(snId)); err != nil {
 			log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
 				"key": key,
-			}).Warn("failed to remove snapshot mounting")
+			}).Warn("sn: failed to remove snapshot mounting")
 			return err
 		}
 	}
@@ -386,7 +386,7 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 		"id":         info.Name,
 		"parents":    info.Parent,
 		"_starlight": usingSL,
-	}).Debug("remove")
+	}).Debug("sn: remove")
 
 	return nil
 }
@@ -502,7 +502,7 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 				},
 			}, nil
 		} else {
-			return nil, fmt.Errorf("please use native overlayfs")
+			return nil, fmt.Errorf("sn: please use native overlayfs")
 		}
 	}
 
@@ -525,7 +525,7 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 
 	log.G(s.ctx).
 		WithField("managers", mdsl).
-		Debug("mount: prepare manager")
+		Debug("sn: prepare manager")
 
 	lower := make([]string, 0)
 	for i := len(stack) - 1; i >= 0; i-- {

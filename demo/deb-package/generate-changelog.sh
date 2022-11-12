@@ -5,7 +5,7 @@ function logentry() {
     local version=$2
     local version_number=`echo $2 | sed 's/v//g'`
     local version_number=`[[ -z "$version_number" ]] && echo "0.0.0" || echo $version_number`
-    echo "starlight-snapshotter ($version_number) unstable; urgency=low"
+    echo "starlight ($version_number) unstable; urgency=low"
     echo
     git --no-pager log --format="  * %s" $previous${previous:+..}$version
     echo
