@@ -73,6 +73,7 @@ https://github.com/mc256/starlight
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
+			Aliases:     []string{"l"},
 			DefaultText: cfg.LogLevel,
 			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
 			Required:    false,

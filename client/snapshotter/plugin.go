@@ -25,6 +25,26 @@ import (
 	"sync"
 )
 
+//////////////////////////////////////////////////////////////////////
+// COPY FROM containerd snapshots/overlay/overlay.go
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+//////////////////////////////////////////////////////////////////////
+
 type PluginClient interface {
 
 	// GetFilesystemPath only use this for starlightfs' stat
@@ -69,6 +89,8 @@ func NewPlugin(ctx context.Context, client PluginClient, metadataDB string) (s *
 	if err != nil {
 		return nil, err
 	}
+
+	// overlayfs
 
 	return
 }
@@ -141,11 +163,14 @@ func (s *Plugin) Usage(ctx context.Context, key string) (snapshots.Usage, error)
 	}
 
 	if _, usingSL := inf.Labels[util.SnapshotLabelRefUncompressed]; !usingSL {
+		// overlayfs
 		if inf.Kind == snapshots.KindActive {
 			var du fs.Usage
 			du, err = fs.DiskUsage(c, s.getUpper(snId))
 			usage = snapshots.Usage(du)
 		}
+	} else {
+		// starlightfs is RO so we don't need to calculate the usage
 	}
 
 	log.G(s.ctx).WithFields(logrus.Fields{
@@ -169,6 +194,7 @@ func (s *Plugin) Mounts(ctx context.Context, key string) ([]mount.Mount, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	mnt, err := s.mounts(c, ssId, &info)
 	if err != nil {
 		return nil, err
@@ -200,6 +226,7 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	if err != nil {
 		return nil, err
 	}
+
 	kind := snapshots.KindActive
 	if readonly {
 		kind = snapshots.KindView
@@ -278,16 +305,21 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("sn: failed to rollback transaction")
+			}
+		}
+	}()
 
 	// Get Snapshot info
 	snId, inf, _, err = storage.GetInfo(c, key)
 	if err != nil {
-		if err = t.Rollback(); err != nil {
-			log.G(ctx).WithError(err).Warn("sn: failed to rollback transaction")
-		}
 		return err
 	}
 
+	// update info so we can get Starlight related labels
 	for _, opt := range opts {
 		if err = opt(&inf); err != nil {
 			return err
@@ -315,9 +347,6 @@ func (s *Plugin) Commit(ctx context.Context, name, key string, opts ...snapshots
 
 	// Commit
 	if _, err = storage.CommitActive(c, key, name, snapshots.Usage(usage), opts...); err != nil {
-		if rerr := t.Rollback(); rerr != nil {
-			log.G(ctx).WithError(rerr).Warn("sn: failed to rollback transaction")
-		}
 		return fmt.Errorf("failed to commit snapshot: %w", err)
 	}
 
@@ -347,7 +376,13 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer t.Rollback()
+	defer func() {
+		if err != nil {
+			if rerr := t.Rollback(); rerr != nil {
+				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
+			}
+		}
+	}()
 
 	// Get Snapshot info
 	snId, info, _, err = storage.GetInfo(c, key)
@@ -372,7 +407,7 @@ func (s *Plugin) Remove(ctx context.Context, key string) (err error) {
 			return err
 		}
 	} else {
-		// overlay
+		// overlayfs
 		if err = os.RemoveAll(s.getMountingPoint(snId)); err != nil {
 			log.G(s.ctx).WithError(err).WithFields(logrus.Fields{
 				"key": key,
@@ -486,6 +521,7 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 	if len(stack) == 0 {
 		var m string
 		if current.IsStarlightFS() {
+			// starlightfs
 			md, und, _ := current.GetStarlightFeature()
 			if err = s.client.PrepareManager(md); err != nil {
 				return nil, err
@@ -502,7 +538,21 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 				},
 			}, nil
 		} else {
-			return nil, fmt.Errorf("sn: please use native overlayfs")
+			// overlayfs
+			rwo := "ro"
+			if inf.Kind == snapshots.KindActive {
+				rwo = "rw"
+			}
+			log.G(s.ctx).WithFields(logrus.Fields{
+				"key": ssId,
+			}).Warn("sn: starlightfs is using as overlayfs")
+			return []mount.Mount{
+				{
+					Type:    "bind",
+					Source:  s.getUpper(ssId),
+					Options: []string{"rbind", rwo},
+				},
+			}, nil
 		}
 	}
 

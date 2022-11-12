@@ -90,6 +90,7 @@ information about Starlight, please visit our repository at https://github.com/m
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
+			Aliases:     []string{"l"},
 			DefaultText: cfg.LogLevel,
 			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
 			Required:    false,

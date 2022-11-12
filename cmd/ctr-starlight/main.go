@@ -84,6 +84,7 @@ https://github.com/mc256/starlight
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
+			Aliases:     []string{"l"},
 			Usage:       "log level for this command line tool",
 			Value:       "info",
 			DefaultText: "info",
