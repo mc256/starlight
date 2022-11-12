@@ -752,6 +752,7 @@ func (c *Client) Mount(ld digest.Digest, ssId string, sn *snapshots.Info) (mnt s
 
 		log.G(c.ctx).
 			WithField("s", ssId).
+			WithField("ld", ld.String()).
 			Warn("mount: no manager found")
 
 		return "", common.ErrNoManager
@@ -863,7 +864,7 @@ type StarlightDaemonAPIServer struct {
 	client *Client
 }
 
-func (s *StarlightDaemonAPIServer) Version(ctx context.Context, req *pb.Request) (*pb.Version, error) {
+func (s *StarlightDaemonAPIServer) GetVersion(ctx context.Context, req *pb.Request) (*pb.Version, error) {
 	return &pb.Version{
 		Version: util.Version,
 	}, nil

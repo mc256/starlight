@@ -65,7 +65,7 @@ https://github.com/mc256/starlight
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:        "config",
-			DefaultText: "/etc/starlight/daemon_config.json",
+			DefaultText: "/etc/starlight/starlight-daemon.json",
 			Aliases:     []string{"c"},
 			EnvVars:     []string{"STARLIGHT_DAEMON_CONFIG"},
 			Usage:       "json configuration file. CLI parameter will override values in the config file if specified",
