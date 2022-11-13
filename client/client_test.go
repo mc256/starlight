@@ -14,7 +14,10 @@ import (
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"io/fs"
 	"io/ioutil"
+	"os"
+	"syscall"
 	"testing"
 )
 
@@ -45,7 +48,7 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 
 	c.operator = snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
 	ready := make(chan bool)
-	img, err := c.PullImage(nil,
+	img, _, err := c.PullImage(nil,
 		"harbor.yuri.moe/starlight/redis:6.2.7",
 		"linux/amd64",
 		"",
@@ -124,7 +127,7 @@ func TestClient_PullImageWithUpdate(t *testing.T) {
 	}
 
 	ready := make(chan bool)
-	img, err := c.PullImage(base,
+	img, _, err := c.PullImage(base,
 		"harbor.yuri.moe/starlight/redis:7.0.5",
 		"linux/amd64",
 		"",
@@ -147,7 +150,7 @@ func TestClient_CreateImageService(t *testing.T) {
 	//plt := platforms.Format(platforms.DefaultSpec())
 	//t.Log("pulling image", "platform", plt)
 	ready := make(chan bool)
-	img, err := c.PullImage(nil,
+	img, _, err := c.PullImage(nil,
 		"starlight/redis:6.2.7",
 		"linux/amd64",
 		"",
@@ -264,3 +267,12 @@ func TestPlatform(t *testing.T) {
 
 	_, _ = config, star
 */
+
+func TestTransportEndpointNotConnected(t *testing.T) {
+	_, err := os.Stat("/var/lib/starlight/mnt/4/slfs")
+	if err.(*fs.PathError).Err == syscall.ENOTCONN {
+		t.Log("not connected")
+		return
+	}
+	t.Error(err)
+}

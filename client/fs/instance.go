@@ -6,8 +6,12 @@
 package fs
 
 import (
+	"context"
+	"github.com/containerd/containerd/log"
 	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
+	iofs "io/fs"
+	"os"
 	"syscall"
 	"time"
 )
@@ -21,6 +25,8 @@ type ImageManager interface {
 
 // Instance should be created using
 type Instance struct {
+	ctx context.Context
+
 	Root      ReceivedFile
 	rootInode *StarlightFsNode
 
@@ -44,8 +50,9 @@ func (fi *Instance) Serve() {
 	fi.server.Serve()
 }
 
-func NewInstance(m ImageManager, root ReceivedFile, stack int64, dir string, options *fs.Options, debug bool) (fi *Instance, err error) {
+func NewInstance(ctx context.Context, m ImageManager, root ReceivedFile, stack int64, dir string, options *fs.Options, debug bool) (fi *Instance, err error) {
 	fi = &Instance{
+		ctx:     ctx,
 		manager: m,
 		stack:   stack,
 	}
@@ -68,7 +75,17 @@ func NewInstance(m ImageManager, root ReceivedFile, stack int64, dir string, opt
 		options.Debug = true
 	}
 
-	_ = syscall.Unmount(dir, UnmountFlag)
+	if _, err = os.Stat(dir); err != nil && err.(*iofs.PathError).Err == syscall.ENOTCONN {
+		// if the directory exists, it means that the snapshot is already created
+		// or there is a problem unmounting the snapshot
+		// Transport endpoint is not connected
+		err = syscall.Unmount(dir, UnmountFlag)
+		log.G(ctx).
+			WithError(err).
+			WithField("dir", dir).
+			Warn("fs:  cleanup disconnected mountpoint")
+	}
+
 	rawFs := fs.NewNodeFS(fi.rootInode, options)
 	fi.server, err = fuse.NewServer(rawFs, dir, &options.MountOptions)
 

@@ -152,7 +152,7 @@ func (b *Builder) WriteBody(w http.ResponseWriter, req *http.Request) error {
 				ssr := io.NewSectionReader(sr, chunk.Offset, chunk.CompressedSize)
 				_, err := io.CopyN(w, ssr, chunk.CompressedSize)
 				if err != nil {
-					return errors.Wrapf(err, "failed to read chunk at %d bytes for %s, perhaps outdated ToC in database", chunk.Offset, c.Files[0].Name)
+					return errors.Wrapf(err, "failed to copy chunk at [%d] for file [%s]", chunk.Offset, c.Files[0].Name)
 				}
 			}
 		} else {

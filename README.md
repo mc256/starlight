@@ -167,7 +167,7 @@ Starlight is not complete. Our roadmap:
 | Version                                                  | Status      | Scheduled Release |
 |----------------------------------------------------------|-------------|-------------------|
 | [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) | stable      |                   |
-| [v0.2.0](https://github.com/mc256/starlight)             | development |                   |
+| [v0.2.2](https://github.com/mc256/starlight)             | development |                   |
 | v0.3.0                                                   |             | 2022-12-15        |
 | v0.4.0                                                   |             | 2023-01-15        |
 | v0.5.0                                                   |             | 2023-02-15        |
@@ -176,12 +176,12 @@ Feature List:
 - [x] Scalable database backend (v0.2)
   - [x] Postgres Database Schema (v0.2)
   - [x] Starlight Proxy Server (v0.2)
-- [ ] Kubernetes support (v0.3)
+- [x] Kubernetes support (v0.3)
   - [x] Starlight Proxy (v0.2)
     - [x] Helm Chart (v0.2)
     - [x] Starlight Proxy authentication (v0.2)
   - [x] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
-  - [ ] initContainer tool (v0.3)
+  - [x] initContainer tool (v0.3)
 - [ ] OCI container registry support (v0.3)
   - [x] Goharbor support (v0.2)
   - [x] Multiple platforms image support (v0.2) 

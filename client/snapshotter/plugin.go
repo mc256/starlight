@@ -13,16 +13,19 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
+	slfs "github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/common"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	iofs "io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 //////////////////////////////////////////////////////////////////////
@@ -250,15 +253,24 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 		return nil, fmt.Errorf("failed to create snapshot: %w", err)
 	}
 
-	// create snapshot directories
-	if err = os.MkdirAll(s.getStarlightFS(ss.ID), 0755); err != nil {
-		return nil, err
+	// create starlight directory
+	slfsdir := s.getStarlightFS(ss.ID)
+	if _, err = os.Stat(slfsdir); err != nil && err.(*iofs.PathError).Err == syscall.ENOTCONN {
+		// if the directory exists, it means that the snapshot is already created
+		// or there is a problem unmounting the snapshot
+		// Transport endpoint is not connected
+		err = syscall.Unmount(slfsdir, slfs.UnmountFlag)
+		log.G(ctx).WithError(err).WithField("mnt", slfsdir).Warn("sn: cleanup disconnected mountpoint")
 	}
+	if err = os.MkdirAll(slfsdir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to create slfs directory %s", s.getStarlightFS(ss.ID))
+	}
+	// create overlayfs directories
 	if err = os.MkdirAll(s.getUpper(ss.ID), 0755); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to upper directory %s", s.getUpper(ss.ID))
 	}
 	if err = os.MkdirAll(s.getWork(ss.ID), 0711); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to work directory %s", s.getWork(ss.ID))
 	}
 
 	var inf snapshots.Info

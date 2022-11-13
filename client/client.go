@@ -379,15 +379,15 @@ func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
 // PullImage pulls an image from a registry and stores it in the content store
 // it also stores the manager in memory.
 // In case there exists another manager in memory, it removes it and re-pull the image
-func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, err error) {
+func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, closedReady bool, err error) {
 	// check local image
 	reqFilter := getImageFilter(ref)
 	img, err = c.findImage(reqFilter)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to check requested image %s", ref)
+		return nil, false, errors.Wrapf(err, "failed to check requested image %s", ref)
 	}
 	if img != nil {
-		return nil, fmt.Errorf("requested image %s already exists", ref)
+		return nil, false, fmt.Errorf("requested image %s already exists", ref)
 	}
 
 	// connect to proxy
@@ -405,7 +405,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// pull image
 	body, mSize, cSize, sSize, md, sld, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to pull image %s", ref)
+		return nil, false, errors.Wrapf(err, "failed to pull image %s", ref)
 	}
 	defer func() {
 		if body != nil {
@@ -455,45 +455,45 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// manifest
 	buf, err = c.readBody(body, mSize)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read manifest")
+		return nil, false, errors.Wrapf(err, "failed to read manifest")
 	}
 	manifest, man, err = c.handleManifest(buf)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to handle manifest")
+		return nil, false, errors.Wrapf(err, "failed to handle manifest")
 	}
 	err = c.storeManifest(pcn, md, ref,
 		manifest.Config.Digest.String(), sld,
 		man)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to store manifest")
+		return nil, false, errors.Wrapf(err, "failed to store manifest")
 	}
 
 	// config
 	buf, err = c.readBody(body, cSize)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read config")
+		return nil, false, errors.Wrapf(err, "failed to read config")
 	}
 	imageConfig, con, err = c.handleConfig(buf)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to handle config")
+		return nil, false, errors.Wrapf(err, "failed to handle config")
 	}
 	err = c.storeConfig(pcn, ref, manifest.Config.Digest, con)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to store config")
+		return nil, false, errors.Wrapf(err, "failed to store config")
 	}
 
 	// starlight header
 	buf, err = c.readBody(body, sSize)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read starlight header")
+		return nil, false, errors.Wrapf(err, "failed to read starlight header")
 	}
 	star, sta, err := c.handleStarlightHeader(buf)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to handle starlight header")
+		return nil, false, errors.Wrapf(err, "failed to handle starlight header")
 	}
 	err = c.storeStarlightHeader(pcn, ref, sld, sta)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to store starlight header")
+		return nil, false, errors.Wrapf(err, "failed to store starlight header")
 	}
 
 	// create image
@@ -531,12 +531,15 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// we should set optimizer before creating the filesystems
 	if c.defaultOptimizer {
 		if _, err = star.SetOptimizerOn(c.defaultOptimizeGroup); err != nil {
-			return nil, errors.Wrapf(err, "failed to enable optimizer")
+			log.G(c.ctx).
+				WithError(err).
+				Error("failed to set optimizer on")
+			return nil, false, errors.Wrapf(err, "failed to enable optimizer")
 		}
 	}
 
 	if err = star.PrepareDirectories(c); err != nil {
-		return nil, errors.Wrapf(err, "failed to initialize directories")
+		return nil, false, errors.Wrapf(err, "failed to initialize directories")
 	}
 
 	// 4. update in-memory layer map
@@ -544,7 +547,10 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// should unlock the managerMapLock before calling CreateSnapshot
 	var chainIds []digest.Digest
 	if chainIds, err = star.CreateSnapshots(c); err != nil {
-		return nil, errors.Wrapf(err, "failed to create snapshots")
+		log.G(c.ctx).
+			WithError(err).
+			Error("failed to create snapshots")
+		return nil, false, errors.Wrapf(err, "failed to create snapshots")
 	}
 
 	// ------------------------------------------------------------------------------------
@@ -553,12 +559,19 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// 5. Send signal
 	// Image is ready (content is still on the way)
 	close(*ready)
+	closedReady = true
 
 	// 6. Extract file content
 	// download content
+	log.G(c.ctx).
+		WithField("m", md).
+		Info("start decompressing content")
 	if err = star.Extract(&body); err != nil {
-		return nil, errors.Wrapf(err, "failed to extract starlight image")
+		return nil, true, errors.Wrapf(err, "failed to extract starlight image")
 	}
+	log.G(c.ctx).
+		WithField("m", md).
+		Info("content decompression completed")
 
 	// 7. Mark image as completed
 	// mark as completed
@@ -567,12 +580,12 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	// mark image as completed
 	ctrImg.Labels[util.ContentLabelCompletion] = t.Format(time.RFC3339)
 	if ctrImg, err = is.Update(c.ctx, ctrImg, "labels."+util.ContentLabelCompletion); err != nil {
-		return nil, errors.Wrapf(err, "failed to mark image as completed")
+		return nil, true, errors.Wrapf(err, "failed to mark image as completed")
 	}
 
 	// update garbage collection labels
 	if err = c.updateManifest(md, chainIds, t); err != nil {
-		return nil, errors.Wrapf(err, "failed to update manifest")
+		return nil, true, errors.Wrapf(err, "failed to update manifest")
 	}
 
 	return
@@ -933,13 +946,14 @@ func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.
 	}, nil
 }
 
-func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (*pb.ImagePullResponse, error) {
+func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (resp *pb.ImagePullResponse, err error) {
 	log.G(s.client.ctx).WithFields(logrus.Fields{
 		"base": ref.Base,
 		"ref":  ref.Reference,
 	}).Trace("grpc: pull image")
 
-	base, err := s.client.FindBaseImage(ref.Base, ref.Reference)
+	var base containerd.Image
+	base, err = s.client.FindBaseImage(ref.Base, ref.Reference)
 	if err != nil {
 		return &pb.ImagePullResponse{
 			Success: false,
@@ -953,14 +967,21 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 
 	ready := make(chan bool)
 	go func() {
-		_, err = s.client.PullImage(
+		var (
+			e      error
+			closed bool
+		)
+		defer func() {
+			if !closed {
+				close(ready)
+			}
+		}()
+		_, closed, e = s.client.PullImage(
 			base, ref.Reference,
 			platforms.DefaultString(), ref.ProxyConfig,
 			&ready)
-		if err != nil {
-			log.G(s.client.ctx).WithError(err).Errorf("failed to pull image")
-			close(ready)
-			return
+		if e != nil {
+			log.G(s.client.ctx).WithError(e).Errorf("failed to pull image")
 		}
 	}()
 
@@ -973,8 +994,9 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 
 	if err != nil {
 		return &pb.ImagePullResponse{
-			Success: false,
-			Message: err.Error(),
+			Success:   false,
+			Message:   err.Error(),
+			BaseImage: baseImage,
 		}, nil
 	}
 

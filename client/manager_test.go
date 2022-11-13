@@ -251,7 +251,7 @@ func TestManager_NewStarlightFSMultiple3(t *testing.T) {
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
 	m.Init(ctx, cfg, true, nil, nil, md)
-	err = m.SetOptimizerOn("default")
+	_, err = m.SetOptimizerOn("default")
 	if err != nil {
 		t.Error(err)
 		return

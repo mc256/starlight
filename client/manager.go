@@ -406,7 +406,7 @@ func (m *Manager) NewStarlightFS(mount string, stack int64, options *fusefs.Opti
 	if f, has = m.fs[stack]; has {
 		_ = f.Teardown()
 	}
-	f, err = fs.NewInstance(m, m.fileLookUpMap[stack]["."], stack, mount, options, debug)
+	f, err = fs.NewInstance(m.ctx, m, m.fileLookUpMap[stack]["."], stack, mount, options, debug)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create new filesystem instance")
 	}
