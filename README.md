@@ -42,11 +42,25 @@ The development and operational pipelines remain unchanged.
 ## Architecture
 Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
 * A **proxy** server on the cloud side mediates between Starlight workers and any standard registry server.
-* On the worker side, a **command line tool** tells Starlight to PULL, CREATE, and START containers.
-* A **Starlight snapshotter plugin** runs inside the containerd snapshotter dameon of each worker node. It receives user commands and implements them.
-* Instead of OverlayFS, Starlight uses an efficient **FUSE-based filesystem** on worker nodes.
+* On the worker side, a **command line tool** tells Starlight to PULL containers.
+* A **Starlight daemon** (snapshotter plugin) runs belongs the containerd of each worker node.
 
 ## Getting Started
+
+### Kubernetes
+
+Starlight is compatible with Kubernetes and can replace the default `overlayfs` snapshotter.
+While deploying a container, we can use **Starlight CLI** as an `initContainer` to pull the container from the proxy.
+
+
+
+
+### Google Cloud Shell
+
+
+
+### The Hard Way 
+
 
 [TL;DR?](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
 
