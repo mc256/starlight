@@ -69,6 +69,7 @@ func (bo ByAccessTimeOptimized) Swap(i, j int) {
 	bo[i], bo[j] = bo[j], bo[i]
 }
 
+// Tracer collects filesystem access traces. It should belongs to a manager.
 type Tracer struct {
 	ctx context.Context
 
@@ -77,6 +78,7 @@ type Tracer struct {
 	OptimizeGroup string    `json:"group"`
 	Image         string    `json:"image"`
 	StartTime     time.Time `json:"start"`
+	EndTime       time.Time `json:"end"`
 	logPath       string
 	fh            *os.File
 	mtx           *sync.Mutex
@@ -97,22 +99,23 @@ func (t *Tracer) Log(fileName string, stack int64, accessTime, completeTime time
 	t.Seq = append(t.Seq, &item)
 }
 
-func (t *Tracer) Close() error {
+func (t *Tracer) Close() (time.Duration, error) {
 	t.mtx.Lock()
 	defer t.mtx.Unlock()
 
 	sort.Sort(ByAccessTime(t.Seq))
+	t.EndTime = time.Now()
 
 	b, _ := json.Marshal(t)
 	_, _ = t.fh.Write(b)
 
 	log.G(t.ctx).WithFields(logrus.Fields{
-		"optimizeGroup": t.OptimizeGroup,
-		"digest":        t.Image,
-		"logPath":       t.logPath,
+		"group":  t.OptimizeGroup,
+		"digest": t.Image,
+		"path":   t.logPath,
 	}).Info("tracer: stopped")
 
-	return t.fh.Close()
+	return t.EndTime.Sub(t.StartTime), t.fh.Close()
 }
 
 func NewTracer(ctx context.Context, optimizeGroup, digest, outputDir string) (*Tracer, error) {
@@ -120,7 +123,7 @@ func NewTracer(ctx context.Context, optimizeGroup, digest, outputDir string) (*T
 	if err != nil {
 		return nil, err
 	}
-	logPath := path.Join(outputDir, fmt.Sprintf("%s.json", util.GetRandomId("trace-")))
+	logPath := path.Join(outputDir, fmt.Sprintf("%s.json", util.GetRandomId("trace")))
 
 	fh, err := os.Create(logPath)
 	if err != nil {
@@ -128,9 +131,9 @@ func NewTracer(ctx context.Context, optimizeGroup, digest, outputDir string) (*T
 	}
 
 	log.G(ctx).WithFields(logrus.Fields{
-		"optimizeGroup": optimizeGroup,
-		"digest":        digest,
-		"logPath":       logPath,
+		"group":  optimizeGroup,
+		"digest": digest,
+		"path":   logPath,
 	}).Info("tracer: started")
 
 	return &Tracer{
@@ -184,6 +187,7 @@ func clearTraceCollection(f string) error {
 	return os.Remove(f)
 }
 
+// NewTraceCollection create a new trace collection with multiple optimize groups
 func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error) {
 	files, err := ioutil.ReadDir(p)
 	if err != nil {
@@ -195,17 +199,25 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 		Groups:    make([]*OptimizedGroup, 0),
 	}
 
+	log.G(ctx).
+		WithField("dir", p).
+		Debug("tracer: loading traces")
+
 	for _, f := range files {
 		if path.Ext(f.Name()) == ".json" {
 			buf, err := ioutil.ReadFile(path.Join(p, f.Name()))
 			if err != nil {
-				log.G(ctx).WithField("file", f.Name()).Error("cannot read file")
+				log.G(ctx).
+					WithField("file", f.Name()).
+					Warn("tracer: cannot read file")
 				continue
 			}
 			var t Tracer
 			err = json.Unmarshal(buf, &t)
 			if err != nil {
-				log.G(ctx).WithField("file", f.Name()).Error("cannot parse file")
+				log.G(ctx).
+					WithField("file", f.Name()).
+					Warn("tracer: cannot parse file")
 				continue
 			}
 
@@ -213,7 +225,7 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 				"file":  f.Name(),
 				"group": t.OptimizeGroup,
 				"image": t.Image,
-			}).Info("parsed file")
+			}).Debug("tracer: parsed file")
 
 			_ = clearTraceCollection(path.Join(p, f.Name()))
 

@@ -26,6 +26,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -56,8 +57,10 @@ type Manager struct {
 
 	fileLookUpMap []map[string]fs.ReceivedFile
 
-	tracer *fs.Tracer
-	fs     map[int64]*fs.Instance
+	tracerLock sync.Mutex
+	tracer     *fs.Tracer
+
+	fs map[int64]*fs.Instance
 }
 
 func (m *Manager) String() string {
@@ -93,6 +96,8 @@ func (m *Manager) LookUpFile(stack int64, filename string) fs.ReceivedFile {
 }
 
 func (m *Manager) LogTrace(stack int64, filename string, access, complete time.Time) {
+	m.tracerLock.Lock()
+	defer m.tracerLock.Unlock()
 	if m.tracer != nil {
 		m.tracer.Log(filename, stack, access, complete)
 	}
@@ -105,12 +110,15 @@ func (m *Manager) getPathBySerial(serial int64) string {
 	panic("layer not found")
 }
 
-func (m *Manager) Extract(r *io.ReadCloser) error {
+func (m *Manager) Extract(r *io.ReadCloser) (err error) {
 	start := time.Now()
 	if r == nil {
 		return fmt.Errorf("cannot call extract if it has completed")
 	}
 
+	var (
+		p, pp string
+	)
 	// Extract Contents
 	for i, c := range m.Contents {
 		// skip the layer if it already exists
@@ -126,36 +134,48 @@ func (m *Manager) Extract(r *io.ReadCloser) error {
 		}
 
 		// regular extraction
-		p := m.GetPathByStack(c.Stack)
+		p = m.GetPathByStack(c.Stack)
 		if err := os.MkdirAll(filepath.Join(p, c.GetBaseDir()), 0755); err != nil {
 			return errors.Wrapf(err, "failed to create directory %s", filepath.Join(p, c.GetBaseDir()))
 		}
-		f, err := os.Create(filepath.Join(p, c.GetPath()))
-		isClosed := false
-		defer func() {
-			if !isClosed {
-				f.Close()
-			}
-		}()
-		if err != nil {
-			return errors.Wrapf(err, "failed to create file %s", filepath.Join(p, c.GetPath()))
-		}
-		for idx, ch := range c.Chunks {
-			b := bytes.NewBuffer(make([]byte, 0, ch.CompressedSize))
-			if n, err := io.CopyN(b, *r, ch.CompressedSize); err != nil || n != ch.CompressedSize {
-				return errors.Wrapf(err, "failed to read content %d-%d at %d", i, idx, c.Offset)
-			}
-			gr, err := gzip.NewReader(b)
+		pp = c.GetPath()
+		err = func() error {
+			f, err := os.Create(filepath.Join(p, pp))
+			isClosed := false
+			defer func() {
+				if !isClosed {
+					_ = f.Close()
+				}
+			}()
 			if err != nil {
-				return errors.Wrapf(err, "failed to create gzip reader for content %d-%d at %d", i, idx, c.Offset)
+				return errors.Wrapf(err, "failed to create file %s", filepath.Join(p, c.GetPath()))
 			}
-			if _, err := io.CopyN(f, gr, ch.ChunkSize); err != nil {
-				return errors.Wrapf(err, "failed to write content %d-%d at %d", i, idx, c.Offset)
+			for idx, ch := range c.Chunks {
+				b := bytes.NewBuffer(make([]byte, 0, ch.CompressedSize))
+				if n, err := io.CopyN(b, *r, ch.CompressedSize); err != nil || n != ch.CompressedSize {
+					return errors.Wrapf(err, "failed to read content %d-%d at %d", i, idx, c.Offset)
+				}
+				gr, err := gzip.NewReader(b)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create gzip reader for content %d-%d at %d", i, idx, c.Offset)
+				}
+				if _, err := io.CopyN(f, gr, ch.ChunkSize); err != nil {
+					return errors.Wrapf(err, "failed to write content %d-%d at %d", i, idx, c.Offset)
+				}
 			}
+			_ = f.Close()
+			isClosed = true
+			close(c.Signal) // send out signal that this content is ready
+			return nil
+		}()
+
+		if err != nil {
+			return err
 		}
-		f.Close()
-		isClosed = true
-		close(c.Signal) // send out signal that this content is ready
+		log.G(m.ctx).
+			WithField("l", p).
+			WithField("f", pp).
+			Trace("extracted")
 	}
 
 	complete := time.Now()
@@ -212,11 +232,17 @@ func (m *Manager) CreateSnapshots(c *Client) (chainIds []digest.Digest, err erro
 		d := m.layers[m.stackSerialMap[idx]].Hash
 
 		idx := idx
-		go func() {
+		func() {
 			c.layerMapLock.Lock()
 			defer c.layerMapLock.Unlock()
 
-			if _, has := c.layerMap[d]; !has {
+			if mp, has := c.layerMap[d]; has {
+				if mp.manager == nil {
+					// this must be loaded from the local storage
+					mp.manager = m
+					mp.stack = int64(idx)
+				}
+			} else {
 				c.layerMap[d] = &mountPoint{
 					fs:      nil,
 					manager: m,
@@ -331,27 +357,42 @@ func (m *Manager) Init(ctx context.Context, cfg *Configuration, ready bool,
 	}
 }
 
-func (m *Manager) SetOptimizerOn(optimizeGroup string) (err error) {
+func (m *Manager) SetOptimizerOn(optimizeGroup string) (starTime time.Time, err error) {
+	m.tracerLock.Lock()
+	defer m.tracerLock.Unlock()
+
 	if m.tracer == nil {
 		log.G(m.ctx).Debug("manager: start tracer")
 		m.tracer, err = fs.NewTracer(m.ctx, optimizeGroup, m.manifestDigest.String(), m.cfg.TracesDir)
 	}
-	return
+	if err != nil {
+		return time.Time{}, err
+	}
+	return m.tracer.StartTime, nil
 }
 
-func (m *Manager) SetOptimizerOff() (err error) {
+func (m *Manager) SetOptimizerOff() (duration time.Duration, err error) {
+	m.tracerLock.Lock()
+	defer m.tracerLock.Unlock()
+
 	if m.tracer != nil {
 		log.G(m.ctx).Debug("manager: stop tracer")
-		err = m.tracer.Close()
+		duration, err = m.tracer.Close()
+		if err != nil {
+			return time.Duration(0), err
+		}
 		m.tracer = nil
 	}
-	return
+	return duration, nil
 }
 
 func (m *Manager) Teardown() {
+	m.tracerLock.Lock()
+	defer m.tracerLock.Unlock()
+
 	if m.tracer != nil {
 		log.G(m.ctx).Debug("manager: stop tracer")
-		_ = m.tracer.Close()
+		_, _ = m.tracer.Close()
 	}
 	for _, v := range m.fs {
 		log.G(m.ctx).WithField("mnt", v.GetMountPoint()).Debug("manager: unmounting filesystem")

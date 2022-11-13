@@ -116,100 +116,95 @@ func (a *Server) scanner(w http.ResponseWriter, req *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func (a *Server) starlight(w http.ResponseWriter, req *http.Request) {
+func (a *Server) delta(w http.ResponseWriter, req *http.Request) {
 	ip := a.getIpAddress(req)
 	q := req.URL.Query()
-	action := q.Get("action")
+	log.G(a.ctx).WithFields(logrus.Fields{"action": "delta", "ip": ip}).Info("request received")
 
-	log.G(a.ctx).WithFields(logrus.Fields{"action": action, "ip": ip}).Info("request received")
-
-	switch action {
-	case "delta-image":
-		f, t, plt := q.Get("from"), q.Get("to"), q.Get("platform")
-		if t == "" || plt == "" {
-			a.error(w, req, "missing parameters")
-			return
-		}
-
-		b, err := NewBuilder(a, f, t, plt)
-		if err != nil {
-			a.error(w, req, err.Error())
-			return
-		}
-
-		if err = b.Load(); err != nil {
-			a.error(w, req, err.Error())
-			return
-		}
-
-		if err = b.WriteHeader(w, req); err != nil {
-			log.G(a.ctx).WithError(err).Error("failed to write delta image header")
-			return
-		}
-		if err = b.WriteBody(w, req); err != nil {
-			log.G(a.ctx).WithError(err).Error("failed to write delta image body")
-			return
-		}
+	f, t, plt := q.Get("from"), q.Get("to"), q.Get("platform")
+	if t == "" || plt == "" {
+		a.error(w, req, "missing parameters")
 		return
-
-	case "notify":
-		i := q.Get("ref")
-		if i == "" {
-			a.error(w, req, "missing parameters")
-			return
-		}
-
-		extractor, err := NewExtractor(a, i)
-		if err != nil {
-			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
-			a.error(w, req, err.Error())
-			return
-		}
-
-		res, err := extractor.SaveToC()
-		if err != nil {
-			log.G(a.ctx).WithError(err).Error("failed to cache ToC")
-			a.error(w, req, err.Error())
-			return
-		}
-
-		log.G(a.ctx).WithField("container", i).Info("cached ToC")
-		a.respond(w, req, res)
-		return
-
-	case "report-traces":
-		tc, err := fs.NewTraceCollectionFromBuffer(req.Body)
-		if err != nil {
-			log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
-			a.error(w, req, err.Error())
-			return
-		}
-
-		arr, err := a.db.UpdateFileRanks(tc)
-		if err != nil {
-			log.G(a.ctx).WithError(err).Info("cannot update file ranks")
-			a.error(w, req, err.Error())
-			return
-		}
-
-		log.G(a.ctx).
-			WithField("ip", ip).
-			WithField("layers", arr).
-			Info("received traces")
-
-		a.respond(w, req, &ApiResponse{
-			Status:  "OK",
-			Code:    http.StatusOK,
-			Message: "Starlight Proxy",
-		})
-
-		return
-
-	default:
-		a.error(w, req, "unknown action ('delta-image', 'notify' or 'report-traces' expected)")
 	}
 
-	a.error(w, req, "missing parameter")
+	b, err := NewBuilder(a, f, t, plt)
+	if err != nil {
+		a.error(w, req, err.Error())
+		return
+	}
+
+	if err = b.Load(); err != nil {
+		a.error(w, req, err.Error())
+		return
+	}
+
+	if err = b.WriteHeader(w, req); err != nil {
+		log.G(a.ctx).WithError(err).Error("failed to write delta image header")
+		return
+	}
+	if err = b.WriteBody(w, req); err != nil {
+		log.G(a.ctx).WithError(err).Error("failed to write delta image body")
+		return
+	}
+}
+
+func (a *Server) notify(w http.ResponseWriter, req *http.Request) {
+	ip := a.getIpAddress(req)
+	q := req.URL.Query()
+	log.G(a.ctx).WithFields(logrus.Fields{"action": "notify", "ip": ip}).Info("request received")
+
+	i := q.Get("ref")
+	if i == "" {
+		a.error(w, req, "missing parameters")
+		return
+	}
+
+	extractor, err := NewExtractor(a, i)
+	if err != nil {
+		log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+		a.error(w, req, err.Error())
+		return
+	}
+
+	res, err := extractor.SaveToC()
+	if err != nil {
+		log.G(a.ctx).WithError(err).Error("failed to cache ToC")
+		a.error(w, req, err.Error())
+		return
+	}
+
+	log.G(a.ctx).WithField("container", i).Info("cached ToC")
+	a.respond(w, req, res)
+}
+
+func (a *Server) report(w http.ResponseWriter, req *http.Request) {
+	ip := a.getIpAddress(req)
+	log.G(a.ctx).WithFields(logrus.Fields{"action": "report", "ip": ip}).Info("request received")
+
+	tc, err := fs.NewTraceCollectionFromBuffer(req.Body)
+	if err != nil {
+		log.G(a.ctx).WithError(err).Info("cannot parse trace collection")
+		a.error(w, req, err.Error())
+		return
+	}
+
+	arr, err := a.db.UpdateFileRanks(tc)
+	if err != nil {
+		log.G(a.ctx).WithError(err).Info("cannot update file ranks")
+		a.error(w, req, err.Error())
+		return
+	}
+
+	log.G(a.ctx).
+		WithField("ip", ip).
+		WithField("layers", arr).
+		Info("received traces")
+
+	a.respond(w, req, &ApiResponse{
+		Status:  "OK",
+		Code:    http.StatusOK,
+		Message: "Starlight Proxy",
+	})
 }
 
 func (a *Server) error(w http.ResponseWriter, req *http.Request, reason string) {
@@ -274,7 +269,9 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 
 	// create router
 	http.HandleFunc("/scanner", server.scanner)
-	http.HandleFunc("/starlight", server.starlight)
+	http.HandleFunc("/starlight/delta", server.delta)
+	http.HandleFunc("/starlight/notify", server.notify)
+	http.HandleFunc("/starlight/report", server.report)
 	http.HandleFunc("/health-check", server.healthCheck)
 	http.HandleFunc("/", server.root)
 

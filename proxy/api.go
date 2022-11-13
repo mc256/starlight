@@ -106,11 +106,10 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
-		Path:   path.Join("starlight"),
+		Path:   path.Join("starlight", "notify"),
 	}
 	q := u.Query()
 	q.Set("ref", ref.String())
-	q.Set("action", "notify")
 	u.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
 	if pwd, isSet := a.auth.Password(); isSet {
@@ -163,13 +162,12 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
-		Path:   path.Join("starlight"),
+		Path:   path.Join("starlight", "delta"),
 	}
 	q := u.Query()
 	q.Set("from", from)
 	q.Set("to", to)
 	q.Set("platform", platform)
-	q.Set("action", "delta-image")
 	u.RawQuery = q.Encode()
 
 	log.G(a.ctx).WithFields(logrus.Fields{
@@ -190,6 +188,18 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	}
 
 	version := resp.Header.Get("Starlight-Version")
+	if resp.StatusCode == 400 {
+		response, _ := ioutil.ReadAll(resp.Body)
+		e := strings.TrimSpace(string(response))
+		log.G(a.ctx).
+			WithFields(logrus.Fields{
+				"code":     fmt.Sprintf("%d", resp.StatusCode),
+				"version":  version,
+				"response": e,
+			}).
+			Error("server error")
+		return nil, 0, 0, 0, "", "", fmt.Errorf(e)
+	}
 	if resp.StatusCode != 200 || version == "" {
 		response, err := ioutil.ReadAll(resp.Body)
 		log.G(a.ctx).
@@ -243,11 +253,8 @@ func (a *StarlightProxy) Report(body io.Reader) error {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
-		Path:   path.Join("starlight"),
+		Path:   path.Join("starlight", "report"),
 	}
-	q := u.Query()
-	q.Set("action", "report-traces")
-	u.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), body)
 	if pwd, isSet := a.auth.Password(); isSet {
 		req.SetBasicAuth(a.auth.Username(), pwd)

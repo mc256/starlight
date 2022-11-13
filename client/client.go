@@ -407,7 +407,14 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to pull image %s", ref)
 	}
-	defer body.Close()
+	defer func() {
+		if body != nil {
+			err = body.Close()
+			if err != nil {
+				log.G(c.ctx).WithError(err).Errorf("failed to close body")
+			}
+		}
+	}()
 
 	log.G(c.ctx).
 		WithField("manifest", mSize).
@@ -417,6 +424,8 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		WithField("sl_digest", sld).
 		Infof("pulling image %s", ref)
 
+	// 1. check manager in memory, if it exists, remove it and re-pull the image
+	// (This behavior is different from LoadImage() which does not remove the manager in memory)
 	c.managerMapLock.Lock()
 	release := false
 	defer func() {
@@ -442,6 +451,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		imageConfig *v1.Image
 	)
 
+	// 2. load manifest, config, and starlight header
 	// manifest
 	buf, err = c.readBody(body, mSize)
 	if err != nil {
@@ -505,19 +515,22 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	})
 	log.G(c.ctx).WithField("image", ctrImg.Name).Debugf("created image")
 
+	// 3. create manager
 	// keep going and download layers
 	star.Init(c.ctx, c.cfg, false, manifest, imageConfig, mdd)
 
 	// create manager
 	c.managerMap[md] = star
-	log.G(c.ctx).WithField("manifest", md).Debugf("client: added manager")
+	log.G(c.ctx).
+		WithField("manifest", md).
+		Info("client: added manager")
 	release = true
 	c.managerMapLock.Unlock()
 
 	// check optimizer
 	// we should set optimizer before creating the filesystems
 	if c.defaultOptimizer {
-		if err = star.SetOptimizerOn(c.defaultOptimizeGroup); err != nil {
+		if _, err = star.SetOptimizerOn(c.defaultOptimizeGroup); err != nil {
 			return nil, errors.Wrapf(err, "failed to enable optimizer")
 		}
 	}
@@ -526,6 +539,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		return nil, errors.Wrapf(err, "failed to initialize directories")
 	}
 
+	// 4. update in-memory layer map
 	// Create Snapshots
 	// should unlock the managerMapLock before calling CreateSnapshot
 	var chainIds []digest.Digest
@@ -533,14 +547,20 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 		return nil, errors.Wrapf(err, "failed to create snapshots")
 	}
 
+	// ------------------------------------------------------------------------------------
+	// LoadImage() does not have the following code
+	//
+	// 5. Send signal
 	// Image is ready (content is still on the way)
 	close(*ready)
 
+	// 6. Extract file content
 	// download content
 	if err = star.Extract(&body); err != nil {
 		return nil, errors.Wrapf(err, "failed to extract starlight image")
 	}
 
+	// 7. Mark image as completed
 	// mark as completed
 	t := time.Now()
 
@@ -562,6 +582,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 // if it is in memory, return manager directly.
 //
 // This method should not use any snapshotter methods to avoid recursive lock.
+// This method is similar to PullImage, but it only uses content store.
 func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error) {
 
 	var (
@@ -572,7 +593,7 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 		star Manager
 	)
 
-	// manager cache
+	// 1. check manager in memory
 	c.managerMapLock.Lock()
 	defer c.managerMapLock.Unlock()
 
@@ -594,6 +615,7 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 
 	starlight := digest.Digest(ii.Labels[fmt.Sprintf("%s.starlight", util.ContentLabelContainerdGC)])
 
+	// 2. load manifest, config, and starlight header
 	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: manifest}); err != nil {
 		return nil, err
 	}
@@ -615,12 +637,23 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 		return nil, err
 	}
 
+	// 3. create manager
 	star.Init(c.ctx, c.cfg, true, man, cfg, manifest)
 
 	// save to cache
 	c.managerMap[manifest.String()] = &star
-	log.G(c.ctx).WithField("manifest", manifest.String()).Debugf("client: added manager")
+	log.G(c.ctx).
+		WithField("manifest", manifest.String()).
+		Info("client: added manager")
 
+	// set optimizer
+	if c.defaultOptimizer {
+		if _, err = star.SetOptimizerOn(c.defaultOptimizeGroup); err != nil {
+			return nil, errors.Wrapf(err, "failed to enable optimizer")
+		}
+	}
+
+	// 4. update in-memory layer map
 	// update layerMap
 	c.layerMapLock.Lock()
 	defer c.layerMapLock.Unlock()
@@ -954,38 +987,46 @@ func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.Opt
 		"enable": req.Enable,
 	}).Trace("grpc: set optimizer")
 
+	s.client.optimizerLock.Lock()
+	defer s.client.optimizerLock.Unlock()
+
+	s.client.managerMapLock.Lock()
+	defer s.client.managerMapLock.Unlock()
+
 	if req.Enable {
-		s.client.optimizerLock.Lock()
-		defer s.client.optimizerLock.Unlock()
 
 		s.client.defaultOptimizer = true
 		s.client.defaultOptimizeGroup = req.Group
 
-		s.client.layerMapLock.Lock()
-		defer s.client.layerMapLock.Unlock()
-
-		for _, layer := range s.client.layerMap {
-			if err := layer.manager.SetOptimizerOn(req.Group); err == nil {
-				okRes[layer.manager.manifestDigest.String()] = time.Now().Format(time.RFC3339)
+		for d, m := range s.client.managerMap {
+			if st, err := m.SetOptimizerOn(req.Group); err != nil {
+				log.G(s.client.ctx).
+					WithField("group", req.Group).
+					WithField("md", d).
+					WithField("start", st).
+					WithError(err).
+					Error("failed to set optimizer on")
+				failRes[d] = err.Error()
 			} else {
-				failRes[layer.manager.manifestDigest.String()] = err.Error()
+				okRes[d] = time.Now().Format(time.RFC3339)
 			}
 		}
+
 	} else {
-		s.client.optimizerLock.Lock()
-		defer s.client.optimizerLock.Unlock()
 
 		s.client.defaultOptimizer = false
 		s.client.defaultOptimizeGroup = ""
 
-		s.client.layerMapLock.Lock()
-		defer s.client.layerMapLock.Unlock()
-
-		for _, layer := range s.client.layerMap {
-			if err := layer.manager.SetOptimizerOff(); err == nil {
-				okRes[layer.manager.manifestDigest.String()] = time.Now().Format(time.RFC3339)
+		for d, m := range s.client.managerMap {
+			if et, err := m.SetOptimizerOff(); err != nil {
+				log.G(s.client.ctx).
+					WithField("md", d).
+					WithField("duration", et).
+					WithError(err).
+					Error("failed to set optimizer off")
+				failRes[d] = err.Error()
 			} else {
-				failRes[layer.manager.manifestDigest.String()] = err.Error()
+				okRes[d] = fmt.Sprintf("collected %.3fs file access traces", et.Seconds())
 			}
 		}
 	}
