@@ -47,22 +47,12 @@ Starlight is implemented on top of **containerd**. It it comprised of cloud and 
 
 ## Getting Started
 
-### Kubernetes
 
 Starlight is compatible with Kubernetes and can replace the default `overlayfs` snapshotter.
-While deploying a container, we can use **Starlight CLI** as an `initContainer` to pull the container from the proxy.
+We could use helm to deploy Starlight on a Kubernetes cluster.
 
-
-
-
-### Google Cloud Shell
-
-
-
-### The Hard Way 
-
-
-[TL;DR?](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
+- [I am familiar with K8s & Helm. TL;DR](https://github.com/mc256/starlight/blob/master/docs/helm.md)
+- [I have 2 Virtual Machines, but TL;DR](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
 
 Suppose you have a container on a [OCI compatible **registry**](https://github.com/distribution/distribution) that you want to deploy.
 You need to:
@@ -87,7 +77,9 @@ and starting the Starlight snapshotter daemon
    The Starlight format is **backwards compatible** and almost the same size, so there is no need to store compressed layers twice. In other words, non-Starlight workers will descrompress Starlight images with no chanages.
    The **Starlight CLI tool** features the image conversion, example:
    ```shell
-    ctr-starlight convert --notify harbor.yuri.moe/public/redis:6.2.7 harbor.yuri.moe/starlight/redis:6.2.7
+    ctr-starlight convert --notify \
+      --platform=linux/amd64 \
+      docker.io/library/redis:6.2.7 harbor.yuri.moe/x/redis:6.2.7
    ```
     In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment. 
     The `--nofity` flag tells the proxy to fetch the metadata from the registry and store it in the metadata database.
@@ -99,24 +91,23 @@ and starting the Starlight snapshotter daemon
    The **Starlight CLI tool** features trace collection, example:
    ```shell
    sudo ctr-starlight optimizer on
-   sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:6.2.7 && \
-   mkdir /tmp/test-redis-data && \
-   sudo ctr create --snapshotter=starlight \
-        --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-        --env-file ./demo/config/all.env --net-host \
-        harbor.yuri.moe/starlight/redis:6.2.7
+   sudo ctr-starlight pull harbor.yuri.moe/x/redis:6.2.7 && \
+   mkdir /tmp/redis-data && \
+   sudo ctr c create --snapshotter=starlight \
+        --mount type=bind,src=/tmp/redis-data,dst=/data,options=rbind:rw \
+        --env-file ./demo/config/all.env --network=host \
+        harbor.yuri.moe/x/redis:6.2.7
         instance1 && \
-   sudo ctr task start instance1
+   sudo ctr t start instance1
    ```
    
-   You may terminate the container using `Ctrl-C`, and remove the container:
-   ```shell
-   sudo ctr container rm instance1
-   ```
-   
-   After finished running the container several times, then we can report all the traces to the proxy, using:
+   You may terminate the container using `Ctrl-C` and turn off the optimizer using 
    ```shell
    sudo ctr-starlight optimizer off
+   ```
+   
+   We could repeat this process several times, then can report all the traces to the proxy, using:
+   ```shell
    sudo ctr-starlight report
    ```
 
@@ -136,28 +127,35 @@ Start a container using Starlight
 ```shell
 sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:6.2.7 && \
 mkdir /tmp/test-redis-data && \
-sudo ctr container create --snapshotter=starlight \
+sudo ctr c create \
+    --snapshotter=starlight \
     --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
     --env-file ./demo/config/all.env \
     --net-host \
     harbor.yuri.moe/x/redis:6.2.7 \
     instance3 && \
-sudo ctr task start instance3
+sudo ctr t start instance3
 ```
 
 Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:7.0.5`)
 ```shell
 sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:7.0.5 && \
-sudo ctr container create --snapshotter=starlight  \
+sudo ctr c create \
+    --snapshotter=starlight  \
     --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
     --env-file ./demo/config/all.env \
     --net-host \
-    harbor.yuri.moe/starlight/redis:7.0.5 \
+    harbor.yuri.moe/x/redis:7.0.5 \
     instance4 && \
-sudo ctr task start instance4
+sudo ctr t start instance4
 ```
 
-For more information, please check out `ctr-starlight --help` and `starlight-grpc --help`
+For more information, please check out `ctr-starlight --help` and `starlight-daemon --help`
+
+## Testing Server 
+
+If you don't want to set up your own proxy server, you can use our testing server.
+
 
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
