@@ -152,7 +152,7 @@ cd starlight
 
 Build the snapshotter plugin and CLI tool
 ```shell
-make build-starlight-grpc build-ctr-starlight
+make starlight-grpc ctr-starlight
 ```
 
 ### 4. Configure Starlight Snapshotter

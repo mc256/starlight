@@ -9,40 +9,47 @@ VERSIONNUMBER=$(shell echo $(VERSION) | sed 's/v//g')
 COMPILEDATE=$(shell date +%Y%m%d)
 
 
-.PHONY: build clean build-starlight-proxy build-starlight-daemon build-ctr-starlight
+.PHONY: build clean starlight-proxy starlight-daemon ctr-starlight
 .SILENT: install-systemd-service
 
 ######################################################################
 # Build
 ######################################################################
 .PHONY: build
-build: build-starlight-proxy build-starlight-daemon build-ctr-starlight
+build: starlight-proxy starlight-daemon ctr-starlight
 
-.PHONY: build-starlight-proxy
-build-starlight-proxy:
+.PHONY: starlight-proxy
+starlight-proxy:
 	-mkdir ./out 2>/dev/null | true
 	go mod tidy
 	go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
 
-.PHONY: build-starlight-daemon
-build-starlight-daemon:
+.PHONY: starlight-daemon
+starlight-daemon:
 	-mkdir ./out 2>/dev/null | true
 	go build -o ./out/starlight-daemon ./cmd/starlight-daemon/main.go
 
-.PHONY: build-ctr-starlight
-build-ctr-starlight:
+.PHONY: ctr-starlight
+ctr-starlight:
 	-mkdir ./out 2>/dev/null | true
 	go build -o ./out/ctr-starlight ./cmd/ctr-starlight/main.go
 
-.PHONY: build-starlight-proxy-for-alpine
-build-starlight-proxy-for-alpine:
+.PHONY: ctr-starlight-for-alpine
+ctr-starlight-for-alpine:
+	-mkdir ./out 2>/dev/null | true
+	go mod vendor
+	go mod tidy
+	$(COMMONENVVAR) $(BUILDENVVAR)	go build -o ./out/ctr-starlight ./cmd/ctr-starlight/main.go
+
+.PHONY: starlight-proxy-for-alpine
+starlight-proxy-for-alpine:
 	-mkdir ./out 2>/dev/null | true
 	go mod vendor
 	go mod tidy
 	$(COMMONENVVAR) $(BUILDENVVAR) go build -o ./out/starlight-proxy ./cmd/starlight-proxy/main.go
 
-.PHONY: build-helm-package
-build-helm-package:
+.PHONY: helm-package
+helm-package:
 	helm package ./demo/chart --version $(VERSIONNUMBER) -d /tmp
 
 .PHONY: push-helm-package
@@ -63,7 +70,7 @@ generate-changelog:
 	sh -c ./demo/deb-package/generate-changelog.sh > ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/changelog
 
 .PHONY: create-deb-package
-create-deb-package: change-version-number set-production build-starlight-daemon build-ctr-starlight generate-changelog
+create-deb-package: change-version-number set-production starlight-daemon ctr-starlight generate-changelog
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/ 2>/dev/null | true
 	cp -r ./demo/deb-package/debian ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/starlight/usr/bin/ 2>/dev/null | true
@@ -93,7 +100,7 @@ create-deb-package.amd64: create-deb-package
 
 
 .PHONY: create-deb-package.armv6l
-create-deb-package.armv6l: change-version-number set-production build-starlight-daemon build-ctr-starlight generate-changelog
+create-deb-package.armv6l: change-version-number set-production starlight-daemon ctr-starlight generate-changelog
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/ 2>/dev/null | true
 	cp -r ./demo/deb-package/debian ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/starlight/usr/bin/ 2>/dev/null | true
@@ -110,7 +117,7 @@ create-deb-package.armv6l: change-version-number set-production build-starlight-
 	dpkg-deb --info ./sandbox/starlight_$(VERSIONNUMBER)_armhf.deb
 
 .PHONY: create-deb-package.arm64
-create-deb-package.arm64: change-version-number set-production build-starlight-daemon build-ctr-starlight generate-changelog
+create-deb-package.arm64: change-version-number set-production starlight-daemon ctr-starlight generate-changelog
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/ 2>/dev/null | true
 	cp -r ./demo/deb-package/debian ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/
 	mkdir -p ./sandbox/starlight-$(VERSIONNUMBER)-$(COMPILEDATE)/debian/starlight/usr/bin/ 2>/dev/null | true
@@ -191,4 +198,5 @@ install-systemd-service:
 	#systemctl daemon-reload
 
 docker-image:
-	docker build -t harbor.yuri.moe/public/starlight-proxy:latest -f Dockerfile .
+	docker build -t harbor.yuri.moe/public/starlight-proxy:latest -f Dockerfile --target starlight-proxy .
+	docker build -t harbor.yuri.moe/public/starlight-cli:latest -f Dockerfile --target starlight-cli .

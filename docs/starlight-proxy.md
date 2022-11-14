@@ -176,7 +176,7 @@ cd starlight
 
 5. Build Starlight proxy
 ```shell
-make build-starlight-proxy
+make starlight-proxy
 ```
 
 6. Run Starlight
