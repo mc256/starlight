@@ -2,9 +2,50 @@
 nameOverride: ""
 fullnameOverride: ""
 
+########################################################################
+# CLOUD
+########################################################################
 # Image pull information
 starlightProxy:
   repository: "ghcr.io/mc256/starlight/proxy"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+  # dbConnection specify
+  # For example: "postgres://postgres:postgres@postgres:5432/starlight?sslmode=disable"
+  # if left blank, the proxy will use the default connection string assuming the PostgresDB is enabled in this chart.
+  dbConnection: ""
+
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 2Gi
+
+# ---------------------------------------------------------------------
+# Metadata database - PostgreSQL
+# ---------------------------------------------------------------------
+# if disabled, please specify an existing database using `dbConnection` in the previous section
+postgres:
+  enabled: true
+  pullPolicy: IfNotPresent
+  tag: "latest"
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+
+# ---------------------------------------------------------------------
+# Metadata database management tool
+# ---------------------------------------------------------------------
+# A simple web UI for metadata database.
+# This database is mainly for debugging and testing purposes.
+# If you are not curious about what is in the database, you can disable it.
+adminer:
+  enabled: true
   pullPolicy: IfNotPresent
   tag: "latest"
   persistence:
@@ -14,6 +55,11 @@ starlightProxy:
     accessModes: [ReadWriteOnce]
     size: 2Gi
 
+# ---------------------------------------------------------------------
+# Vanilla Container Registry
+# ---------------------------------------------------------------------
+# Recommend to use https://goharbor.io/ in production.
+# But this is good enough for testing.
 registry:
   enabled: true # If use other container registry, please specify `registryAddress`
   repository: "registry"
@@ -25,8 +71,9 @@ registry:
     storageClass: ""
     accessModes: [ReadWriteOnce]
     size: 20Gi
-  # Recommend to use https://goharbor.io/
 
+
+# ---------------------------------------------------------------------
 imagePullSecrets: []
 
 # Starlight Proxy Default Environment Variables
@@ -59,15 +106,64 @@ resources:
     cpu: 1
     memory: 1024Mi
 
-# Pin to master node
-tolerations:
+# select nodes in the cloud
+cloudTolerations:
+  # allow pod deploying to master node
   - key: node-role.kubernetes.io/master
     effect: NoSchedule
 
+cloudNodeSelector: {}
+
 
 ########################################################################
-# Other Configurations
+# EDGE
+########################################################################
+# This only setup the StarlightCLI as the initContainer.
+# You still need to install the Starlight daemon (containerd snapshotter) and enable it on the edge node.
+#
+# ON THE WORKER NODE:
+# 1. Install the Starlight daemon
+#
+#   wget https://github.com/mc256/starlight/releases/download/v0.2.3/starlight_0.2.3_amd64.deb
+#   sudo dpkg -i starlight_0.2.3_amd64.deb
+#   sudo systemctl enable starlight
+#   sudo systemctl start starlight
+#
+#
+#
+# 2. Configure the containerd to use Starlight as the snapshotter
+#
+#   sudo mkdir -p /etc/containerd
+#   cat <<EOF | sudo tee /etc/containerd/config.toml
+#   [plugins]
+#     [plugins."io.containerd.grpc.v1.cri".containerd]
+#       snapshotter = "starlight"
+#   [proxy_plugins]
+#     [proxy_plugins.starlight]
+#       type = "snapshot"
+#       address = "/run/starlight/starlight-snapshotter.sock"
+#   EOF
+#
+#   sudo systemctl restart containerd
+#
+#
+starlightCli:
+  # starlightCLI connects to the Starlight Daemon on the edge node via gRPC
+  repository: "ghcr.io/mc256/starlight/cli"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+  # Starlight CLI Default Environment Variables
+  # registryAddress: goharbor-core.default.svc.cluster.local/starlight
+  logLevel: info
 
+# select nodes in the edge
+edgeTolerations: []
+
+edgeNodeSelector: {}
+
+########################################################################
+# OTHER CONFIGURATIONS
+########################################################################
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -89,5 +185,3 @@ securityContext: {}
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
-
-nodeSelector: {}

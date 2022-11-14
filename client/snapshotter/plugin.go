@@ -61,7 +61,7 @@ type PluginClient interface {
 	// It requires the manifest, Starlight Metadatain and image config is present in containerd's content storage.
 	// In case the above requirements are not met, the client should return an error.
 	// The plugin should then try the next referenced manager (manifest digest).
-	PrepareManager(manifest digest.Digest) (err error)
+	PrepareManager(namespace string, manifest digest.Digest) (err error)
 
 	// Unmount starlightfs
 	Unmount(compressDigest, key string) error
@@ -127,7 +127,7 @@ func (s *Plugin) Stat(ctx context.Context, key string) (snapshots.Info, error) {
 
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name": info.Name,
-	}).Debug("sn: stat")
+	}).Trace("sn: stat")
 	return info, nil
 }
 
@@ -179,7 +179,7 @@ func (s *Plugin) Usage(ctx context.Context, key string) (snapshots.Usage, error)
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"key":   key,
 		"usage": usage,
-	}).Debug("sn: usage")
+	}).Trace("sn: usage")
 	return usage, nil
 }
 
@@ -198,7 +198,8 @@ func (s *Plugin) Mounts(ctx context.Context, key string) ([]mount.Mount, error) 
 		return nil, err
 	}
 
-	mnt, err := s.mounts(c, ssId, &info)
+	keysplit := strings.Split(key, "/")
+	mnt, err := s.mounts(c, keysplit[0], ssId, &info)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +281,9 @@ func (s *Plugin) newSnapshot(ctx context.Context, key, parent string, readonly b
 	}
 
 	// mount snapshot
-	mnt, err := s.mounts(c, ss.ID, &inf)
+	keysplit := strings.Split(key, "/")
+
+	mnt, err := s.mounts(c, keysplit[0], ss.ID, &inf)
 	if err != nil {
 		log.G(s.ctx).WithError(err).Error("sn: mount failed")
 		return nil, err
@@ -517,7 +520,7 @@ func (s *Plugin) getFsStack(ctx context.Context, cur *snapshots.Info) (pSi []*Sn
 	return pSi, nil
 }
 
-func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (mnt []mount.Mount, err error) {
+func (s *Plugin) mounts(ctx context.Context, namespace, ssId string, inf *snapshots.Info) (mnt []mount.Mount, err error) {
 	stack, err := s.getFsStack(ctx, inf)
 	// from upper to lower, not include current layer
 
@@ -535,7 +538,7 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 		if current.IsStarlightFS() {
 			// starlightfs
 			md, und, _ := current.GetStarlightFeature()
-			if err = s.client.PrepareManager(md); err != nil {
+			if err = s.client.PrepareManager(namespace, md); err != nil {
 				return nil, err
 			}
 			m, err = s.client.Mount(und, ssId, inf)
@@ -606,7 +609,7 @@ func (s *Plugin) mounts(ctx context.Context, ssId string, inf *snapshots.Info) (
 						if mdsidx >= len(mdsl) {
 							return nil, errors.Wrapf(err, "no manager for %s", und)
 						}
-						err = s.client.PrepareManager(mdsl[mdsidx])
+						err = s.client.PrepareManager(namespace, mdsl[mdsidx])
 						if err == nil {
 							break
 						}

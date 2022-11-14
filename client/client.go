@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"io"
+	iofs "io/fs"
 	"io/ioutil"
 	"net"
 	"os"
@@ -55,21 +56,15 @@ type mountPoint struct {
 type Client struct {
 	ctx context.Context
 	cfg *Configuration
-	cs  content.Store
-
-	// containerd
-	client *containerd.Client
 
 	// Snapshotter
 	snServer   *grpc.Server
 	snListener net.Listener
+	plugin     *snapshotter.Plugin
 
 	// CLI
 	cliServer   *grpc.Server
 	cliListener net.Listener
-
-	operator *snapshotter.Operator
-	plugin   *snapshotter.Plugin
 
 	// layer
 	layerMapLock sync.Mutex
@@ -109,9 +104,9 @@ func getDistributionSource(cfg string) string {
 	return fmt.Sprintf("starlight.mc256.dev/distribution.source.%s", cfg)
 }
 
-func (c *Client) findImage(filter string) (img containerd.Image, err error) {
+func (c *Client) findImage(ctr *containerd.Client, filter string) (img containerd.Image, err error) {
 	var list []containerd.Image
-	list, err = c.client.ListImages(c.ctx, filter)
+	list, err = ctr.ListImages(c.ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +131,7 @@ func (c *Client) findImage(filter string) (img containerd.Image, err error) {
 
 // FindBaseImage find the closest available image for the requested image, if user appointed an image, then this
 // function will be used for confirming the appointed image is available in the local storage
-func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err error) {
+func (c *Client) FindBaseImage(ctr *containerd.Client, base, ref string) (img containerd.Image, err error) {
 	var baseFilter string
 	if base == "" {
 		baseFilter = strings.Split(ref, ":")[0]
@@ -148,7 +143,7 @@ func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err erro
 		baseFilter = getImageFilter(base)
 	}
 
-	img, err = c.findImage(baseFilter)
+	img, err = c.findImage(ctr, baseFilter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find base image for %s", ref)
 	}
@@ -157,6 +152,97 @@ func (c *Client) FindBaseImage(base, ref string) (img containerd.Image, err erro
 	}
 
 	return img, nil
+}
+
+// -----------------------------------------------------------------------------
+// ScanExistingFilesystems scans place where the extracted file content is stored
+// in case the file system has not extracted fully (without the `complete.json` file),
+// we will remove the directory.
+func (c *Client) ScanExistingFilesystems() {
+	var (
+		err                    error
+		dir1, dir2, dir3, dir4 []iofs.FileInfo
+		x1, x2, x3             bool
+	)
+	log.G(c.ctx).
+		WithField("root", c.GetFilesystemRoot()).
+		Debug("scanning existing filesystems")
+
+	dir1, err = ioutil.ReadDir(filepath.Join(c.GetFilesystemRoot(), "layers"))
+	if err != nil {
+		return
+	}
+	for _, d1 := range dir1 {
+		x1 = false
+		if d1.IsDir() && len(d1.Name()) == 1 {
+			dir2, err = ioutil.ReadDir(filepath.Join(c.GetFilesystemRoot(), "layers",
+				d1.Name(),
+			))
+			if err != nil {
+				continue
+			}
+			for _, d2 := range dir2 {
+				x2 = false
+				if d2.IsDir() && len(d2.Name()) == 2 {
+					dir3, err = ioutil.ReadDir(filepath.Join(c.GetFilesystemRoot(), "layers",
+						d1.Name(), d2.Name(),
+					))
+					if err != nil {
+						continue
+					}
+					for _, d3 := range dir3 {
+						x3 = false
+						if d3.IsDir() && len(d3.Name()) == 2 {
+							dir4, err = ioutil.ReadDir(filepath.Join(c.GetFilesystemRoot(), "layers",
+								d1.Name(), d2.Name(), d3.Name(),
+							))
+							if err != nil {
+								continue
+							}
+							for _, d4 := range dir4 {
+								if d4.IsDir() {
+									d := filepath.Join(c.GetFilesystemRoot(), "layers",
+										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+									)
+									h := fmt.Sprintf("sha256:%s%s%s%s",
+										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+									)
+									completeFile := filepath.Join(d, "completed.json")
+									if _, err = os.Stat(completeFile); err != nil {
+										_ = os.RemoveAll(filepath.Join(c.GetFilesystemRoot(), "layers",
+											d1.Name(), d2.Name(), d3.Name(), d4.Name(),
+										))
+										log.G(c.ctx).WithField("digest", h).Warn("removed incomplete layer")
+									} else {
+										x1, x2, x3 = true, true, true
+										c.AddCompletedLayers(h)
+										log.G(c.ctx).WithField("digest", h).Debug("found layer")
+									}
+								}
+							}
+						}
+						if !x3 {
+							_ = os.RemoveAll(filepath.Join(c.GetFilesystemRoot(), "layers",
+								d1.Name(), d2.Name(), d3.Name(),
+							))
+						}
+					}
+				}
+				if !x2 {
+					_ = os.RemoveAll(filepath.Join(c.GetFilesystemRoot(), "layers",
+						d1.Name(), d2.Name(),
+					))
+				}
+			}
+		}
+		if !x1 {
+			_ = os.RemoveAll(filepath.Join(c.GetFilesystemRoot(), "layers",
+				d1.Name(),
+			))
+		}
+	}
+
+	return
 }
 
 // -----------------------------------------------------------------------------
@@ -199,12 +285,12 @@ func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []b
 }
 
 // storeManifest saves the manifest in the content store with necessary labels
-func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (err error) {
+func (c *Client) storeManifest(cs content.Store, cfgName, d, ref, cfgd, sld string, man []byte) (err error) {
 	pd := digest.Digest(d)
 
 	// create content store
 	err = content.WriteBlob(
-		c.ctx, c.cs, pd.Hex(), bytes.NewReader(man),
+		c.ctx, cs, pd.Hex(), bytes.NewReader(man),
 		v1.Descriptor{Size: int64(len(man)), Digest: pd},
 		content.WithLabels(map[string]string{
 			// identifier
@@ -225,9 +311,9 @@ func (c *Client) storeManifest(cfgName, d, ref, cfgd, sld string, man []byte) (e
 }
 
 // updateManifest marks the manifest as completed
-func (c *Client) updateManifest(d string, chainIds []digest.Digest, t time.Time) (err error) {
+func (c *Client) updateManifest(ctr *containerd.Client, d string, chainIds []digest.Digest, t time.Time) (err error) {
 	pd := digest.Digest(d)
-	cs := c.client.ContentStore()
+	cs := ctr.ContentStore()
 
 	var info content.Info
 
@@ -271,11 +357,11 @@ func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.Image, b []byte, er
 	return config, cfg, nil
 }
 
-func (c *Client) storeConfig(cfgName, ref string, pd digest.Digest, cfg []byte) (err error) {
+func (c *Client) storeConfig(cs content.Store, cfgName, ref string, pd digest.Digest, cfg []byte) (err error) {
 	// create content store
 
 	err = content.WriteBlob(
-		c.ctx, c.cs, pd.Hex(), bytes.NewReader(cfg),
+		c.ctx, cs, pd.Hex(), bytes.NewReader(cfg),
 		v1.Descriptor{Size: int64(len(cfg)), Digest: pd},
 		content.WithLabels(map[string]string{
 			util.ImageLabelPuller:               "starlight",
@@ -305,12 +391,12 @@ func (c *Client) handleStarlightHeader(buf *bytes.Buffer) (header *Manager, h []
 	return header, h, nil
 }
 
-func (c *Client) storeStarlightHeader(cfgName, ref, sld string, h []byte) (err error) {
+func (c *Client) storeStarlightHeader(cs content.Store, cfgName, ref, sld string, h []byte) (err error) {
 	hd := digest.Digest(sld)
 
 	// create content store
 	err = content.WriteBlob(
-		c.ctx, c.cs, hd.Hex(), bytes.NewReader(h),
+		c.ctx, cs, hd.Hex(), bytes.NewReader(h),
 		v1.Descriptor{Size: int64(len(h)), Digest: hd},
 		content.WithLabels(map[string]string{
 			util.ImageLabelPuller:               "starlight",
@@ -379,10 +465,11 @@ func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
 // PullImage pulls an image from a registry and stores it in the content store
 // it also stores the manager in memory.
 // In case there exists another manager in memory, it removes it and re-pull the image
-func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, closedReady bool, err error) {
+func (c *Client) PullImage(ctr *containerd.Client, base containerd.Image,
+	ref, platform, proxyCfg string, ready *chan bool) (img containerd.Image, closedReady bool, err error) {
 	// check local image
 	reqFilter := getImageFilter(ref)
-	img, err = c.findImage(reqFilter)
+	img, err = c.findImage(ctr, reqFilter)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to check requested image %s", ref)
 	}
@@ -452,6 +539,9 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	)
 
 	// 2. load manifest, config, and starlight header
+
+	cs := ctr.ContentStore()
+
 	// manifest
 	buf, err = c.readBody(body, mSize)
 	if err != nil {
@@ -461,7 +551,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to handle manifest")
 	}
-	err = c.storeManifest(pcn, md, ref,
+	err = c.storeManifest(cs, pcn, md, ref,
 		manifest.Config.Digest.String(), sld,
 		man)
 	if err != nil {
@@ -477,7 +567,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to handle config")
 	}
-	err = c.storeConfig(pcn, ref, manifest.Config.Digest, con)
+	err = c.storeConfig(cs, pcn, ref, manifest.Config.Digest, con)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to store config")
 	}
@@ -491,14 +581,14 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to handle starlight header")
 	}
-	err = c.storeStarlightHeader(pcn, ref, sld, sta)
+	err = c.storeStarlightHeader(cs, pcn, ref, sld, sta)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to store starlight header")
 	}
 
 	// create image
 	mdd := digest.Digest(md)
-	is := c.client.ImageService()
+	is := ctr.ImageService()
 	ctrImg, err = is.Create(c.ctx, images.Image{
 		Name: ref,
 		Target: v1.Descriptor{
@@ -517,7 +607,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 
 	// 3. create manager
 	// keep going and download layers
-	star.Init(c.ctx, c.cfg, false, manifest, imageConfig, mdd)
+	star.Init(ctr, c, c.ctx, c.cfg, false, manifest, imageConfig, mdd)
 
 	// create manager
 	c.managerMap[md] = star
@@ -584,7 +674,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 	}
 
 	// update garbage collection labels
-	if err = c.updateManifest(md, chainIds, t); err != nil {
+	if err = c.updateManifest(ctr, md, chainIds, t); err != nil {
 		return nil, true, errors.Wrapf(err, "failed to update manifest")
 	}
 
@@ -596,7 +686,7 @@ func (c *Client) PullImage(base containerd.Image, ref, platform, proxyCfg string
 //
 // This method should not use any snapshotter methods to avoid recursive lock.
 // This method is similar to PullImage, but it only uses content store.
-func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error) {
+func (c *Client) LoadImage(ctr *containerd.Client, manifest digest.Digest) (manager *Manager, err error) {
 
 	var (
 		buf  []byte
@@ -615,7 +705,7 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 	}
 
 	// no cache, load from store
-	cs := c.client.ContentStore()
+	cs := ctr.ContentStore()
 	ii, err = cs.Info(c.ctx, manifest)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get manifest info")
@@ -629,21 +719,21 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 	starlight := digest.Digest(ii.Labels[fmt.Sprintf("%s.starlight", util.ContentLabelContainerdGC)])
 
 	// 2. load manifest, config, and starlight header
-	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: manifest}); err != nil {
+	if buf, err = content.ReadBlob(c.ctx, cs, v1.Descriptor{Digest: manifest}); err != nil {
 		return nil, err
 	}
 	if err = json.Unmarshal(buf, &man); err != nil {
 		return nil, err
 	}
 
-	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: starlight}); err != nil {
+	if buf, err = content.ReadBlob(c.ctx, cs, v1.Descriptor{Digest: starlight}); err != nil {
 		return nil, err
 	}
 	if err = json.Unmarshal(buf, &star); err != nil {
 		return nil, err
 	}
 
-	if buf, err = content.ReadBlob(c.ctx, c.cs, v1.Descriptor{Digest: man.Config.Digest}); err != nil {
+	if buf, err = content.ReadBlob(c.ctx, cs, v1.Descriptor{Digest: man.Config.Digest}); err != nil {
 		return nil, err
 	}
 	if err = json.Unmarshal(buf, &cfg); err != nil {
@@ -651,7 +741,7 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 	}
 
 	// 3. create manager
-	star.Init(c.ctx, c.cfg, true, man, cfg, manifest)
+	star.Init(ctr, c, c.ctx, c.cfg, true, man, cfg, manifest)
 
 	// save to cache
 	c.managerMap[manifest.String()] = &star
@@ -692,9 +782,6 @@ func (c *Client) LoadImage(manifest digest.Digest) (manager *Manager, err error)
 }
 
 func (c *Client) Close() {
-	// containerd client
-	_ = c.client.Close()
-
 	// snapshotter server
 	if c.snServer != nil {
 		c.snServer.Stop()
@@ -753,9 +840,18 @@ func (c *Client) getStarlightFS(ssId string) string {
 	return filepath.Join(c.GetFilesystemPath(ssId), "slfs")
 }
 
-func (c *Client) PrepareManager(manifest digest.Digest) (err error) {
-	_, err = c.LoadImage(manifest)
-	return
+func (c *Client) PrepareManager(namespace string, manifest digest.Digest) error {
+	client, err := containerd.New(c.cfg.Containerd, containerd.WithDefaultNamespace(namespace))
+	if err != nil {
+		return errors.Wrapf(err, "failed to connect to containerd")
+	}
+	defer client.Close()
+
+	_, err = c.LoadImage(client, manifest)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load image")
+	}
+	return nil
 }
 
 // Mount returns the mountpoint for the given snapshot
@@ -952,8 +1048,25 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 		"ref":  ref.Reference,
 	}).Trace("grpc: pull image")
 
-	var base containerd.Image
-	base, err = s.client.FindBaseImage(ref.Base, ref.Reference)
+	var (
+		ctr  *containerd.Client
+		base containerd.Image
+	)
+
+	ns := ref.Namespace
+	if ns == "" {
+		ns = s.client.cfg.Namespace
+	}
+	ctr, err = containerd.New(s.client.cfg.Containerd, containerd.WithDefaultNamespace(ns))
+	if err != nil {
+		return &pb.ImagePullResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+	defer ctr.Close()
+
+	base, err = s.client.FindBaseImage(ctr, ref.Base, ref.Reference)
 	if err != nil {
 		return &pb.ImagePullResponse{
 			Success: false,
@@ -977,6 +1090,7 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 			}
 		}()
 		_, closed, e = s.client.PullImage(
+			ctr,
 			base, ref.Reference,
 			platforms.DefaultString(), ref.ProxyConfig,
 			&ready)
@@ -1183,26 +1297,15 @@ func (c *Client) StartCLIServer() {
 
 func NewClient(ctx context.Context, cfg *Configuration) (c *Client, err error) {
 	c = &Client{
-		ctx:    ctx,
-		cfg:    cfg,
-		client: nil,
+		ctx: ctx,
+		cfg: cfg,
 
 		layerMap:   make(map[string]*mountPoint),
 		managerMap: make(map[string]*Manager),
 	}
 
-	// containerd client
-	c.client, err = containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
-	if err != nil {
-		return nil, err
-	}
-
-	// content store
-	c.cs = c.client.ContentStore()
-	c.operator = snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
-
 	// scan existing filesystems
-	c.operator.ScanExistingFilesystems()
+	c.ScanExistingFilesystems()
 
 	return c, nil
 }

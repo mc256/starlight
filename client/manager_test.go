@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/containerd/containerd"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/opencontainers/go-digest"
@@ -63,7 +64,13 @@ func TestManager_Extract(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 
 	err = m.Extract(&rc)
 	if err != nil {
@@ -98,7 +105,13 @@ func TestManager_Init(t *testing.T) {
 	*/
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 
 }
 
@@ -121,7 +134,13 @@ func TestManager_NewStarlightFS(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 	stack := int64(2)
 	f, err := m.NewStarlightFS("/opt/test", stack, &opt, true)
@@ -156,7 +175,13 @@ func TestManager_NewStarlightFSMultiple(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 
 	fss := make([]*fs.Instance, 0)
@@ -203,7 +228,13 @@ func TestManager_NewStarlightFSMultiple2(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 	opt := fusefs.Options{}
 
 	fss := make([]*fs.Instance, 0)
@@ -250,7 +281,13 @@ func TestManager_NewStarlightFSMultiple3(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, true, nil, nil, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, true, nil, nil, md)
 	_, err = m.SetOptimizerOn("default")
 	if err != nil {
 		t.Error(err)
@@ -338,7 +375,13 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 
 	// keep going and download layers
 	md := digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
-	m.Init(ctx, cfg, false, manifest, configFile, md)
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m.Init(client, nil, ctx, cfg, false, manifest, configFile, md)
 	_, _ = m.CreateSnapshots(cc)
 
 }
@@ -356,5 +399,4 @@ func TestChannel(t *testing.T) {
 	close(ch)
 	fmt.Println(<-ch)
 	fmt.Printf("%p", ch)
-
 }

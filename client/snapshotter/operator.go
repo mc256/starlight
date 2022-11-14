@@ -12,10 +12,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
-	"io/fs"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 type OperatorClient interface {
@@ -42,96 +38,6 @@ func NewOperator(ctx context.Context, client OperatorClient, sn snapshots.Snapsh
 		client: client,
 		sn:     sn,
 	}
-}
-
-// ScanExistingFilesystems scans place where the extracted file content is stored
-// in case the file system has not extracted fully (without the `complete.json` file),
-// we will remove the directory.
-func (op *Operator) ScanExistingFilesystems() {
-	var (
-		err                    error
-		dir1, dir2, dir3, dir4 []fs.FileInfo
-		x1, x2, x3             bool
-	)
-	log.G(op.ctx).
-		WithField("root", op.client.GetFilesystemRoot()).
-		Debug("scanning existing filesystems")
-
-	dir1, err = ioutil.ReadDir(filepath.Join(op.client.GetFilesystemRoot(), "layers"))
-	if err != nil {
-		return
-	}
-	for _, d1 := range dir1 {
-		x1 = false
-		if d1.IsDir() && len(d1.Name()) == 1 {
-			dir2, err = ioutil.ReadDir(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-				d1.Name(),
-			))
-			if err != nil {
-				continue
-			}
-			for _, d2 := range dir2 {
-				x2 = false
-				if d2.IsDir() && len(d2.Name()) == 2 {
-					dir3, err = ioutil.ReadDir(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-						d1.Name(), d2.Name(),
-					))
-					if err != nil {
-						continue
-					}
-					for _, d3 := range dir3 {
-						x3 = false
-						if d3.IsDir() && len(d3.Name()) == 2 {
-							dir4, err = ioutil.ReadDir(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-								d1.Name(), d2.Name(), d3.Name(),
-							))
-							if err != nil {
-								continue
-							}
-							for _, d4 := range dir4 {
-								if d4.IsDir() {
-									d := filepath.Join(op.client.GetFilesystemRoot(), "layers",
-										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-									)
-									h := fmt.Sprintf("sha256:%s%s%s%s",
-										d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-									)
-									completeFile := filepath.Join(d, "completed.json")
-									if _, err = os.Stat(completeFile); err != nil {
-										_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-											d1.Name(), d2.Name(), d3.Name(), d4.Name(),
-										))
-										log.G(op.ctx).WithField("digest", h).Warn("removed incomplete layer")
-									} else {
-										x1, x2, x3 = true, true, true
-										op.client.AddCompletedLayers(h)
-										log.G(op.ctx).WithField("digest", h).Debug("found layer")
-									}
-								}
-							}
-						}
-						if !x3 {
-							_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-								d1.Name(), d2.Name(), d3.Name(),
-							))
-						}
-					}
-				}
-				if !x2 {
-					_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-						d1.Name(), d2.Name(),
-					))
-				}
-			}
-		}
-		if !x1 {
-			_ = os.RemoveAll(filepath.Join(op.client.GetFilesystemRoot(), "layers",
-				d1.Name(),
-			))
-		}
-	}
-
-	return
 }
 
 func (op *Operator) ScanSnapshots() (err error) {

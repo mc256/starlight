@@ -90,6 +90,15 @@ https://github.com/mc256/starlight
 			DefaultText: "info",
 			Required:    false,
 		},
+		&cli.StringFlag{
+			Name:        "namespace",
+			Aliases:     []string{"n"},
+			EnvVars:     []string{"CONTAINERD_NAMESPACE"},
+			Usage:       "namespace to use with commands (if using kubernetes, please specify `k8s.io`)",
+			Value:       "default",
+			DefaultText: "default",
+			Required:    false,
+		},
 	}
 	app.Commands = append([]*cli.Command{
 		cmdVersion.Command(),   // 1. confirm the version of starlight-daemon

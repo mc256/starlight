@@ -142,10 +142,14 @@ func (a *Server) delta(w http.ResponseWriter, req *http.Request) {
 		log.G(a.ctx).WithError(err).Error("failed to write delta image header")
 		return
 	}
+	log.G(a.ctx).WithFields(logrus.Fields{"action": "delta", "ip": ip}).Debug("header sent")
+
 	if err = b.WriteBody(w, req); err != nil {
 		log.G(a.ctx).WithError(err).Error("failed to write delta image body")
 		return
 	}
+
+	log.G(a.ctx).WithFields(logrus.Fields{"action": "delta", "ip": ip}).Debug("response sent")
 }
 
 func (a *Server) notify(w http.ResponseWriter, req *http.Request) {

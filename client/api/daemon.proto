@@ -81,6 +81,7 @@ message ImageReference {
   string reference = 1;
   string base = 2;
   string proxyConfig = 3;
+  string namespace = 4;
 }
 
 message ImagePullResponse {

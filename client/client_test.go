@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/platforms"
 	"github.com/mc256/starlight/client/snapshotter"
@@ -29,7 +30,12 @@ func TestNewClient(t *testing.T) {
 		return
 	}
 
-	img, err := c.findImage(getImageFilter("harbor.yuri.moe/public/redis:test2"))
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	img, err := c.findImage(client, getImageFilter("harbor.yuri.moe/public/redis:test2"))
 	if err != nil {
 		t.Error(err)
 		return
@@ -46,9 +52,15 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 		return
 	}
 
-	c.operator = snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	operator := snapshotter.NewOperator(c.ctx, c, client.SnapshotService("starlight"))
 	ready := make(chan bool)
-	img, _, err := c.PullImage(nil,
+	img, _, err := c.PullImage(client, nil,
 		"harbor.yuri.moe/starlight/redis:6.2.7",
 		"linux/amd64",
 		"",
@@ -58,6 +70,7 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 		return
 	}
 	t.Log(img)
+	t.Log(operator)
 }
 
 func TestClient_TestSnapshotter(t *testing.T) {
@@ -68,7 +81,13 @@ func TestClient_TestSnapshotter(t *testing.T) {
 		return
 	}
 
-	svc := c.client.SnapshotService("starlight")
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	svc := client.SnapshotService("starlight")
 
 	op := snapshotter.NewOperator(c.ctx, c, svc)
 	_ = op.ScanSnapshots()
@@ -83,7 +102,13 @@ func TestClient_TestSnapshotterAdd(t *testing.T) {
 		return
 	}
 
-	svc := c.client.SnapshotService("starlight")
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	svc := client.SnapshotService("starlight")
 	mnt, err := svc.Prepare(c.ctx, "test", "")
 	if err != nil {
 		t.Error(err)
@@ -100,7 +125,12 @@ func TestClient_FindBaseImage(t *testing.T) {
 		return
 	}
 
-	img, err := c.FindBaseImage("", "harbor.yuri.moe/starlight/redis:7.0.5")
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	img, err := c.FindBaseImage(client, "", "harbor.yuri.moe/starlight/redis:7.0.5")
 	if err != nil {
 		t.Error(err)
 		return
@@ -120,14 +150,19 @@ func TestClient_PullImageWithUpdate(t *testing.T) {
 	//t.Log("pulling image", "platform", plt)
 	//"harbor.yuri.moe/starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965"
 
-	base, err := c.FindBaseImage("", "harbor.yuri.moe/starlight/redis:7.0.5")
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	base, err := c.FindBaseImage(client, "", "harbor.yuri.moe/starlight/redis:7.0.5")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	ready := make(chan bool)
-	img, _, err := c.PullImage(base,
+	img, _, err := c.PullImage(client, base,
 		"harbor.yuri.moe/starlight/redis:7.0.5",
 		"linux/amd64",
 		"",
@@ -147,10 +182,16 @@ func TestClient_CreateImageService(t *testing.T) {
 		return
 	}
 
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	//plt := platforms.Format(platforms.DefaultSpec())
 	//t.Log("pulling image", "platform", plt)
 	ready := make(chan bool)
-	img, _, err := c.PullImage(nil,
+	img, _, err := c.PullImage(client, nil,
 		"starlight/redis:6.2.7",
 		"linux/amd64",
 		"",
@@ -169,7 +210,13 @@ func Test_WriteContent(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	cs := c.client.ContentStore()
+
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	cs := client.ContentStore()
 
 	mf, err := ioutil.ReadFile("/root/manifest.json")
 	if err != nil {
@@ -208,9 +255,10 @@ func TestClient_scanExistingFilesystems(t *testing.T) {
 		return
 	}
 
-	sn := c.client.SnapshotService("starlight")
-	op := snapshotter.NewOperator(c.ctx, c, sn)
-	op.ScanExistingFilesystems()
+	//sn := client.SnapshotService("starlight")
+	//op:= snapshotter.NewOperator(c.ctx, c, sn)
+
+	c.ScanExistingFilesystems()
 	if err != nil {
 		t.Error(err)
 		return
@@ -225,8 +273,7 @@ func TestClient_scanSnapshots(t *testing.T) {
 		return
 	}
 
-	op := snapshotter.NewOperator(c.ctx, c, c.client.SnapshotService("starlight"))
-	op.ScanExistingFilesystems()
+	c.ScanExistingFilesystems()
 	if err != nil {
 		t.Error(err)
 		return
@@ -241,7 +288,12 @@ func TestClient_LoadImage(t *testing.T) {
 		return
 	}
 
-	m, err := c.LoadImage(
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	m, err := c.LoadImage(client,
 		digest.Digest("sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965"),
 	)
 	if err != nil {

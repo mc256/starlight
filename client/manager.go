@@ -11,10 +11,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
 	fusefs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/mc256/starlight/client/fs"
+	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/mc256/starlight/util/receive"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -59,6 +61,8 @@ type Manager struct {
 
 	tracerLock sync.Mutex
 	tracer     *fs.Tracer
+
+	operator *snapshotter.Operator
 
 	fs map[int64]*fs.Instance
 }
@@ -253,7 +257,7 @@ func (m *Manager) CreateSnapshots(c *Client) (chainIds []digest.Digest, err erro
 			}
 		}()
 
-		_, err = c.operator.AddSnapshot(
+		_, err = m.operator.AddSnapshot(
 			chain.String(), prev, m.manifestDigest.String(), d, int64(idx),
 		)
 		if err != nil {
@@ -272,7 +276,7 @@ func (m *Manager) CreateSnapshots(c *Client) (chainIds []digest.Digest, err erro
 //  - image, manifest, imageConfig: information about the image (maybe we don't need this)
 //
 // do not change any outside state, only the manager itself
-func (m *Manager) Init(ctx context.Context, cfg *Configuration, ready bool,
+func (m *Manager) Init(ctr *containerd.Client, client *Client, ctx context.Context, cfg *Configuration, ready bool,
 	manifest *v1.Manifest, imageConfig *v1.Image, manifestDigest digest.Digest) {
 	// init variables
 	m.ctx = ctx
@@ -280,10 +284,10 @@ func (m *Manager) Init(ctx context.Context, cfg *Configuration, ready bool,
 	m.stackSerialMap = make([]int64, 0, len(m.Destination.Layers))
 	m.layers = make(map[int64]*receive.ImageLayer)
 	m.fs = make(map[int64]*fs.Instance)
-
 	m.manifest = manifest
 	m.imageConfig = imageConfig
 	m.manifestDigest = manifestDigest
+	m.operator = snapshotter.NewOperator(ctx, client, ctr.SnapshotService("starlight"))
 
 	// populate directory fields
 	for _, layer := range m.Destination.Layers {

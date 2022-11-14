@@ -59,6 +59,7 @@ func Action(ctx context.Context, c *cli.Context) error {
 		Reference:   ref,
 		Base:        base,
 		ProxyConfig: c.String("profile"),
+		Namespace:   c.String("namespace"),
 	}, c.Bool("quiet"))
 	return nil
 }
