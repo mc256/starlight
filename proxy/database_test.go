@@ -6,6 +6,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/mc256/starlight/client/fs"
@@ -20,8 +21,9 @@ var (
 
 func TestMain(m *testing.M) {
 	cfg, _, _, _ := LoadConfig("")
+	ctx := context.Background()
 	var err error
-	db, err = NewDatabase(cfg.PostgresConnectionString)
+	db, err = NewDatabase(ctx, cfg.PostgresConnectionString)
 	if err != nil {
 		fmt.Printf("failed to connect to database %v\n", err)
 	}
@@ -29,7 +31,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestDatabase_Init(t *testing.T) {
-	db, err := NewDatabase("postgres://postgres:example@172.18.1.61:5432/postgres?sslmode=disable")
+	ctx := context.Background()
+	db, err := NewDatabase(ctx, "postgres://postgres:example@172.18.1.61:5432/postgres?sslmode=disable")
 	if err != nil {
 		t.Error(err)
 		return

@@ -15,13 +15,8 @@ starlightProxy:
   # For example: "postgres://postgres:postgres@postgres:5432/starlight?sslmode=disable"
   # if left blank, the proxy will use the default connection string assuming the PostgresDB is enabled in this chart.
   dbConnection: ""
-
-  persistence:
-    enabled: true
-    existingClaim: ""
-    storageClass: ""
-    accessModes: [ReadWriteOnce]
-    size: 2Gi
+  logLevel: "info"
+  defaultRegistry: "http://container-registry.default.svc.cluster.local:5000"
 
 # ---------------------------------------------------------------------
 # Metadata database - PostgreSQL
@@ -48,12 +43,6 @@ adminer:
   enabled: true
   pullPolicy: IfNotPresent
   tag: "latest"
-  persistence:
-    enabled: true
-    existingClaim: ""
-    storageClass: ""
-    accessModes: [ReadWriteOnce]
-    size: 2Gi
 
 # ---------------------------------------------------------------------
 # Vanilla Container Registry

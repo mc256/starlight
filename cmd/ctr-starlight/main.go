@@ -70,7 +70,7 @@ https://github.com/mc256/starlight
 			Value:       "default",
 			DefaultText: "default",
 			EnvVars:     []string{"CONTAINERD_NAMESPACE"},
-			Usage:       "namespace to use with commands",
+			Usage:       "namespace to use with commands (if using kubernetes, please specify `k8s.io`)",
 			Required:    false,
 		},
 		&cli.StringFlag{
@@ -88,15 +88,6 @@ https://github.com/mc256/starlight
 			Usage:       "log level for this command line tool",
 			Value:       "info",
 			DefaultText: "info",
-			Required:    false,
-		},
-		&cli.StringFlag{
-			Name:        "namespace",
-			Aliases:     []string{"n"},
-			EnvVars:     []string{"CONTAINERD_NAMESPACE"},
-			Usage:       "namespace to use with commands (if using kubernetes, please specify `k8s.io`)",
-			Value:       "default",
-			DefaultText: "default",
 			Required:    false,
 		},
 	}

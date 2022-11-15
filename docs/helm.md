@@ -3,7 +3,7 @@
 ## TL;DR
 
 ```shell
-helm upgrade --install  -f starlight/values.yaml starlight oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2
+helm upgrade --install  -f starlight/values.yaml starlight oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.2.3
 ```
 
 ## Prerequisites
@@ -34,14 +34,14 @@ kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storagec
 To install the chart with the app name `my-starlight-proxy`:
 
 ```shell
-helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.2.3
 ```
 
 
 You may want to set a few parameter for example the domain name for the ingress, for example set the domain name for ingress to `mydomain.local`:
 
 ```shell
-helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.1.2 \
+helm install my-starlight-proxy oci://ghcr.io/mc256/starlight/starlight-proxy-chart --version 0.2.3 \
 --set "ingress.hosts={mydomain.local}"
 ```
 
@@ -59,37 +59,5 @@ helm delete my-starlight-proxy
 
 
 ## Parameters
-
-### Common Parameters
-
-| Name     | Description | Value|
-| ---      | ---       | --- |
-| ingress.hosts | domain name for the ingress | [starlight.lan] |
-| registryAddress | customize registry address if choose not to use the container registry in this chart | null |
-| registry.enable | enable container registry in this deployment | true |
-
-### Starlight Proxy
-
-| Name     | Description | Value|
-| ---      | ---       | --- |
-| starlightProxy.tag | tage of the image | "latest" |
-| starlightProxy.pullPolicy | pull image policy | IfNotPresent |
-| starlightProxy.persistence.enabled | tage of the image | "latest" |
-| starlightProxy.persistence.existingClaim | if specified, use existing PV | "" |
-| starlightProxy.persistence.storageClass | storage class, if not specified, used default storage class | "" |
-| starlightProxy.persistence.size | storage size | 2Gi |
-
-### Registry
-
-| Name     | Description | Value|
-| ---      | ---       | --- |
-| registry.enable | enable registry | true |
-| registry.repository | container image | "registry"|
-| registry.pullPolicy | pull image policy | IfNotPresent |
-| registry.tag | tage of the image | "latest" |
-| registry.persistence.enabled | tage of the image | "latest" |
-| registry.persistence.existingClaim | if specified, use existing PV | "" |
-| registry.persistence.storageClass | storage class, if not specified, used default storage class | "" |
-| registry.persistence.size | storage size | 2Gi |
-
+Please the comments in the [`values.yaml`]() file
 

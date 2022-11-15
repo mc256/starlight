@@ -41,7 +41,7 @@ func TestExtractor_SaveToC(t *testing.T) {
 		},
 		config: cfg,
 	}
-	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+	if db, err := NewDatabase(ctx, cfg.PostgresConnectionString); err != nil {
 		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
 	} else {
 		server.db = db

@@ -39,7 +39,7 @@ func InitDatabase() (context.Context, *Configuration, *Server) {
 		config: cfg,
 		cache:  make(map[string]*common.LayerCache),
 	}
-	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+	if db, err := NewDatabase(ctx, cfg.PostgresConnectionString); err != nil {
 		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
 	} else {
 		server.db = db

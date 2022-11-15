@@ -257,17 +257,29 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 	}
 
 	// connect database
-	if db, err := NewDatabase(cfg.PostgresConnectionString); err != nil {
+	if db, err := NewDatabase(ctx, cfg.PostgresConnectionString); err != nil {
 		log.G(ctx).Errorf("failed to connect to database: %v\n", err)
 	} else {
 		server.db = db
 	}
 
 	// init database
-	err := server.db.InitDatabase()
-	if err != nil {
-		log.G(ctx).Errorf("failed to init database: %v\n", err)
-		return nil, err
+	i := 0
+	for {
+		i += 1
+		err := server.db.InitDatabase()
+		if err != nil {
+			if i > 10 {
+				log.G(ctx).Errorf("failed to init database: %v\n", err)
+				return nil, err
+			}
+			log.G(ctx).
+				WithError(err).
+				Errorf("failed to connect to database, retrying in 5 seconds (%d/10)", i)
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
 	}
 	log.G(ctx).Debug("database initialized")
 

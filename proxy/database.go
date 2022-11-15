@@ -6,9 +6,11 @@
 package proxy
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
@@ -30,12 +32,27 @@ func (d *Database) Close() {
 	_ = d.db.Close()
 }
 
-func NewDatabase(conStr string) (*Database, error) {
-	d, err := sql.Open("postgres", conStr)
-	if err != nil {
-		return nil, err
+func NewDatabase(ctx context.Context, conStr string) (*Database, error) {
+	var (
+		d   *sql.DB
+		err error
+	)
+	i := 0
+	for {
+		i += 1
+		d, err = sql.Open("postgres", conStr)
+		if err == nil {
+			return &Database{db: d}, nil
+		} else if err != nil {
+			if i > 10 {
+				return nil, err
+			}
+			log.G(ctx).
+				WithError(err).
+				Errorf("failed to connect to database, retrying in 5 seconds (%d/10)", i)
+			time.Sleep(5 * time.Second)
+		}
 	}
-	return &Database{db: d}, nil
 }
 
 func (d *Database) InitDatabase() error {
