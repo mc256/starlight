@@ -1,0 +1,22 @@
+{{- if .Values.registry.persistence.enabled }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "starlight.fullname-registry" . }}
+  labels:
+    {{- include "starlight.proxyLabels" . | nindent 4 }}
+  annotations:
+  {{- if .Values.registry.persistence.storageClass }}
+    volume.beta.kubernetes.io/storage-class: {{ .Values.registry.persistence.storageClass | quote }}
+  {{- else }}
+    volume.alpha.kubernetes.io/storage-class: default
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.registry.persistence.accessModes }}
+    - {{ . }}
+    {{- end }}  
+  resources:
+    requests:
+      storage: {{ .Values.registry.persistence.size | quote }}
+{{- end -}}

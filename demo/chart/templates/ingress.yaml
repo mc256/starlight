@@ -1,5 +1,6 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "starlight-proxy-chart.fullname" . -}}
+{{- $fullName := include "starlight.fullname" . -}}
+{{- $fullNameRegistry := include "starlight.fullname-registry" . -}}
 {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
@@ -16,7 +17,7 @@ kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
-    {{- include "starlight-proxy-chart.labels" . | nindent 4 }}
+    {{- include "starlight.proxyLabels" . | nindent 4 }}
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     {{- with .Values.ingress.annotations }}
@@ -40,7 +41,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ $fullName }}
+                name: {{ $fullNameRegistry }}
                 port:
                   number: 5000
           {{- end }}
@@ -51,7 +52,7 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: 8090
-          - path: /()(prepare.*|from.*|report.*|scanner.*|starlight.*|health-check.*)
+          - path: /()(scanner.*|starlight.*|health-check.*)
             pathType: Prefix
             backend:
               service:
@@ -60,3 +61,5 @@ spec:
                   number: 8090
     {{- end }}
 {{- end }}
+
+

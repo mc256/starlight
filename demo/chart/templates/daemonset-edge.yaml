@@ -1,0 +1,63 @@
+{{- if .Values.edge.enabled}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "starlight.fullname-edge" . }}
+  labels:
+    {{- include "starlight.edgeLabels" . | nindent 4 }}
+    kubernetes.io/cluster-service: "true"
+spec:
+  selector:
+    matchLabels:
+      {{- include "starlight.edgeSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "starlight.edgeSelectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+      - name: socket
+        hostPath:
+          path: /run/starlight
+      containers:
+      ##############################################################
+      ##############################################################
+        - name: starlight-edge
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.edge.repository }}:{{ .Values.edge.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.edge.imagePullPolicy }}
+          command: {{ .Values.edge.command }}
+          resources:
+            {{- toYaml .Values.edge.resources | nindent 12}}
+          env:
+          - name: CONTAINERD_NAMESPACE
+            value: "k8s.io"
+          volumeMounts:
+          - name: socket
+            mountPath: /run/starlight
+      ##############################################################
+      ##############################################################
+      {{- with .Values.edgeNodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.edgeAffinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.edgeTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end}}

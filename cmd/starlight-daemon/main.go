@@ -74,6 +74,7 @@ https://github.com/mc256/starlight
 		&cli.StringFlag{
 			Name:        "log-level",
 			Aliases:     []string{"l"},
+			EnvVars:     []string{"LOG_LEVEL"},
 			DefaultText: cfg.LogLevel,
 			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
 			Required:    false,
@@ -83,6 +84,7 @@ https://github.com/mc256/starlight
 			Name:        "metadata",
 			DefaultText: cfg.Metadata,
 			Aliases:     []string{"m"},
+			EnvVars:     []string{"METADATA"},
 			Usage:       "path to store image metadata",
 			Required:    false,
 		},

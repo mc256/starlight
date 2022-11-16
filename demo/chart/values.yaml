@@ -8,15 +8,17 @@ fullnameOverride: ""
 # Image pull information
 starlightProxy:
   repository: "ghcr.io/mc256/starlight/proxy"
-  pullPolicy: IfNotPresent
   tag: "latest"
+  imagePullPolicy: IfNotPresent
 
   # dbConnection specify
-  # For example: "postgres://postgres:postgres@postgres:5432/starlight?sslmode=disable"
-  # if left blank, the proxy will use the default connection string assuming the PostgresDB is enabled in this chart.
-  dbConnection: ""
+  # Default is set to the postgres instance in the same deployment.
+  dbConnection: "postgres://postgres:postgres@postgres:5432/starlight?sslmode=disable"
+  # logLevel is the log level for the proxy, options are: trace, debug, info, warn, error, fatal
   logLevel: "info"
+  # defaultRegistry is the default registry when the full image name is not specified
   defaultRegistry: "http://container-registry.default.svc.cluster.local:5000"
+  resources: {}
 
 # ---------------------------------------------------------------------
 # Metadata database - PostgreSQL
@@ -24,7 +26,7 @@ starlightProxy:
 # if disabled, please specify an existing database using `dbConnection` in the previous section
 postgres:
   enabled: true
-  pullPolicy: IfNotPresent
+  imagePullPolicy: IfNotPresent
   tag: "latest"
   persistence:
     enabled: true
@@ -32,6 +34,7 @@ postgres:
     storageClass: ""
     accessModes: [ReadWriteOnce]
     size: 20Gi
+  resources: {}
 
 # ---------------------------------------------------------------------
 # Metadata database management tool
@@ -39,10 +42,12 @@ postgres:
 # A simple web UI for metadata database.
 # This database is mainly for debugging and testing purposes.
 # If you are not curious about what is in the database, you can disable it.
+# postgres.enabled must be true
 adminer:
   enabled: true
-  pullPolicy: IfNotPresent
+  imagePullPolicy: IfNotPresent
   tag: "latest"
+  resources: {}
 
 # ---------------------------------------------------------------------
 # Vanilla Container Registry
@@ -52,7 +57,7 @@ adminer:
 registry:
   enabled: true # If use other container registry, please specify `registryAddress`
   repository: "registry"
-  pullPolicy: IfNotPresent
+  imagePullPolicy: IfNotPresent
   tag: "latest"
   persistence:
     enabled: true
@@ -60,7 +65,7 @@ registry:
     storageClass: ""
     accessModes: [ReadWriteOnce]
     size: 20Gi
-
+  resources: {}
 
 # ---------------------------------------------------------------------
 imagePullSecrets: []
@@ -71,8 +76,9 @@ logLevel: info
 
 # Service
 service:
-  type: LoadBalancer
-  port: 80
+  # Recommended to use Cluster IP and put a reverse proxy in front of it.
+  type: ClusterIP
+  
 
 # Ingress
 ingress:
@@ -86,28 +92,25 @@ ingress:
   hosts: [ starlight.lan ]
   tls: []
 
-# Resource limits
-resources:
-  limits:
-    cpu: 4
-    memory: 4096Mi
-  requests:
-    cpu: 1
-    memory: 1024Mi
-
 # select nodes in the cloud
-cloudTolerations:
+cloudTolerations: []
   # allow pod deploying to master node
-  - key: node-role.kubernetes.io/master
-    effect: NoSchedule
+  #- key: node-role.kubernetes.io/master
+  #  effect: NoSchedule
 
-cloudNodeSelector: {}
-
+cloudNodeSelector:
+  kubernetes.io/os: linux 
+  # kubernetes.io/arch: amd64
+  # kubernetes.io/hostname: cloud
+  
+cloudAffinity: {}
 
 ########################################################################
 # EDGE
 ########################################################################
-# This only setup the StarlightCLI as the initContainer.
+# The purpose of this deployment is to keep the Starlight CLI image on every edge node,
+# so that whever the user uses initContainer, there is a starlight CLI container for that.
+#
 # You still need to install the Starlight daemon (containerd snapshotter) and enable it on the edge node.
 #
 # ON THE WORKER NODE:
@@ -133,22 +136,27 @@ cloudNodeSelector: {}
 #       address = "/run/starlight/starlight-snapshotter.sock"
 #   EOF
 #
+# 3. and restart the container
 #   sudo systemctl restart containerd
 #
 #
-starlightCli:
+edge:
+  enabled: true
   # starlightCLI connects to the Starlight Daemon on the edge node via gRPC
   repository: "ghcr.io/mc256/starlight/cli"
-  pullPolicy: IfNotPresent
+  imagePullPolicy: IfNotPresent
   tag: "latest"
+  # This keep the container running allows you to run some starlight-related commands on the edge node
+  command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
   # Starlight CLI Default Environment Variables
-  # registryAddress: goharbor-core.default.svc.cluster.local/starlight
-  logLevel: info
 
 # select nodes in the edge
 edgeTolerations: []
 
-edgeNodeSelector: {}
+edgeNodeSelector: 
+  kubernetes.io/os: linux 
+  # kubernetes.io/arch: arm64
+  # kubernetes.io/hostname: edge
 
 ########################################################################
 # OTHER CONFIGURATIONS

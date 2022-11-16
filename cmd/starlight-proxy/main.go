@@ -77,20 +77,24 @@ information about Starlight, please visit our repository at https://github.com/m
 		// ----
 		&cli.StringFlag{
 			Name:        "host",
+			Aliases:     []string{"h"},
+			EnvVars:     []string{"STARLIGHT_HOST"},
 			DefaultText: cfg.ListenAddress,
 			Usage:       "host",
 			Required:    false,
 		},
 		&cli.IntFlag{
 			Name:        "port",
-			DefaultText: fmt.Sprintf("%d", cfg.ListenPort),
 			Aliases:     []string{"p"},
+			EnvVars:     []string{"STARLIGHT_PORT"},
+			DefaultText: fmt.Sprintf("%d", cfg.ListenPort),
 			Usage:       "proxy port",
 			Required:    false,
 		},
 		&cli.StringFlag{
 			Name:        "log-level",
 			Aliases:     []string{"l"},
+			EnvVars:     []string{"LOG_LEVEL"},
 			DefaultText: cfg.LogLevel,
 			Usage:       "Choose one log level (fatal, error, warning, info, debug, trace)",
 			Required:    false,
@@ -98,36 +102,34 @@ information about Starlight, please visit our repository at https://github.com/m
 		// ----
 		&cli.StringFlag{
 			Name:        "postgres",
+			Aliases:     []string{"db"},
+			EnvVars:     []string{"DB_CONNECTION_STRING"},
 			DefaultText: ProtectPassword(cfg.PostgresConnectionString),
 			Usage:       "use PostgreSQL database backend for storing TOCs",
-			Required:    false,
-		},
-		&cli.StringFlag{
-			Name:        "postgres-schema",
-			DefaultText: cfg.PostgresDBSchema,
-			Usage:       "the schema to hold tables",
 			Required:    false,
 		},
 		// ----
 		&cli.StringFlag{
 			Name:        "registry",
+			Aliases:     []string{"r"},
+			EnvVars:     []string{"REGISTRY"},
 			DefaultText: cfg.DefaultRegistry,
 			Usage:       "Default container registry",
 			Required:    false,
 		},
 		// ----
-		&cli.BoolFlag{
-			Name:        "goharbor",
-			DefaultText: fmt.Sprintf("%v", cfg.EnableHarborScanner),
-			Usage:       "integrate goharbor and enable auto container image conversion",
-			Required:    false,
-		},
-		&cli.StringFlag{
-			Name:        "goharbor-apikey",
-			DefaultText: cfg.HarborApiKey,
-			Usage:       "api key for verify the scan requests",
-			Required:    false,
-		},
+		// &cli.BoolFlag{
+		// 	Name:        "goharbor",
+		// 	DefaultText: fmt.Sprintf("%v", cfg.EnableHarborScanner),
+		// 	Usage:       "integrate goharbor and enable auto container image conversion",
+		// 	Required:    false,
+		// },
+		// &cli.StringFlag{
+		// 	Name:        "goharbor-apikey",
+		// 	DefaultText: cfg.HarborApiKey,
+		// 	Usage:       "api key for verify the scan requests",
+		// 	Required:    false,
+		// },
 	}
 	app.Action = func(c *cli.Context) error {
 		return DefaultAction(c, cfg)
@@ -180,9 +182,6 @@ func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
 
 	if pc := context.String("postgres"); pc != "" {
 		cfg.PostgresConnectionString = pc
-	}
-	if ps := context.String("postgres-schema"); ps != "" {
-		cfg.PostgresDBSchema = ps
 	}
 
 	if r := context.String("registry"); r != "" {

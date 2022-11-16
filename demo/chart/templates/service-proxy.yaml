@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "starlight.fullname" . }}
+  labels:
+    {{- include "starlight.proxyLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 8090
+      name: starlightproxy
+      targetPort: 8090
+      protocol: TCP
+    {{- if .Values.postgres.enabled}}
+    - port: 5432
+      name: postgres
+      targetPort: 5432
+      protocol: TCP
+    {{- if .Values.adminer.enabled}}
+    - port: 8080
+      name: adminer
+      targetPort: 8080
+      protocol: TCP
+    {{- end}}
+    {{- end}}
+  selector:
+    {{- include "starlight.proxySelectorLabels" . | nindent 4 }}

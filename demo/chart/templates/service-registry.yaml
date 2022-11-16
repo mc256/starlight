@@ -1,0 +1,17 @@
+{{- if .Values.registry.enabled}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "starlight.fullname-registry" . }}
+  labels:
+    {{- include "starlight.registryLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 5000
+      name: container-registry
+      targetPort: 5000
+      protocol: TCP
+  selector:
+    {{- include "starlight.registrySelectorLabels" . | nindent 4 }}
+{{- end}}

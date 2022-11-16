@@ -23,7 +23,6 @@ type Configuration struct {
 
 	// database
 	PostgresConnectionString string `json:"postgres"`
-	PostgresDBSchema         string `json:"postgres_schema"`
 
 	// registry
 	DefaultRegistry string `json:"default_registry"`
@@ -95,7 +94,6 @@ func NewConfig() *Configuration {
 		ListenAddress:            "0.0.0.0",
 		LogLevel:                 "info",
 		PostgresConnectionString: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable",
-		PostgresDBSchema:         "starlight",
 		DefaultRegistry:          "127.0.0.1:9000",
 		EnableHarborScanner:      false,
 		HarborApiKey:             uuid.New().String(),

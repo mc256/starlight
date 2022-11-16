@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "starlight.fullname-registry" . }}
+  labels:
+    {{- include "starlight.registryLabels" . | nindent 4 }}
+    kubernetes.io/cluster-service: "true"
+spec:
+  selector:
+    matchLabels:
+      {{- include "starlight.registrySelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "starlight.registrySelectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }} 
+      {{- if eq  .Values.registry.persistence.enabled true }}
+      volumes:
+        - name: registry-pv
+          persistentVolumeClaim:
+            {{- $newClaimName := include "starlight.fullname-registry" . }}
+            claimName: {{ .Values.registry.persistence.existingClaim | default  $newClaimName }}
+      {{- end }}
+      containers:
+      ##############################################################
+      ##############################################################
+        - name: container-registry
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.registry.repository }}:{{ .Values.registry.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.registry.imagePullPolicy }}
+          ports:
+            - name: registry
+              containerPort: 5000
+              protocol: TCP
+          livenessProbe:
+            periodSeconds: 60
+            httpGet:
+              path: /v2/
+              port: 5000
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12}}
+      ##############################################################
+      ##############################################################
+      {{- with .Values.cloudNodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cloudAffinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cloudTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

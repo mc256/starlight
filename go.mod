@@ -11,7 +11,6 @@ require (
 	// resolved overlayfs OICTL issue in https://github.com/hanwen/go-fuse/pull/408
 	// tested on Kernel 5.15.0-52-generic
 	github.com/hanwen/go-fuse/v2 v2.1.1-0.20221003202731-4c25c9c1eece
-
 	github.com/lib/pq v1.10.6
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198
@@ -21,13 +20,14 @@ require (
 
 	// newer version causes issue #24
 	github.com/urfave/cli/v2 v2.3.0
-
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	google.golang.org/grpc v1.47.0
 )
+
+require google.golang.org/protobuf v1.28.0
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
@@ -60,5 +60,4 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
 )

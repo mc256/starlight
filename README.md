@@ -51,8 +51,10 @@ Starlight is implemented on top of **containerd**. It it comprised of cloud and 
 Starlight is compatible with Kubernetes and can replace the default `overlayfs` snapshotter.
 We could use helm to deploy Starlight on a Kubernetes cluster.
 
-- [I am familiar with K8s & Helm. TL;DR](https://github.com/mc256/starlight/blob/master/docs/helm.md)
-- [I have 2 Virtual Machines, but TL;DR](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
+- [I am familiar with **K8s** & Helm. **TL;DR**](https://github.com/mc256/starlight/blob/master/docs/helm.md)
+- [I have 2 **Virtual Machines**, but **TL;DR**](https://github.com/mc256/starlight/blob/master/docs/newbie.md)
+
+---
 
 Suppose you have a container on a [OCI compatible **registry**](https://github.com/distribution/distribution) that you want to deploy.
 You need to:
@@ -152,10 +154,6 @@ sudo ctr t start instance4
 
 For more information, please check out `ctr-starlight --help` and `starlight-daemon --help`
 
-## Testing Server 
-
-If you don't want to set up your own proxy server, you can use our testing server.
-
 
 ## Citation
 If you find Starlight useful in your work, please cite our NSDI 2022 paper:
@@ -179,7 +177,7 @@ Starlight is not complete. Our roadmap:
 | Version                                                  | Status      | Scheduled Release |
 |----------------------------------------------------------|-------------|-------------------|
 | [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) | stable      |                   |
-| [v0.2.2](https://github.com/mc256/starlight)             | development |                   |
+| [v0.2.3](https://github.com/mc256/starlight)             | development |                   |
 | v0.3.0                                                   |             | 2022-12-15        |
 | v0.4.0                                                   |             | 2023-01-15        |
 | v0.5.0                                                   |             | 2023-02-15        |
