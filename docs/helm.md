@@ -5,7 +5,7 @@
 ```shell
 helm upgrade --install -f starlight/values.yaml \
      starlight \
-     oci://ghcr.io/mc256/starlight/starlight-proxy-chart \
+     oci://ghcr.io/mc256/starlight/starlight \
      --version 0.2.3
 ```
 
@@ -47,7 +47,7 @@ To install the chart with the app name `my-starlight-proxy`:
 
 ```shell
 helm install my-starlight-proxy \
-  oci://ghcr.io/mc256/starlight/starlight-proxy-chart \
+  oci://ghcr.io/mc256/starlight/starlight \
   --version 0.2.3
 ```
 
@@ -56,7 +56,7 @@ You may want to set a few parameter for example the domain name for the ingress,
 
 ```shell
 helm install my-starlight-proxy \
-  oci://ghcr.io/mc256/starlight/starlight-proxy-chart \
+  oci://ghcr.io/mc256/starlight/starlight \
   --version 0.2.3 \
   --set "ingress.hosts={mydomain.local}"
 ```
@@ -99,9 +99,6 @@ The Starlight CLI talks to the Starlight Daemon via gRPC socket to request the i
       mountPath: /run/starlight
 ```
 
-
-
-
 The following is a complete example of the a Redis deployment:
 ```yaml
 apiVersion: apps/v1
@@ -140,7 +137,6 @@ spec:
         volumeMounts:
         - name: socket
           mountPath: /run/starlight
-
       containers:
       - name: test-redis
         image: harbor.yuri.moe/x/redis:6.2.7

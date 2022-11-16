@@ -54,7 +54,7 @@ helm-package:
 
 .PHONY: push-helm-package
 push-helm-package:
-	helm push /tmp/starlight-proxy-chart-$(VERSIONNUMBER).tgz oci://ghcr.io/mc256/starlight/
+	helm push /tmp/starlight-$(VERSIONNUMBER).tgz oci://ghcr.io/mc256/starlight/
 
 .PHONY: change-version-number
 change-version-number:

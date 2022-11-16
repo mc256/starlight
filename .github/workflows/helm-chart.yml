@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |-
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.repository_owner }} --password-stdin ghcr.io
-          make build-helm-package push-helm-package
+          make helm-package push-helm-package
           helm registry logout ghcr.io
         env:
           HELM_EXPERIMENTAL_OCI: '1'
