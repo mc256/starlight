@@ -8,5 +8,6 @@ Homepage: https://github.com/mc256/starlight
 
 Package: starlight
 Architecture: amd64
-Depends: containerd (>= 1.4.13), linux-headers-generic (>= 5.15.0)
+Recommends: containerd (>= 1.4.13)
+Depends: linux-headers-generic (>= 5.15.0)
 Description: Starlight is an accelerator for provisioning container-based applications.

@@ -42,8 +42,7 @@ spec:
           resources:
             {{- toYaml .Values.edge.resources | nindent 12}}
           env:
-          - name: CONTAINERD_NAMESPACE
-            value: "k8s.io"
+           {{- toYaml .Values.edge.env | nindent 12}}
           volumeMounts:
           - name: socket
             mountPath: /run/starlight

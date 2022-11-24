@@ -3,10 +3,17 @@
 ## TL;DR
 
 ```shell
-helm upgrade --install -f starlight/values.yaml \
+helm show values oci://ghcr.io/mc256/starlight/starlight \
+     --version 0.2.4 > ./my-values.yaml
+```
+
+Take a look at `./my-values.yaml` and edit it to your liking. Then run:
+
+```
+helm upgrade --install -f ./my-values.yaml \
      starlight \
      oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.2.3
+     --version 0.2.4
 ```
 
 ## Prerequisites
@@ -17,7 +24,7 @@ The current deployment has tested in this environment:
 - Helm 3.9.0+
 - PV provisioner support in the underlying infrastructure
 - ReadWriteOnce volumes persistence storage
-- Linux kernel 5.15.0+
+- Linux kernel 5.15.0+ (edge node)
 
 
 ## Introductions

@@ -46,6 +46,7 @@ A light-weight database management tool Adminer has been enabled, to view the da
 {{- end }}
 
 {{ if .Values.edge.enabled}}
+--------------------------------------------------------------------------------
 You have enabled edge server.
 The purpose of this deployment is to keep the Starlight CLI image on every edge node,
 so that whever the user uses initContainer, there is a starlight CLI container for that.
@@ -55,7 +56,7 @@ You still need to install the Starlight daemon (containerd snapshotter) and enab
 ON THE WORKER NODE:
 1. Install the Starlight daemon
 
-  echo ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
+  export ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
   wget https://github.com/mc256/starlight/releases/download/v{{ .Chart.Version }}/starlight_{{ .Chart.Version }}_$ARCH.deb
   sudo dpkg -i starlight_{{ .Chart.Version }}_$ARCH.deb
   sudo systemctl enable starlight
@@ -76,8 +77,35 @@ ON THE WORKER NODE:
       address = "/run/starlight/starlight-snapshotter.sock"
   EOF
 
+  If using k3s, please create `/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl` and add the configuration.
+
 3. and restart the container
+
   sudo systemctl restart containerd
+
+
+4. Add Starlight Proxy to the edge node, test to see if it works
+  {{ range $host := .Values.ingress.hosts }}
+  ctr-starlight ap in-cluster http{{ if $.Values.ingress.tls }}s{{ end }} {{ $host }}
+  {{- end }}
+  ctr-starlight test in-cluster
+
+5. Convert Container Images (on the edge node)
+
+  ctr-starlight convert \
+    --insecure-destination --profile in-cluster --notify \
+    --platform=linux/arm/v7,linux/amd64 \
+    docker.io/library/redis:6.2.1 \
+    starlight-registry.default.svc.cluster.local:5000/starlight/redis:6.2.1
+
+  ctr-starlight convert \
+    --insecure-destination --profile in-cluster --notify\
+    --platform=linux/arm/v7,linux/amd64 \
+    docker.io/library/redis:6.2.2 \
+    starlight-registry.default.svc.cluster.local:5000/starlight/redis:6.2.2
+
+
+--------------------------------------------------------------------------------
 {{ end}}
 
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.

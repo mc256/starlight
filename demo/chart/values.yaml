@@ -83,7 +83,7 @@ service:
 # Ingress
 ingress:
   enabled: true
-  className: "nginx"
+  ingressClassName: "nginx"
   annotations:
     # kubernetes.io/tls-acme: "true"
     # set to the largest layer size for uploading container image
@@ -107,39 +107,7 @@ cloudAffinity: {}
 
 ########################################################################
 # EDGE
-########################################################################
-# The purpose of this deployment is to keep the Starlight CLI image on every edge node,
-# so that whever the user uses initContainer, there is a starlight CLI container for that.
-#
-# You still need to install the Starlight daemon (containerd snapshotter) and enable it on the edge node.
-#
-# ON THE WORKER NODE:
-# 1. Install the Starlight daemon
-#
-#   wget https://github.com/mc256/starlight/releases/download/v0.2.3/starlight_0.2.3_amd64.deb
-#   sudo dpkg -i starlight_0.2.3_amd64.deb
-#   sudo systemctl enable starlight
-#   sudo systemctl start starlight
-#
-#
-#
-# 2. Configure the containerd to use Starlight as the snapshotter
-#
-#   sudo mkdir -p /etc/containerd
-#   cat <<EOF | sudo tee /etc/containerd/config.toml
-#   [plugins]
-#     [plugins."io.containerd.grpc.v1.cri".containerd]
-#       snapshotter = "starlight"
-#   [proxy_plugins]
-#     [proxy_plugins.starlight]
-#       type = "snapshot"
-#       address = "/run/starlight/starlight-snapshotter.sock"
-#   EOF
-#
-# 3. and restart the container
-#   sudo systemctl restart containerd
-#
-#
+########################################################################\
 edge:
   enabled: true
   # starlightCLI connects to the Starlight Daemon on the edge node via gRPC
@@ -149,6 +117,11 @@ edge:
   # This keep the container running allows you to run some starlight-related commands on the edge node
   command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
   # Starlight CLI Default Environment Variables
+  env:
+    - name: CONTAINERD_NAMESPACE
+      value: "k8s.io"
+    - name: PATH
+      value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt"
 
 # select nodes in the edge
 edgeTolerations: []

@@ -1215,7 +1215,7 @@ func (s *StarlightDaemonAPIServer) NotifyProxy(ctx context.Context, req *pb.Noti
 		}, nil
 	}
 
-	err = s.client.Notify(req.Reference, reference)
+	err = s.client.Notify(req.ProxyConfig, reference)
 	if err != nil {
 		return &pb.NotifyResponse{
 			Success: false,

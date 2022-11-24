@@ -24,3 +24,5 @@ sandbox/
 .vscode
 
 vendor/
+
+my-values.yaml
