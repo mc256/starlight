@@ -77,7 +77,6 @@ information about Starlight, please visit our repository at https://github.com/m
 		// ----
 		&cli.StringFlag{
 			Name:        "host",
-			Aliases:     []string{"h"},
 			EnvVars:     []string{"STARLIGHT_HOST"},
 			DefaultText: cfg.ListenAddress,
 			Usage:       "host",

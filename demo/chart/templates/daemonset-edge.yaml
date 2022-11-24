@@ -37,7 +37,8 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.edge.repository }}:{{ .Values.edge.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.edge.imagePullPolicy }}
-          command: {{ .Values.edge.command }}
+          command:
+            {{- toYaml .Values.edge.command | nindent 12 }}
           resources:
             {{- toYaml .Values.edge.resources | nindent 12}}
           env:

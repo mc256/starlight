@@ -13,7 +13,7 @@ starlightProxy:
 
   # dbConnection specify
   # Default is set to the postgres instance in the same deployment.
-  dbConnection: "postgres://postgres:postgres@postgres:5432/starlight?sslmode=disable"
+  dbConnection: "postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
   # logLevel is the log level for the proxy, options are: trace, debug, info, warn, error, fatal
   logLevel: "info"
   # defaultRegistry is the default registry when the full image name is not specified

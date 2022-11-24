@@ -9,47 +9,44 @@ For more info, please visit https://github.com/mc256/starlight
                         __/ |          
                         |___/   
 
-{{- if .Values.registry.enabled}}
-You have enabled container registry. 
-{{- end}}
 
 {{- if .Values.ingress.enabled }}
 Get the application URL by running these commands:
-
-  {{ range $host := .Values.ingress.hosts }}
+  {{- range $host := .Values.ingress.hosts }}
   Starlight Proxy       : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}
     {{- if $.Values.registry.enabled }}
   Container Registry    : http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host }}/v2
     {{- end }}
-  {{ end }}
-           
+  {{- end }}
+
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "starlight.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  
   echo http://$SERVICE_IP
   echo $SERVICE_IP
 
   Please point your domain to $SERVICE_IP in your hosts file or DNS server.
 
-
 The maximum upload size of the Nginx ingress has set to {{ index .Values.ingress.annotations "nginx.ingress.kubernetes.io/proxy-body-size" }}.
 {{- else }}
 You have not enabled ingress.
 {{- end }}
-{{ if .Values.postgres.enabled }}
-You have enabled local postgresql. 
-In production environment, please consider using an external postgresql with porperly configured security and parition large tables.
 
-{{ if .Values.adminer.enabled }}
-A light-weight database management tool Adminer has been enabled.  
+{{- if .Values.postgres.enabled }}
+--------------------------------------------------------------------------------
+You have enabled a local PostgresQL database.
+In production environment, please consider using an external postgresql with properly configured security and partition.
+{{- if .Values.adminer.enabled }}
 
-  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "starlight.fullname" . }}-adminer 8080:8080
+--------------------------------------------------------------------------------
+A light-weight database management tool Adminer has been enabled, to view the database content:
 
-{{ end }}
-{{ end }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "starlight.fullname" . }} 8080:8080
+  open it in http://localhost:8080/ and the default login credential is 'postgres'.
+
+{{- end }}
+{{- end }}
 
 {{ if .Values.edge.enabled}}
 You have enabled edge server.
-
 The purpose of this deployment is to keep the Starlight CLI image on every edge node,
 so that whever the user uses initContainer, there is a starlight CLI container for that.
 
@@ -58,8 +55,9 @@ You still need to install the Starlight daemon (containerd snapshotter) and enab
 ON THE WORKER NODE:
 1. Install the Starlight daemon
 
-  wget https://github.com/mc256/starlight/releases/download/v0.2.3/starlight_0.2.3_amd64.deb
-  sudo dpkg -i starlight_0.2.3_amd64.deb
+  echo ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
+  wget https://github.com/mc256/starlight/releases/download/v{{ .Chart.Version }}/starlight_{{ .Chart.Version }}_$ARCH.deb
+  sudo dpkg -i starlight_{{ .Chart.Version }}_$ARCH.deb
   sudo systemctl enable starlight
   sudo systemctl start starlight
 
@@ -80,9 +78,7 @@ ON THE WORKER NODE:
 
 3. and restart the container
   sudo systemctl restart containerd
-
 {{ end}}
-
 
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.
            You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "starlight.fullname" . }}'

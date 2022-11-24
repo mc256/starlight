@@ -5,7 +5,7 @@ COPY . .
 
 ENV GO111MODULE=on
 
-RUN make change-version-number set-production starlight-proxy-for-alpine && mkdir ./out/data
+RUN make change-version-number set-production starlight-proxy-for-alpine
 
 #CMD ["/go/src/app/out/starlight-proxy"]
 FROM alpine:3.12 AS starlight-proxy
@@ -20,7 +20,9 @@ FROM golang:1.18 AS starlight-cli-build
 WORKDIR /go/src/app
 COPY . .
 
-RUN make change-version-number set-production ctr-starlight-for-alpine && mkdir ./out/data
+ENV GO111MODULE=on
+
+RUN make change-version-number set-production ctr-starlight-for-alpine
 
 FROM alpine:3.12 AS starlight-cli
 

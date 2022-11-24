@@ -54,16 +54,20 @@ spec:
               port: 8090
           resources:
             {{- toYaml .Values.starlightProxy.resources | nindent 12}}
+          #command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
           command: ["/opt/starlight-proxy"]
-          args:
-          - --registry
-          - {{ .Values.starlightProxy.defaultRegistry | quote | default "http://container-registry.default.svc.cluster.local:5000" }}
-          - --log-level
-          - {{ .Values.starlightProxy.logLevel | quote | default "info" }}
-          - --postgres
-          - {{ .Values.starlightProxy.dbConnection | quote | default "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" }}
-          - --port
-          - "8090"
+          # args: ["--config", "/etc/starlight/proxy_config.json"]
+          env:
+          - name: STARLIGHT_HOST
+            value: "0.0.0.0"
+          - name: STARLIGHT_PORT
+            value: "8090"
+          - name: LOG_LEVEL
+            value: {{ .Values.starlightProxy.logLevel | quote | default "info" }}
+          - name: DB_CONNECTION_STRING
+            value: {{ .Values.starlightProxy.dbConnection | quote | default "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" }}
+          - name: REGISTRY
+            value: {{ .Values.starlightProxy.defaultRegistry | quote | default "http://container-registry.default.svc.cluster.local:5000" }}
         {{- if .Values.postgres.enabled }}
         ############################################################
         - name: starlight-metadata
