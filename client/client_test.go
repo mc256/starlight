@@ -22,25 +22,67 @@ import (
 	"testing"
 )
 
-func TestNewClient(t *testing.T) {
-	cfg, _, _, _ := LoadConfig("")
+func TestImageFilter(t *testing.T) {
+	cfg, p, _, _ := LoadConfig("/sandbox/etc/starlight/starlight-daemon.json")
+	fmt.Println("config path: ", p)
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-
+	fmt.Println("containerd: ", cfg.Containerd)
+	fmt.Println("namespace: ", cfg.Namespace)
 	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	img, err := c.findImage(client, getImageFilter("harbor.yuri.moe/public/redis:test2"))
+	imgFilterRef := "starlight-registry.default.svc.cluster.local:5000/starlight/redis:6.2.1"
+	img, err := c.findImage(client, getImageFilter(imgFilterRef, true))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Log(img)
+	if img != nil {
+		t.Error("image should be nil")
+	}
+
+	img, err = c.findImage(client, getImageFilter(imgFilterRef, false))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if img == nil {
+		t.Error("image should not be nil")
+	}
+
+}
+
+func TestClient_RemoveImage(t *testing.T) {
+	cfg, p, _, _ := LoadConfig("/sandbox/etc/starlight/starlight-daemon.json")
+	fmt.Println("config path: ", p)
+	c, err := NewClient(context.Background(), cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println("containerd: ", cfg.Containerd)
+	fmt.Println("namespace: ", cfg.Namespace)
+	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	imgFilterRef := "starlight-registry.default.svc.cluster.local:5000/starlight/redis:6.2.1"
+
+	is := client.ImageService()
+	// remove image
+	err = is.Delete(c.ctx, imgFilterRef)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 }
 
 func TestClient_PullImageNotUpdate(t *testing.T) {
@@ -59,12 +101,8 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 	}
 
 	operator := snapshotter.NewOperator(c.ctx, c, client.SnapshotService("starlight"))
-	ready := make(chan bool)
-	img, _, err := c.PullImage(client, nil,
-		"harbor.yuri.moe/starlight/redis:6.2.7",
-		"linux/amd64",
-		"",
-		&ready)
+	img, err := c.pullImageSync(client, nil,
+		"harbor.yuri.moe/starlight/redis:6.2.7", "linux/amd64", "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -161,12 +199,10 @@ func TestClient_PullImageWithUpdate(t *testing.T) {
 		return
 	}
 
-	ready := make(chan bool)
-	img, _, err := c.PullImage(client, base,
+	img, err := c.pullImageSync(client, base,
 		"harbor.yuri.moe/starlight/redis:7.0.5",
 		"linux/amd64",
-		"",
-		&ready)
+		"")
 	if err != nil {
 		t.Error(err)
 		return
@@ -190,12 +226,8 @@ func TestClient_CreateImageService(t *testing.T) {
 
 	//plt := platforms.Format(platforms.DefaultSpec())
 	//t.Log("pulling image", "platform", plt)
-	ready := make(chan bool)
-	img, _, err := c.PullImage(client, nil,
-		"starlight/redis:6.2.7",
-		"linux/amd64",
-		"",
-		&ready)
+	img, err := c.pullImageSync(client, nil,
+		"starlight/redis:6.2.7", "linux/amd64", "")
 	if err != nil {
 		t.Error(err)
 		return

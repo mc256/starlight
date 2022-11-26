@@ -78,6 +78,7 @@ ON THE WORKER NODE:
   EOF
 
   If using k3s, please create `/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl` and add the configuration.
+  You will need to change `containerd` socket address to `/run/k3s/containerd/containerd.sock` in `/etc/starlight/proxy.json`.
 
 3. and restart the container
 
