@@ -468,52 +468,57 @@ func (d *Database) GetUniqueFiles(layers []*send.ImageLayer) ([]*send.File, erro
 	return fl, nil
 }
 
-func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs []int64, err error) {
-	var layersMap []int64
+func (d *Database) UpdateFileRanks(collection *fs.TraceCollection) (fs [][][]int64, err error) {
+	res := make([][][]int64, 0, len(collection.Groups))
+	for _, group := range collection.Groups {
+		layersImageMap := make([][]int64, len(group.Images))
+		for idx, img := range group.Images {
+			// get image serial id
+			var imageSerial, nlayer int64
+			if err = d.db.QueryRow(`
+					SELECT id, nlayer FROM image
+					WHERE ready IS NOT NULL AND hash=$1 LIMIT 1`,
+				img).Scan(&imageSerial, &nlayer); err != nil {
+				return nil, err
+			}
 
-	for _, img := range collection.Groups {
-		// get image serial id
-		i := img.Images[0]
-		var imageSerial, nlayer int64
-		if err = d.db.QueryRow(`
-			SELECT id, nlayer FROM image
-			WHERE ready IS NOT NULL AND hash=$1 LIMIT 1`,
-			i).Scan(&imageSerial, &nlayer); err != nil {
-			return nil, err
-		}
-
-		// get layers of the image
-		var rows *sql.Rows
-		rows, err = d.db.Query(`
+			// get layers of the image
+			var rows *sql.Rows
+			rows, err = d.db.Query(`
 				SELECT 
 					L.layer
 				FROM layer AS L
 				WHERE L.image=$1
 				ORDER BY "stackIndex" ASC`, imageSerial)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-		layersMap = make([]int64, nlayer)
-		idx := 0
-		for rows.Next() {
-			if err = rows.Scan(&layersMap[idx]); err != nil {
+			if err != nil {
 				return nil, err
 			}
-			idx += 1
+			defer rows.Close()
+
+			// update mapping
+			layersImageMap[idx] = make([]int64, nlayer)
+			layerIdx := 0
+			for rows.Next() {
+				if err = rows.Scan(&layersImageMap[idx][layerIdx]); err != nil {
+					return nil, err
+				}
+				layerIdx += 1
+			}
+
 		}
 
 		stmt, _ := d.db.Prepare(`
 			UPDATE file SET "order" = array_append("order",$1) WHERE fs=$2 and file=$3
 		`)
-		for _, f := range img.History {
-			_, err = stmt.Exec(f.Rank, layersMap[f.Stack], f.FileName)
+		for _, f := range group.History {
+			_, err = stmt.Exec(f.Rank, layersImageMap[f.SourceImage][f.Stack], f.FileName)
 			if err != nil {
 				return nil, err
 			}
 		}
+		res = append(res, layersImageMap)
 	}
-	return layersMap, nil
+	return res, nil
 }
 
 func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*send.RankedFile, error) {

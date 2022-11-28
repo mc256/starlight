@@ -337,7 +337,7 @@ func (c *Client) updateManifest(ctr *containerd.Client, d string, chainIds []dig
 	if err != nil {
 		return errors.Wrapf(err, "failed to mark manifest as completed")
 	}
-	log.G(c.ctx).WithField("digest", info.Digest).Info("download completed")
+	log.G(c.ctx).WithField("m", info.Digest).Info("download completed")
 	return nil
 }
 
@@ -511,12 +511,6 @@ func (c *Client) PullImage(
 ) {
 	// init vars
 	is := ctr.ImageService()
-	closedReady := false
-	defer func() {
-		if !closedReady {
-			close(*ready)
-		}
-	}()
 	localCtx := context.Background()
 
 	// check local image
@@ -530,9 +524,14 @@ func (c *Client) PullImage(
 	if img != nil {
 		labels := img.Labels()
 		if _, has := labels[util.ContentLabelCompletion]; has {
+			if _, err = c.LoadImage(ctr, img.Target().Digest); err != nil {
+				*ready <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to load image %s", ref)}
+				return
+			}
 			meta := img.Metadata()
 			*ready <- PullFinishedMessage{&meta, "", fmt.Errorf("requested image %s already exists", ref)}
 			return
+
 		}
 		log.G(c.ctx).
 			WithField("image", ref).
@@ -601,7 +600,6 @@ func (c *Client) PullImage(
 	}
 
 	// check if the image is in containerd's image pool
-
 	var (
 		buf         *bytes.Buffer
 		man, con    []byte
@@ -739,7 +737,6 @@ func (c *Client) PullImage(
 	// Image is ready (content is still on the way)
 	// close(*ready)
 	*ready <- PullFinishedMessage{&ctrImg, baseRef, nil}
-	closedReady = true
 
 	// 6. Extract file content
 	// download content

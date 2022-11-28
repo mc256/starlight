@@ -17,7 +17,7 @@ func TestStarlightProxy_Ping(t *testing.T) {
 	proxy := NewStarlightProxy(context.TODO(), "https", "test.yuri.moe")
 	proxy.auth = *url.UserPassword("username", "password")
 
-	if err := proxy.Ping(); err != nil {
+	if _, _, _, err := proxy.Ping(); err != nil {
 		t.Error(err)
 	}
 }

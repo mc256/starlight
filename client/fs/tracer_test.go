@@ -41,3 +41,17 @@ func TestLoadTraces(t *testing.T) {
 	}
 	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
 }
+
+func TestLoadTraces2(t *testing.T) {
+	ctx := util.ConfigLogger()
+	tc, err := NewTraceCollection(ctx, "/root/traces2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf, err := json.MarshalIndent(tc, "", "\t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
+}

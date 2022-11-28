@@ -150,6 +150,7 @@ func (s *Plugin) Update(ctx context.Context, info snapshots.Info, fieldpaths ...
 	log.G(s.ctx).WithFields(logrus.Fields{
 		"name":  info.Name,
 		"usage": fieldpaths,
+		"info":  info,
 	}).Debug("sn: updated")
 	return info, nil
 }

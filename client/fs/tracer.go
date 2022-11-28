@@ -151,8 +151,8 @@ func NewTracer(ctx context.Context, optimizeGroup, digest, outputDir string) (*T
 // OptimizedTraceItem with ranking
 type OptimizedTraceItem struct {
 	TraceItem
-	Rank        int `json:"r"`
-	SourceImage int `json:"s"`
+	Rank        int `json:"rank"`
+	SourceImage int `json:"img"`
 }
 
 func (oti OptimizedTraceItem) Key() string {
@@ -304,14 +304,16 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 				idx := lookupMap[trace.Image]
 
 				for _, t := range trace.Seq {
+					// remove duplicated items
 					if !visited[t.FileName] {
 						g.History = append(g.History, &OptimizedTraceItem{
 							TraceItem: TraceItem{
 								FileName: t.FileName,
+								Stack:    t.Stack,
 								Access:   t.Access + traceOffset,
 								Wait:     t.Wait,
 							},
-							Rank:        0,
+							Rank:        0, // will be updated later
 							SourceImage: idx,
 						})
 						visited[t.FileName] = true

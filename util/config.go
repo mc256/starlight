@@ -55,9 +55,9 @@ const (
 	// Snapshot labels have a prefix of "containerd.io/snapshot/"
 	// or are the "containerd.io/snapshot.ref" label.
 	// SnapshotLabelRefImage is the digest of the image manifest
-	SnapshotLabelRefImage        = "containerd.io/snapshot/starlight/ref.image"
-	SnapshotLabelRefUncompressed = "containerd.io/snapshot/starlight/ref.uncompressed"
-	SnapshotLabelRefLayer        = "containerd.io/snapshot/starlight/ref.layer"
+	SnapshotLabelRefImage        = "containerd.io/snapshot/starlight.ref.image"
+	SnapshotLabelRefUncompressed = "containerd.io/snapshot/starlight.ref.uncompressed"
+	SnapshotLabelRefLayer        = "containerd.io/snapshot/starlight.ref.layer"
 
 	// ---------------------------------------------------------------------------------
 	// Switch to false in `Makefile` when build for production environment

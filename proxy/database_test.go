@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 
 func TestDatabase_Init(t *testing.T) {
 	ctx := context.Background()
-	db, err := NewDatabase(ctx, "postgres://postgres:example@172.18.1.61:5432/postgres?sslmode=disable")
+	db, err := NewDatabase(ctx, "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
 	if err != nil {
 		t.Error(err)
 		return
@@ -70,7 +70,7 @@ func TestDatabase_GetFilesWithRanks(t *testing.T) {
 }
 
 func TestDatabase_UpdateFileRanks(t *testing.T) {
-	p := "../sandbox/group-optimize.json"
+	p := "/tmp/group-optimize.json"
 	b, err := ioutil.ReadFile(p)
 	if err != nil {
 		t.Error(err)
@@ -79,7 +79,7 @@ func TestDatabase_UpdateFileRanks(t *testing.T) {
 	var col *fs.TraceCollection
 	err = json.Unmarshal(b, &col)
 
-	var arr []int64
+	var arr [][][]int64
 	arr, err = db.UpdateFileRanks(col)
 	if err != nil {
 		t.Error(err)
