@@ -1,24 +1,28 @@
-# Starlight Proxy Helm Package
+# Starlight Helm Package
 
 ## TL;DR
 
 ```shell
 helm show values oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.2.4 > ./my-values.yaml
+     --version 0.2.7 > ./my-values.yaml
 ```
 
-Take a look at `./my-values.yaml` and edit it to your liking. Then run:
+Take a look at `./my-values.yaml` and edit it to your liking. 
+In most cases, you will want to change `cloudNodeSelector` and `edgeNodeSelector` to 
+make sure that the pods are scheduled on the correct nodes.
+You make also need to take a look at the `ingress` section and change the `host` and `ingressClassName`.
 
-```
+Then give it a shot:
+```shell
 helm upgrade --install -f ./my-values.yaml \
      starlight \
      oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.2.4
+     --version 0.2.7
 ```
 
 ## Prerequisites
 
-The current deployment has tested in this environment:
+The current deployment has been tested in this environment:
 
 - Kubernetes 1.24+
 - Helm 3.9.0+
@@ -27,7 +31,7 @@ The current deployment has tested in this environment:
 - Linux kernel 5.15.0+ (edge node)
 
 
-## Introductions
+## Install
 
 This chart bootstraps a **Starlight Proxy** deployment on a Kubernetes cluster.
 
@@ -36,39 +40,81 @@ It also comes with a **[Container Registry (v2)](https://github.com/distribution
 and **[Adminer for managing the database](https://www.adminer.org/)** 
 in the default deployment for convenience and can be disabled by setting the parameters.
 
-
-## Install
-
-Container registry requries persistence storage for storing the metadata. 
-In this case, we use the [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) 
-
-```shell
-kubectl apply -f \
-  https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.23/deploy/local-path-storage.yaml
-  
-kubectl patch storageclass local-path \
-  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-```
-
-To install the chart with the app name `my-starlight-proxy`:
-
-```shell
-helm install my-starlight-proxy \
-  oci://ghcr.io/mc256/starlight/starlight \
-  --version 0.2.3
-```
+<img width="100%" src="images/helm-chart.svg">
 
 
-You may want to set a few parameter for example the domain name for the ingress, for example set the domain name for ingress to `mydomain.local`:
+1. Some components require persistence storage. We cloud use the [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) 
 
-```shell
-helm install my-starlight-proxy \
-  oci://ghcr.io/mc256/starlight/starlight \
-  --version 0.2.3 \
-  --set "ingress.hosts={mydomain.local}"
-```
+    ```shell
+    kubectl apply -f \
+      https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.23/deploy/local-path-storage.yaml
+      
+    kubectl patch storageclass local-path \
+      -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+    ```
 
-Please check the Parameters section for more information.
+2. On the edge node we need to install **Starlight Daemon** and connect <sup>[1]</sup> it to **containerd**.
+    ```shell
+    export ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
+    wget https://github.com/mc256/starlight/releases/download/v{{ .Chart.Version }}/starlight_{{ .Chart.Version }}_$ARCH.deb
+    sudo dpkg -i starlight_{{ .Chart.Version }}_$ARCH.deb
+    ```
+   
+    if you are using k3s, change containerd's socket address in `/etc/starlight/daemon.json`
+    ```json
+    { 
+      "containerd": "/run/containerd/containerd.sock"
+    }
+    ```
+3. Configure **containerd** to use <sup>[2]</sup> Starlight as its default 
+    [snapshotter plugin](https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md)
+
+    Add the following to `/etc/containerd/config.toml`:
+    ```toml
+    [plugins]
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        snapshotter = "starlight"
+    [proxy_plugins]
+      [proxy_plugins.starlight]
+        type = "snapshot"
+        address = "/run/starlight/starlight-snapshotter.sock"
+    ```
+    if file does not exist, create it using 
+
+    ```shell 
+    mkdir /etc/containerd && containerd config default > /etc/containerd/config.toml`
+    ```
+   
+    if you are using k3s, copy the default configuration, and change containerd's config in `/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl`
+    ```shell
+    cp /var/lib/rancher/k3s/agent/etc/containerd/config.toml /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+    ```
+   
+    Restart containerd to apply the changes
+    ```shell
+    systemctl restart containerd
+    # For k3s, use
+    # systemctl restart k3s-agent
+    ```
+
+4. Add proxy configuration<sup>[6]</sup> to **Starlight Daemon** .
+    We can SSH into the Starlight CLI Tool pods in the edge node <sup>[5]</sup>.
+    ```shell
+    kubectl exec --stdin --tty `kubectl get pods --selector=app.kubernetes.io/component=edge,app.kubernetes.io/name=starlight -o jsonpath='{.items[0].metadata.name}'` -- /bin/sh
+    ```
+    
+    Then add a proxy using the Starlight CLI tool. (Please change to the domain name in `.Values.ingress.host`)
+    
+    ```shell
+    ctr-starlight add-proxy in-cluster http YOUR_DOMAIN_NAME
+    ```
+    
+    Test the connection<sup>[6]<sup>
+   ```shell
+   ctr-starlight test in-cluster
+   # ping test success: ok! - https://starlight.mc256.dev
+   # latency: 721 ms
+   ```
 
 
 ## Uninstall
@@ -78,7 +124,6 @@ To uninstall the app  `my-starlight-proxy`:
 ```shell
 helm delete my-starlight-proxy
 ```
-
 
 ## Parameters
 Please see the comments in the [`values.yaml`](https://github.com/mc256/starlight/blob/master/demo/chart/values.yaml) file.
@@ -96,8 +141,8 @@ The Starlight CLI talks to the Starlight Daemon via gRPC socket to request the i
     - /opt/ctr-starlight  
     - pull 
     - --profile
-    - xxx
-    - harbor.yuri.moe/x/redis:6.2.7
+    - in-cluster
+    - starlight-registry.default.svc.cluster.local:5000/redis:6.2.7
     env:
     - name: CONTAINERD_NAMESPACE
       value: "k8s.io"
@@ -136,8 +181,8 @@ spec:
         - /opt/ctr-starlight  
         - pull 
         - --profile
-        - xxx
-        - harbor.yuri.moe/x/redis:6.2.7
+        - in-cluster
+        - starlight-registry.default.svc.cluster.local:5000/redis:6.2.7
         env:
         - name: CONTAINERD_NAMESPACE
           value: "k8s.io"
@@ -146,7 +191,7 @@ spec:
           mountPath: /run/starlight
       containers:
       - name: test-redis
-        image: harbor.yuri.moe/x/redis:6.2.7
+        image: starlight-registry.default.svc.cluster.local:5000/redis:6.2.7
         securityContext:
           runAsUser: 999
           allowPrivilegeEscalation: false

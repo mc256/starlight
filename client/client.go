@@ -136,11 +136,14 @@ func (c *Client) findImage(ctr *containerd.Client, filter string) (img container
 func (c *Client) FindBaseImage(ctr *containerd.Client, base, ref string) (img containerd.Image, err error) {
 	var baseFilter string
 	if base == "" {
-		baseFilter = strings.Split(ref, ":")[0]
-		if baseFilter == "" {
+		sp := strings.Split(ref, ":")
+		if len(sp) > 1 {
+			tag := sp[len(sp)-1]
+			baseFilter = strings.TrimSuffix(ref, tag)
+			baseFilter = getImageFilter(baseFilter, true)
+		} else {
 			return nil, fmt.Errorf("invalid image reference: %s, missing tag", ref)
 		}
-		baseFilter = getImageFilter(baseFilter, true)
 	} else {
 		baseFilter = getImageFilter(base, true)
 	}

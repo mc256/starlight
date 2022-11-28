@@ -5,7 +5,7 @@
 [![Helm Chart](https://img.shields.io/github/workflow/status/mc256/starlight/Helm%20Chart?label=Proxy%20Helm%20Chart&logo=helm&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
 [![Debian Package](https://img.shields.io/github/workflow/status/mc256/starlight/Debian%20Package?label=Snapshotter%20Debian%20Package&logo=debian&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/debian-package.yml)
 [![Release](https://img.shields.io/github/v/release/mc256/starlight?label=starlight&style=flat-square)](https://github.com/mc256/starlight/releases)
-<img align="right" src="docs/provisioning-time-wan.png">
+<img align="right" src="docs/images/provisioning-time-wan.png">
 
 Starlight is an accelerator for provisioning container-based applications.
 It speeds up deploying and updating containers on workers inside and outside the cloud, 

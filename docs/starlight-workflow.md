@@ -1,5 +1,5 @@
 # How Starlight Works (Overview)
-![starlight-workflow](starlight-workflow.png)
+![starlight-workflow](images/starlight-workflow.png)
 
 Once the user issues a worker `PULL` command to download a set of containers ①,
 the command is received by the standard **containerd** daemon.
