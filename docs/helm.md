@@ -119,10 +119,8 @@ in the default deployment for convenience and can be disabled by setting the par
 
 ## Uninstall
 
-To uninstall the app  `my-starlight-proxy`:
-
 ```shell
-helm delete my-starlight-proxy
+helm uninstall starlight
 ```
 
 ## Parameters
