@@ -1,9 +1,9 @@
 
 # Starlight: Fast Container Provisioning
 
-[![Docker Image](https://img.shields.io/github/workflow/status/mc256/starlight/Docker%20Image?label=Proxy%20Docker%20Image&logo=docker&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
-[![Helm Chart](https://img.shields.io/github/workflow/status/mc256/starlight/Helm%20Chart?label=Proxy%20Helm%20Chart&logo=helm&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
-[![Debian Package](https://img.shields.io/github/workflow/status/mc256/starlight/Debian%20Package?label=Snapshotter%20Debian%20Package&logo=debian&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/debian-package.yml)
+[![Docker Image](https://img.shields.io/github/actions/workflow/status/mc256/starlight/docker-image.yml?branch=master&label=Proxy%20Docker%20Image&logo=docker&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
+[![Helm Chart](https://img.shields.io/github/actions/workflow/status/mc256/starlight/helm-chart.yml?branch=master&label=Proxy%20Helm%20Chart&logo=helm&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
+[![Debian Package](https://img.shields.io/github/actions/workflow/status/mc256/starlight/debian-package.yml?branch=master&label=Snapshotter%20Debian%20Package&logo=debian&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/debian-package.yml)
 [![Release](https://img.shields.io/github/v/release/mc256/starlight?label=starlight&style=flat-square)](https://github.com/mc256/starlight/releases)
 <img align="right" src="docs/images/provisioning-time-wan.png">
 
@@ -174,13 +174,13 @@ If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ## Roadmap
 Starlight is not complete. Our roadmap:
 
-| Version                                                  | Status      | Scheduled Release |
-|----------------------------------------------------------|-------------|-------------------|
-| [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) | stable      |                   |
-| [v0.2.3](https://github.com/mc256/starlight)             | development |                   |
-| v0.3.0                                                   |             | 2022-12-15        |
-| v0.4.0                                                   |             | 2023-01-15        |
-| v0.5.0                                                   |             | 2023-02-15        |
+| Version                                                  | Status  | Scheduled Release |
+|----------------------------------------------------------|---------|-------------------|
+| [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) |         |                   |
+| [v0.2.7](https://github.com/mc256/starlight/tree/v0.2.7) | stable  |                   |
+| [v0.3.0](https://github.com/mc256/starlight/tree/)       | develop | 2022-12-15        |
+| v0.4.0                                                   |         | 2023-01-15        |
+| v0.5.0                                                   |         | 2023-02-15        |
 
 Feature List:
 - [x] Scalable database backend (v0.2)
@@ -192,11 +192,11 @@ Feature List:
     - [x] Starlight Proxy authentication (v0.2)
   - [x] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
   - [x] initContainer tool (v0.3)
-- [ ] OCI container registry support (v0.3)
+- [ ] OCI container registry support (v0.4)
   - [x] Goharbor support (v0.2)
   - [x] Multiple platforms image support (v0.2) 
-  - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.3)
-  - [ ] Jointly optimizing multiple containers deployments (v0.4)
+  - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.4)
+  - [x] Jointly optimizing multiple containers deployments (v0.4)
   - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.4)
 - [ ] Starlight new features (v0.5)
   - [ ] Resume interrupted pull connection (v0.4)

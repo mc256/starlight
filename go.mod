@@ -3,7 +3,7 @@ module github.com/mc256/starlight
 go 1.18
 
 require (
-	github.com/containerd/containerd v1.6.6
+	github.com/containerd/containerd v1.6.12
 	github.com/containerd/continuity v0.3.0
 	github.com/google/go-containerregistry v0.5.1
 	github.com/google/uuid v1.3.0
@@ -21,9 +21,9 @@ require (
 	// newer version causes issue #24
 	github.com/urfave/cli/v2 v2.3.0
 	go.etcd.io/bbolt v1.3.6
-	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	google.golang.org/grpc v1.47.0
 )
 
@@ -31,7 +31,7 @@ require google.golang.org/protobuf v1.28.0
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/Microsoft/hcsshim v0.9.3 // indirect
+	github.com/Microsoft/hcsshim v0.9.5 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
