@@ -49,9 +49,9 @@ func NewContainerdClient(namespace, socket, logLevel string) (c *ContainerdClien
 		Client:     client,
 	}
 
-	util.ConfigLoggerWithLevel(logLevel)
 	c.ctx = namespaces.WithNamespace(context.Background(), namespace)
-
+	util.ConfigLoggerWithLevel(c.ctx, logLevel)
+	
 	// Snapshotter service
 	c.Sn = NewSnapshotterService(c.ctx, c.Client)
 	return c, c.ctx, nil

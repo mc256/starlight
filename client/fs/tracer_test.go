@@ -19,6 +19,7 @@
 package fs
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -29,7 +30,8 @@ import (
 )
 
 func TestLoadTraces(t *testing.T) {
-	ctx := util.ConfigLogger()
+	ctx := context.TODO()
+	util.ConfigLogger(ctx)
 	tc, err := NewTraceCollection(ctx, "/tmp")
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +45,8 @@ func TestLoadTraces(t *testing.T) {
 }
 
 func TestLoadTraces2(t *testing.T) {
-	ctx := util.ConfigLogger()
+	ctx := context.TODO()
+	util.ConfigLogger(ctx)
 	tc, err := NewTraceCollection(ctx, "/root/traces2")
 	if err != nil {
 		t.Fatal(err)

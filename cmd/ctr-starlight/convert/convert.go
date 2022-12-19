@@ -33,29 +33,29 @@ import (
 )
 
 // Action - This Action does not require communicates to the Starlight daemon.
-func Action(ctx context.Context, c *cli.Context) error {
+func Action(ctx context.Context, cli *cli.Context) error {
 	// [flags] SourceImage StarlightImage
-	if c.Args().Len() != 2 {
+	if cli.Args().Len() != 2 {
 		return errors.New("wrong number of arguments")
 	}
 
-	srcImg := c.Args().Get(0)
-	slImg := c.Args().Get(1)
+	srcImg := cli.Args().Get(0)
+	slImg := cli.Args().Get(1)
 
-	srcInsecure := c.Bool("insecure-source")
-	dstInsecure := c.Bool("insecure-destination")
+	srcInsecure := cli.Bool("insecure-source")
+	dstInsecure := cli.Bool("insecure-destination")
 
 	// logger
-	ns := c.String("namespace")
-	util.ConfigLoggerWithLevel(c.String("log-level"))
+	ns := cli.String("namespace")
 	ctx = namespaces.WithNamespace(ctx, ns)
+	util.ConfigLoggerWithLevel(ctx, cli.String("log-level"))
 
 	// source
-	srcOptions := []name.Option{}
+	var srcOptions []name.Option
 	if srcInsecure {
 		srcOptions = append(srcOptions, name.Insecure)
 	}
-	dstOptions := []name.Option{}
+	var dstOptions []name.Option
 	if dstInsecure {
 		dstOptions = append(dstOptions, name.Insecure)
 	}
@@ -64,7 +64,7 @@ func Action(ctx context.Context, c *cli.Context) error {
 	remoteOptions := []remote.Option{remote.WithAuthFromKeychain(authn.DefaultKeychain)}
 
 	// config
-	convertor, err := util.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions, c.String("platform"))
+	convertor, err := util.NewConvertor(ctx, srcImg, slImg, srcOptions, dstOptions, remoteOptions, cli.String("platform"))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("illegal image reference")
 		return nil
@@ -79,8 +79,8 @@ func Action(ctx context.Context, c *cli.Context) error {
 	log.G(ctx).Info("conversion completed")
 
 	// notify
-	if c.Bool("notify") {
-		err = notify.SharedAction(ctx, c, convertor.GetDst())
+	if cli.Bool("notify") {
+		err = notify.SharedAction(ctx, cli, convertor.GetDst())
 		if err != nil {
 			log.G(ctx).WithError(err).Error("fail to notify the converted image")
 			return nil

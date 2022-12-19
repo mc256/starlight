@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/client"
@@ -129,23 +130,29 @@ https://github.com/mc256/starlight
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) {
+func DefaultAction(cli *cli.Context, cfg *client.Configuration) (err error) {
 	var (
 		p  string
 		ne bool
 	)
+	c := context.TODO()
 
-	config := context.String("config")
+	// config
+	config := cli.String("config")
 	cfg, p, ne, err = client.LoadConfig(config)
 
-	if l := context.String("log-level"); l != "" {
+	// log level
+	if l := cli.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}
-	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+	util.ConfigLoggerWithLevel(c, cfg.LogLevel)
+
+	// version
 	log.G(c).
 		WithField("version", util.Version).
 		Info("starlight-daemon")
 
+	// config load result
 	if err != nil {
 		log.G(c).WithFields(logrus.Fields{
 			"log":  cfg.LogLevel,
@@ -163,22 +170,23 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 			Info("loaded configuration")
 	}
 
-	if id := context.String("id"); id != "" {
+	// server configuration
+	if id := cli.String("id"); id != "" {
 		cfg.ClientId = id
 	}
-	if m := context.String("metadata"); m != "" {
+	if m := cli.String("metadata"); m != "" {
 		cfg.Metadata = m
 	}
-	if s := context.String("socket"); s != "" {
+	if s := cli.String("socket"); s != "" {
 		cfg.Socket = s
 	}
-	if r := context.String("fs-root"); r != "" {
+	if r := cli.String("fs-root"); r != "" {
 		cfg.FileSystemRoot = r
 	}
-	if d := context.String("default"); d != "" {
+	if d := cli.String("default"); d != "" {
 		cfg.DefaultProxy = d
 	}
-	parr := context.StringSlice("proxy")
+	parr := cli.StringSlice("proxy")
 	if len(parr) != 0 {
 		for _, v := range parr {
 			if k, vv, err := client.ParseProxyStrings(v); err != nil {
@@ -229,6 +237,7 @@ func DefaultAction(context *cli.Context, cfg *client.Configuration) (err error) 
 
 	}()
 
+	// wait for terminate signals
 	wait := make(chan interface{})
 	si := make(chan os.Signal, 1)
 	signal.Notify(si, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)

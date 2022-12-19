@@ -19,6 +19,7 @@
 package fs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,9 +38,10 @@ func TestNewReceiverFromFile(t *testing.T) {
 	)
 	_ = os.MkdirAll(filepath.Join(root, "sfs"), 0755)
 
-	ctx := util.ConfigLoggerWithLevel("trace")
+	ctx := context.TODO()
+	util.ConfigLoggerWithLevel(ctx, "trace")
 
-	db, err := util.OpenDatabase(ctx, filepath.Join(root, "sfs"), "layer.db")
+	db, err := util.OpenDatabase(ctx, filepath.Join(root, "sfs"))
 	if err != nil {
 		t.Fatal(err)
 		return

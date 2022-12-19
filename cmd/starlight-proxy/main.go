@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
@@ -137,23 +138,29 @@ information about Starlight, please visit our repository at https://github.com/m
 	return app
 }
 
-func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
+func DefaultAction(cli *cli.Context, cfg *proxy.Configuration) (err error) {
 	var (
 		p  string
 		ne bool
 	)
+	c := context.TODO()
 
-	config := context.String("config")
+	// config
+	config := cli.String("config")
 	cfg, p, ne, err = proxy.LoadConfig(config)
 
-	if l := context.String("log-level"); l != "" {
+	// log level
+	if l := cli.String("log-level"); l != "" {
 		cfg.LogLevel = l
 	}
-	c := util.ConfigLoggerWithLevel(cfg.LogLevel)
+	util.ConfigLoggerWithLevel(c, cfg.LogLevel)
+
+	// version
 	log.G(c).
 		WithField("version", util.Version).
 		Info("starlight-proxy")
 
+	// config load result
 	if err != nil {
 		log.G(c).WithFields(logrus.Fields{
 			"log":  cfg.LogLevel,
@@ -171,19 +178,20 @@ func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
 			Info("loaded configuration")
 	}
 
-	if port := context.Int("port"); port != 0 {
+	// server configuration
+	if port := cli.Int("port"); port != 0 {
 		cfg.ListenPort = port
 	}
-	if h := context.String("host"); h != "" {
+	if h := cli.String("host"); h != "" {
 		cfg.ListenAddress = h
 	}
 	log.G(c).Infof("listen on %s:%d", cfg.ListenAddress, cfg.ListenPort)
 
-	if pc := context.String("postgres"); pc != "" {
+	if pc := cli.String("postgres"); pc != "" {
 		cfg.PostgresConnectionString = pc
 	}
 
-	if r := context.String("registry"); r != "" {
+	if r := cli.String("registry"); r != "" {
 		cfg.DefaultRegistry = r
 	}
 	log.G(c).Infof("default backend registry: %s", cfg.DefaultRegistry)

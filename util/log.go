@@ -26,47 +26,23 @@ import (
 	"time"
 )
 
-func ConfigLogger() (ctx context.Context) {
-	return ConfigLoggerWithLevel("info")
+func ConfigLogger(ctx context.Context) {
+	ConfigLoggerWithLevel(ctx, "info")
 }
 
-func ConfigLoggerWithLevel(level string) (ctx context.Context) {
+func ConfigLoggerWithLevel(ctx context.Context, level string) {
 	level = strings.ToLower(level)
 
-	// Logger
-	ctx = context.Background()
 	log.GetLogger(ctx).Logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: time.StampNano,
-		//ForceColors:     true,
+		//ForceColors: true,
 		//DisableColors: false,
 	})
 
-	switch level {
-
-	case "fatal":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.FatalLevel)
-		break
-	case "error":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.ErrorLevel)
-		break
-	case "warning":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.WarnLevel)
-		break
-	case "info":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.InfoLevel)
-		break
-	case "debug":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.DebugLevel)
-		break
-	case "trace":
-		log.GetLogger(ctx).Logger.SetLevel(logrus.TraceLevel)
-		break
-	default:
-		log.GetLogger(ctx).Logger.SetLevel(logrus.InfoLevel)
-		break
+	l, err := logrus.ParseLevel(level)
+	if err != nil {
+		l = logrus.InfoLevel
 	}
-
-	return
-
+	log.GetLogger(ctx).Logger.SetLevel(l)
 }
