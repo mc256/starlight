@@ -20,15 +20,17 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	cmdAddProxy "github.com/mc256/starlight/cmd/ctr-starlight/addproxy"
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
+	cmdListProxy "github.com/mc256/starlight/cmd/ctr-starlight/listproxy"
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	cmdOptimizer "github.com/mc256/starlight/cmd/ctr-starlight/optimizer"
 	cmdPing "github.com/mc256/starlight/cmd/ctr-starlight/ping"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
 	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
-	"os"
 
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
@@ -94,12 +96,13 @@ https://github.com/mc256/starlight
 	app.Commands = append([]*cli.Command{
 		cmdVersion.Command(),   // 1. confirm the version of starlight-daemon
 		cmdAddProxy.Command(),  // 2. add starlight proxy to the daemon
-		cmdPing.Command(),      // 3. ping the starlight proxy to see if it is alive
-		cmdConvert.Command(),   // 3. convert docker image to starlight image
-		cmdNotify.Command(),    // 4. notify the proxy that the starlight image is available
-		cmdOptimizer.Command(), // 5. turn on/off filesystem traces
-		cmdReport.Command(),    // 6. upload filesystem traces to starlight proxy
-		cmdPull.Command(),      // 7. pull starlight image
+		cmdListProxy.Command(), // 3. list proxy profiles in daemon
+		cmdPing.Command(),      // 4. ping the starlight proxy to see if it is alive
+		cmdConvert.Command(),   // 5. convert docker image to starlight image
+		cmdNotify.Command(),    // 6. notify the proxy that the starlight image is available
+		cmdOptimizer.Command(), // 7. turn on/off filesystem traces
+		cmdReport.Command(),    // 8. upload filesystem traces to starlight proxy
+		cmdPull.Command(),      // 9. pull starlight image
 	})
 
 	return app
