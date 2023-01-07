@@ -11,6 +11,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	iofs "io/fs"
+	"io/ioutil"
+	"net"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/containerd/containerd"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/content"
@@ -32,16 +43,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"io"
-	iofs "io/fs"
-	"io/ioutil"
-	"net"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
 )
 
 type mountPoint struct {
@@ -268,9 +269,9 @@ func (c *Client) readBody(body io.ReadCloser, s int64) (*bytes.Buffer, error) {
 
 // handleManifest unmarshal the manifest.
 // It returns
-//  - the manifest in object
-//  - the manifest in bytes to store in the content store
-//  - error in case of failure
+//   - the manifest in object
+//   - the manifest in bytes to store in the content store
+//   - error in case of failure
 func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []byte, err error) {
 	// decompress manifest
 	r, err := gzip.NewReader(buf)
@@ -1136,6 +1137,22 @@ func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.
 	}).Info("add auth profile")
 	return &pb.AuthResponse{
 		Success: true,
+	}, nil
+}
+
+func (s *StarlightDaemonAPIServer) GetProxyProfiles(ctx context.Context, req *pb.Request) (resp *pb.GetProxyProfilesResponse, err error) {
+	log.G(s.client.ctx).Debug("grpc: get proxy profiles")
+
+	profiles := []*pb.GetProxyProfilesResponse_Profile{}
+	for name, proxy := range s.client.cfg.Proxies {
+		profiles = append(profiles, &pb.GetProxyProfilesResponse_Profile{
+			Name:     name,
+			Protocol: proxy.Protocol,
+			Address:  proxy.Address,
+		})
+	}
+	return &pb.GetProxyProfilesResponse{
+		Profiles: profiles,
 	}, nil
 }
 

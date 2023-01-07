@@ -25,6 +25,7 @@ service Daemon {
   rpc GetVersion(Request) returns (Version) {}
   rpc PingTest(PingRequest) returns (PingResponse) {}
   rpc AddProxyProfile(AuthRequest) returns (AuthResponse) {}
+  rpc GetProxyProfiles(Request) returns (GetProxyProfilesResponse) {}
   rpc NotifyProxy(NotifyRequest) returns (NotifyResponse) {}
   rpc PullImage(ImageReference) returns (ImagePullResponse) {}
   rpc SetOptimizer(OptimizeRequest) returns (OptimizeResponse) {}
@@ -62,6 +63,16 @@ message AuthRequest {
 message AuthResponse {
   bool success = 1;
   string message = 2;
+}
+
+message GetProxyProfilesResponse {
+  message Profile {
+    string name = 1;
+    string protocol = 2;
+    string address = 3;
+  }
+
+  repeated Profile profiles = 1;
 }
 
 // Notify Proxy
