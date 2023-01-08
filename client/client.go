@@ -415,7 +415,7 @@ func (c *Client) storeStarlightHeader(cs content.Store, cfgName, ref, sld string
 	return nil
 }
 
-func (c *Client) Notify(proxyCfg string, reference name.Reference) error {
+func (c *Client) Notify(proxyCfg string, reference name.Reference, insecure bool) error {
 	pc, _ := c.cfg.getProxy(proxyCfg)
 	p := proxy.NewStarlightProxy(c.ctx, pc.Protocol, pc.Address)
 	if pc.Username != "" {
@@ -423,7 +423,7 @@ func (c *Client) Notify(proxyCfg string, reference name.Reference) error {
 	}
 
 	// send message
-	if err := p.Notify(reference); err != nil {
+	if err := p.Notify(reference, insecure); err != nil {
 		return errors.Wrapf(err, "failed to notify proxy")
 	}
 
@@ -1289,7 +1289,7 @@ func (s *StarlightDaemonAPIServer) NotifyProxy(ctx context.Context, req *pb.Noti
 		}, nil
 	}
 
-	err = s.client.Notify(req.ProxyConfig, reference)
+	err = s.client.Notify(req.ProxyConfig, reference, true)
 	if err != nil {
 		return &pb.NotifyResponse{
 			Success: false,

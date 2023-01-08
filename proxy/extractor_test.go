@@ -24,7 +24,7 @@ func TestNewExtractor(t *testing.T) {
 		config: cfg,
 	}
 
-	ext, err := NewExtractor(server, "starlight/mariadb:10.9.2")
+	ext, err := NewExtractor(server, "starlight/mariadb:10.9.2", true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,7 +47,7 @@ func TestExtractor_SaveToC(t *testing.T) {
 		server.db = db
 	}
 
-	ext, err := NewExtractor(server, "starlight/mariadb:10.9.2")
+	ext, err := NewExtractor(server, "starlight/mariadb:10.9.2", true)
 	if err != nil {
 		t.Error(err)
 	}

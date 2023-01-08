@@ -163,7 +163,12 @@ func (a *Server) notify(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	extractor, err := NewExtractor(a, i)
+	insecure := false
+	if q.Get("insecure") != "" {
+		insecure = true
+	}
+
+	extractor, err := NewExtractor(a, i, insecure)
 	if err != nil {
 		log.G(a.ctx).WithError(err).Error("failed to cache ToC")
 		a.error(w, req, err.Error())

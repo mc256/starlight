@@ -47,6 +47,7 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 	// notify
 	notify(pb.NewDaemonClient(conn), &pb.NotifyRequest{
 		ProxyConfig: c.String("profile"),
+		Insecure:    c.Bool("insecure") || c.Bool("insecure-destination"),
 		Reference:   reference.String(),
 	}, c.Bool("quiet"))
 
@@ -78,7 +79,13 @@ func Command() *cli.Command {
 		Action: func(c *cli.Context) error {
 			return Action(ctx, c)
 		},
-		Flags:     auth.ProxyFlags,
+		Flags: append(auth.ProxyFlags,
+			&cli.BoolFlag{
+				Name:     "insecure",
+				Usage:    "use HTTP registry",
+				Value:    false,
+				Required: false,
+			}),
 		ArgsUsage: "[flags] SourceImage StarlightImage",
 	}
 	return &cmd

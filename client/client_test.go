@@ -12,6 +12,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/platforms"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -359,4 +360,12 @@ func TestTransportEndpointNotConnected(t *testing.T) {
 		return
 	}
 	t.Error(err)
+}
+
+func TestInsecureReference(t *testing.T) {
+	n, _ := name.ParseReference("172.31.92.41:5000/redis:6.2.2-starlight")
+	fmt.Println(n)
+
+	n2, _ := name.ParseReference("172.31.92.41:5000/redis:6.2.2-starlight", name.Insecure)
+	fmt.Println(n2)
 }

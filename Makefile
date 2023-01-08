@@ -188,14 +188,8 @@ install:
 	install ./out/*-* /usr/bin
 
 install-systemd-service:
-	./demo/install.sh
-	#@printf "Please enter Starlight Proxy address (example: \033[92mproxy.mc256.dev:8090\033[0m):"
-	#@read proxy_address; \
-	#echo $$proxy_address; \
-	#service_file=`cat './demo/deb-package/debian/starlight.service'`; \
-	#echo `subst "STARLIGHT_PROXY",$(proxy_address),$(service_file)`; \
-	#cp ./demo/deb-package/debian/starlight.service /lib/systemd/system/
-	#systemctl daemon-reload
+	cp ./demo/deb-package/debian/starlight.service /lib/systemd/system/
+	systemctl daemon-reload
 
 docker-image:
 	docker build -t harbor.yuri.moe/public/starlight-proxy:latest -f Dockerfile --target starlight-proxy .
