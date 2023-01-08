@@ -245,7 +245,8 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 	}, nil
 }
 
-func NewExtractor(s *Server, image string) (r *Extractor, err error) {
+// NewExtractor creates an instance for extracting ToC from the container image.
+func NewExtractor(s *Server, image string, insecure bool) (r *Extractor, err error) {
 	r = &Extractor{
 		Image:  image,
 		ref:    nil,
@@ -256,9 +257,15 @@ func NewExtractor(s *Server, image string) (r *Extractor, err error) {
 		return nil, fmt.Errorf("image cannot be nil")
 	}
 
-	r.ref, err = name.ParseReference(image,
-		name.WithDefaultRegistry(s.config.DefaultRegistry), name.WithDefaultTag("latest-starlight"),
-	)
+	opts := []name.Option{
+		name.WithDefaultRegistry(s.config.DefaultRegistry),
+		name.WithDefaultTag("latest-starlight"),
+	}
+	if insecure {
+		opts = append(opts, name.Insecure)
+	}
+
+	r.ref, err = name.ParseReference(image, opts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}

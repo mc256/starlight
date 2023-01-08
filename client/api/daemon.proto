@@ -78,7 +78,8 @@ message GetProxyProfilesResponse {
 // Notify Proxy
 message NotifyRequest {
   string reference = 1;
-  string proxyConfig = 2;
+  bool insecure = 2;
+  string proxyConfig = 3;
 }
 
 message NotifyResponse {

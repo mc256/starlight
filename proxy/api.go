@@ -102,7 +102,7 @@ func (a *StarlightProxy) Ping() (int64, string, string, error) {
 	return rtt, a.protocol, a.serverAddress, nil
 }
 
-func (a *StarlightProxy) Notify(ref name.Reference) error {
+func (a *StarlightProxy) Notify(ref name.Reference, insecure bool) error {
 	u := url.URL{
 		Scheme: a.protocol,
 		Host:   a.serverAddress,
@@ -110,6 +110,9 @@ func (a *StarlightProxy) Notify(ref name.Reference) error {
 	}
 	q := u.Query()
 	q.Set("ref", ref.String())
+	if insecure {
+		q.Set("insecure", "true")
+	}
 	u.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(a.ctx, "POST", u.String(), nil)
 	if pwd, isSet := a.auth.Password(); isSet {
