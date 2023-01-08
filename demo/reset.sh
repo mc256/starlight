@@ -22,7 +22,7 @@ if [ -d "${STARLIGHT_SNAPSHOTTER_ROOT}sfs/" ] ; then
     find "${STARLIGHT_SNAPSHOTTER_ROOT}sfs/" \
          -maxdepth 1 -mindepth 1 -type d -exec sudo umount -f "{}/m" \;
 fi
-rm -rf "${STARLIGHT_SNAPSHOTTER_ROOT}"*
+rm -rf "${STARLIGHT_SNAPSHOTTER_ROOT}"
 
 # Remove Redis data folder
 rm -rf /tmp/test-redis-data

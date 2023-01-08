@@ -3,91 +3,95 @@
 To finish this guide, you will need TWO machines (or VMs) far away from each other. 
 One acts as the Cloud, and the other acts as the Edge. You will need to identify the IP address of the Cloud server.
 
-The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v3.0.1`.
+The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v0.3.1`.
 
-`git checkout v3.0.1`
+`git checkout v0.3.1`
+
 
 ## The "Cloud"
 
 In this machine you will need to set up the Starlight Proxy and a standard container registry. 
-If you are using AWS EC2, please add port 8090 (Starlight Proxy), port 8080 (Metadata database Adminer) and port 5000 (Container Registry) to the Security Group whitelist when you create the VM.
+If you are using AWS EC2, please add the following ports to the Security Group whitelist when you create the VM:
+ - TCP 8090: Starlight Proxy (set the source to be your VPC)
+ - TCP 8080: Adminer - for Metadata database  (set the source to be your own IP)
+ - TCP 5000: Container Registry  (set the source to be your VPC)
+ - TCP 80: Container Registry (set the source to be your VPC)
 
 
-0. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
+1. Change the hostname of the server (Don't copy and paste, replace `<ip address>` with your server's IP address)
 
-If using Ubuntu 22.04 LTS, you could install Docker and Docker Compose using the following commands: 
-```shell
-sudo apt update && \
-sudo apt upgrade -y && \
-sudo apt install -y docker-compose && \
-sudo usermod -aG docker $USER
-```
-After adding the current user to the `docker` group, you (may) **need to log out and log in** to take effect.
-To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
-```shell
-docker ps
-# CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
-```
+    ```shell
+    echo "cloud" | sudo tee /etc/hostname > /dev/null
+    sudo hostname -F /etc/hostname
+    echo "<ip address> cloud.cluster.local" | sudo tee -a /etc/hosts > /dev/null
+    ```
 
-1. Clone this project and launch the registry and proxy containers from `./demo/compose/registry+proxy`
+2. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
 
-```shell
-git clone https://github.com/mc256/starlight.git && \
-cd starlight/demo/compose/registry+proxy && \
-docker-compose up -d
-# Creating network "registryproxy_default" with the default driver
-# Creating registryproxy_db_1       ... done
-# Creating registryproxy_registry_1 ... done
-# Creating registryproxy_dbadmin_1  ... done
-# Creating registryproxy_proxy_1    ... done
-```
-The Starlight proxy writes image metadata to the Postgres database, and
-the container registry saves container images to `./data_registry`.
+    If using Ubuntu 22.04 LTS, you could install Docker and Docker Compose using the following commands: 
+    ```shell
+    sudo apt update && \
+    sudo apt upgrade -y && \
+    sudo apt install -y docker-compose && \
+    sudo usermod -aG docker $USER
+    ```
+    After adding the current user to the `docker` group, you (may) **need to log out and log in** to take effect.
+    To confirm that Docker is working with correct permission, `docker ps` should not print any errors.
+    ```shell
+    docker ps
+    # CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+    ```
+   
+3. Clone this project and launch the registry and proxy containers from `./demo/compose/registry+proxy`
 
-2. Change the hostname of the server (Don't copy and paste, replace `<ip address>` with your server's public IP address)
+    ```shell
+    git clone https://github.com/mc256/starlight.git && \
+    cd starlight/demo/compose/registry+proxy && \
+    git checkout v0.3.1 && \
+    docker-compose up -d
+    # Creating network "registryproxy_default" with the default driver
+    # Creating registryproxy_db_1       ... done
+    # Creating registryproxy_registry_1 ... done
+    # Creating registryproxy_dbadmin_1  ... done
+    # Creating registryproxy_proxy_1    ... done
+    ```
+    The Starlight proxy writes image metadata to the Postgres database, and
+    the container registry saves container images to `./data_registry`.
 
-```shell
-echo "cloud" | sudo tee /etc/hostname > /dev/null
-hostname -F /etc/hostname
-echo "<ip address> cloud.cluster.local" | sudo tee -a /etc/hosts > /dev/null
-```
-
+    
 3. Verify the registry and proxy are running.
-```shell
-# This checks the Starlight Proxy
-curl http://cloud.cluster.local:8090/
-# {"status":"OK","code":200,"message":"Starlight Proxy"}
-# This checks the container registry
-curl http://cloud.cluster.local:5000/v2/
-# {}
-```
+    ```shell
+    # This checks the Starlight Proxy
+    curl http://cloud.cluster.local:8090/
+    # {"status":"OK","code":200,"message":"Starlight Proxy"}
+    # This checks the container registry
+    curl http://cloud.cluster.local:5000/v2/
+    # {}
+    ```
 
-If it does not work, please restart the containers after the database has been created (missing a db health check).
-We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
-But for simplicity, this part is ignored in this example.
+    If it does not work, please restart the containers after the database has been created (missing a db health check).
+    We could put a Nginx reverse proxy to handle SSL certificates or load balancing.
+    But for simplicity, this part is ignored in this example.
 
 
 3. Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
-
-```shell
-cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
-net.core.wmem_max=125829120
-net.core.rmem_max=125829120
-net.ipv4.tcp_rmem= 10240 87380 125829120
-net.ipv4.tcp_wmem= 10240 87380 125829120
-net.ipv4.tcp_window_scaling = 1
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_sack = 1
-net.ipv4.tcp_no_metrics_save = 1
-net.core.netdev_max_backlog = 10000
-EOT
-sudo sysctl -p
-```
+    
+    ```shell
+    cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
+    net.core.wmem_max=125829120
+    net.core.rmem_max=125829120
+    net.ipv4.tcp_rmem= 10240 87380 125829120
+    net.ipv4.tcp_wmem= 10240 87380 125829120
+    net.ipv4.tcp_window_scaling = 1
+    net.ipv4.tcp_timestamps = 1
+    net.ipv4.tcp_sack = 1
+    net.ipv4.tcp_no_metrics_save = 1
+    net.core.netdev_max_backlog = 10000
+    EOT
+    sudo sysctl -p
+    ```
 
 🙌 That's it. Please obtain the IP address of this machine and run the following commands on the Edge server.
-
-You could also inspect the metadata database using the Adminer Web UI at `http://<ip address>:8080/` (system: `PostgreQL`,server: `db`, username: `postgres`, password is the same as the username)
-
 
 ## The "Edge"
 
@@ -153,7 +157,8 @@ sudo sysctl -p
 Clone the Starlight repository
 ```shell
 git clone https://github.com/mc256/starlight.git && \
-cd starlight
+cd starlight && \ 
+git checkout v0.3.1
 ```
 
 Build the snapshotter plugin and CLI tool
@@ -281,7 +286,7 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.1-starlight \
-   instance1 /usr/local/bin/redis-server
+   instance1 /usr/local/bin/redis-server && \
 sudo ctr task start instance1
 ```
 
@@ -299,7 +304,7 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.2-starlight \
-   instance2 /usr/local/bin/redis-server
+   instance2 /usr/local/bin/redis-server && \
 sudo ctr task start instance2
 ```
 
@@ -312,6 +317,10 @@ Report traces to the Starlight Proxy.
 ```shell
 sudo ctr-starlight optimizer off && \
 sudo ctr-starlight report --profile myproxy
+# set optimizer: completed request
+#	sha256:291220ae234f1aa9655359d7e553b05fa9e288fd811b7429f229e5aecd64a181: collected 40.966s file access traces - okay
+#	sha256:561c5b8bb95e26feb56b2bfda1d1fe2aee3229e5d9a2cc879e7524f05ad427a8: collected 13.459s file access traces - okay
+# reported traces: uploaded traces
 ```
 
 
@@ -323,14 +332,29 @@ sudo ctr-starlight report --profile myproxy
 # and unmount all the mount points in /var/lib/starlight/mounts
 sudo ./demo/reset.sh 
 
+# Confirm that the cache is cleared
+sudo ls -al /var/lib/containerd
+# > ls: cannot access '/var/lib/containerd': No such file or directory
+sudo ls -al /var/lib/starlight
+# > ls: cannot access '/var/lib/starlight': No such file or directory
+
+
 # restart the processes
 sudo systemctl start starlight containerd
 ```
 
+### 9. (Optional) Check the metadata database
 
-### 9. Deploying and update container
+You could also inspect the metadata database using the Adminer Web UI at `http://<public ip address of the cloud>:8080/` (system: `PostgreQL`,server: `db`, username: `postgres`, password is the same as the username).
 
-Start a container using Starlight (This time should be much faster)
+In the `file` table, you could see it records the access order of the file.
+
+![adminer](./images/metadatadb-screenshot.png)
+
+
+### 10. Deploying and update container
+
+Start a container using Starlight (it should be much faster)
 ```shell
 sudo ctr-starlight pull --profile myproxy cloud.cluster.local/redis:6.2.1-starlight && \
 mkdir /tmp/test-redis-data && \
@@ -340,7 +364,7 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.1-starlight \
-   instance3 /usr/local/bin/redis-server
+   instance3 /usr/local/bin/redis-server && \
 sudo ctr task start instance3
 ```
 
@@ -353,6 +377,6 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.2-starlight \
-   instance4 /usr/local/bin/redis-server
+   instance4 /usr/local/bin/redis-server && \
 sudo ctr task start instance4
 ```
