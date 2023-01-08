@@ -3,13 +3,15 @@
 ## Please cd into the project's root directory and run this script using this command:
 ##  sudo ./demo/reset.sh
 
-STARLIGHT_SNAPSHOTTER_ROOT=/var/lib/starlight-grpc/
+STARLIGHT_SNAPSHOTTER_ROOT=/var/lib/starlight/
 
 # Stop Starlight and containerd
 systemctl stop containerd
 systemctl stop starlight
+systemctl disable containerd
+systemctl disable starlight
 pkill -9 'containerd' | true
-pkill -9 'starlight-grpc' | true
+pkill -9 'starlight' | true
 
 
 # Clear containerd folder
@@ -27,5 +29,5 @@ rm -rf /tmp/test-redis-data
 
 
 # Restart the service
-./out/starlight-grpc  run --server=starlight.yuri.moe --log-level=debug &
-containerd &
+#./out/starlight-grpc  run --server=starlight.yuri.moe --log-level=debug &
+#containerd &

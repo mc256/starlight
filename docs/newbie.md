@@ -3,9 +3,9 @@
 To finish this guide, you will need TWO machines (or VMs) far away from each other. 
 One acts as the Cloud, and the other acts as the Edge. You will need to identify the IP address of the Cloud server.
 
-The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v3.0.0`.
+The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v3.0.1`.
 
-`git checkout v3.0.0`
+`git checkout v3.0.1`
 
 ## The "Cloud"
 
@@ -15,7 +15,7 @@ If you are using AWS EC2, please add port 8090 (Starlight Proxy), port 8080 (Met
 
 0. Install [Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository) and [Docker Compose](https://docs.docker.com/compose/install/)  
 
-If using Ubuntu 20.04 LTS, you could install Docker and Docker Compose using the following commands: 
+If using Ubuntu 22.04 LTS, you could install Docker and Docker Compose using the following commands: 
 ```shell
 sudo apt update && \
 sudo apt upgrade -y && \
@@ -44,14 +44,21 @@ docker-compose up -d
 The Starlight proxy writes image metadata to the Postgres database, and
 the container registry saves container images to `./data_registry`.
 
+2. Change the hostname of the server (Don't copy and paste, replace `<ip address>` with your server's public IP address)
 
-2. Verify the registry and proxy are running.
+```shell
+echo "cloud" | sudo tee /etc/hostname > /dev/null
+hostname -F /etc/hostname
+echo "<ip address> cloud.cluster.local" | sudo tee -a /etc/hosts > /dev/null
+```
+
+3. Verify the registry and proxy are running.
 ```shell
 # This checks the Starlight Proxy
-curl http://localhost:8090/
+curl http://cloud.cluster.local:8090/
 # {"status":"OK","code":200,"message":"Starlight Proxy"}
 # This checks the container registry
-curl http://localhost:5000/v2/
+curl http://cloud.cluster.local:5000/v2/
 # {}
 ```
 
@@ -77,16 +84,9 @@ EOT
 sudo sysctl -p
 ```
 
-
 🙌 That's it. Please obtain the IP address of this machine and run the following commands on the Edge server.
 
-```shell
-# update the IP address keep this for future use. 
-export STARLIGHT_PROXY=<ip address of your server>:8090
-export REGISTRY=<ip address of your server>:5000
-```
-
-You could also inspect the metadata database using the Adminer Web UI at `http://<ip address of your server>:8080/` (system: `PostgreQL`,server: `db`, username: `postgres`, password is the same as the username)
+You could also inspect the metadata database using the Adminer Web UI at `http://<ip address>:8080/` (system: `PostgreQL`,server: `db`, username: `postgres`, password is the same as the username)
 
 
 ## The "Edge"
@@ -167,15 +167,14 @@ Find out the IP address / DNS of the Starlight Proxy server and set these two en
 ```shell
 # DO NOT COPY! 
 # This is just an example !!! Get the real address of your server !!!
-export STARLIGHT_PROXY=172.18.1.3:8090
-export REGISTRY=172.18.1.3:5000
-```
+echo "<ip address> cloud.cluster.local" | sudo tee -a /etc/hosts > /dev/null
+````
 
 Verify that the Starlight proxy is accessible from the worker. 
 ```shell
-curl http://$STARLIGHT_PROXY
+curl http://cloud.cluster.local:8090/
 # {"status":"OK","code":200,"message":"Starlight Proxy"}
-curl http://$REGISTRY/v2/
+curl http://cloud.cluster.local:5000/v2/
 # {}
 ```
 If it does not work, please check the firewall configurations, 
@@ -200,20 +199,20 @@ sudo systemctl status starlight
 
 Add Starlight Proxy profile to the Snapshotter's configuration file
 ```shell
-sudo ctr-starlight add myproxy http $STARLIGHT_PROXY
+sudo ctr-starlight add myproxy http cloud.cluster.local:8090
 ```
 
 Confirm that the proxy has been added
 ```shell
 sudo ctr-starlight ls
 # [starlight-shared] https://starlight.yuri.moe
-#          [myproxy] http://XXX.XXX.XXX.XXX:8090
+#          [myproxy] http://cloud.cluster.local:8090
 ```
 
 Test the proxy is working
 ```shell
 sudo ctr-starlight test myproxy
-# ping test success: ok! - http://XXX.XXX.XXX.XXX:8090
+# ping test success: ok! - http://cloud.cluster.local:8090
 # latency: XX ms
 ```
 
@@ -247,23 +246,18 @@ sudo ctr plugin ls | grep starlight
 
 Convert the container image to the **Starlight format** container image and report to the Starlight proxy.
 
-```shell
-echo $STARLIGHT_PROXY 
-# make sure we have set the STARLIGHT_PROXY environment variable
-#> 172.18.1.3:8090
-```
 
 ```shell
 sudo ctr-starlight convert \
     --insecure-destination \
     --notify --profile myproxy \
     --platform linux/amd64 \
-    docker.io/library/redis:6.2.1 cluster/redis:6.2.1-starlight && \
+    docker.io/library/redis:6.2.1 cloud.cluster.local/redis:6.2.1-starlight && \
 sudo ctr-starlight convert \
     --insecure-destination \
     --notify --profile myproxy \
     --platform linux/amd64 \
-    docker.io/library/redis:6.2.2 cluster/redis:6.2.2-starlight
+    docker.io/library/redis:6.2.2 cloud.cluster.local/redis:6.2.2-starlight
 ```
 
 In this example, we load two versions of the Redis container image from docker hub and convert them to the Starlight 
@@ -271,13 +265,12 @@ format container image and notify the Starlight proxy (using `--notify` flag).
 
 ### 7. Optimize Container Image
 
-Set `starlight` as the default containerd snapshotter in command line.
+Set `starlight` as the default containerd snapshotter in command line (optional).
 ```shell
 export CONTAINERD_SNAPSHOTTER=starlight
 ```
 
 Collect traces on the worker for container startup.
-
 ```shell
 sudo ctr-starlight optimizer on && \
 sudo ctr-starlight pull --profile myproxy cloud.cluster.local/redis:6.2.1-starlight && \
@@ -288,7 +281,7 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.1-starlight \
-   instance1 && \
+   instance1 /usr/local/bin/redis-server
 sudo ctr task start instance1
 ```
 
@@ -306,7 +299,7 @@ sudo ctr c create \
    --env-file ./demo/config/all.env \
    --net-host \
    cloud.cluster.local/redis:6.2.2-starlight \
-   instance2 && \
+   instance2 /usr/local/bin/redis-server
 sudo ctr task start instance2
 ```
 
@@ -318,43 +311,48 @@ sudo ctr container rm instance2
 Report traces to the Starlight Proxy.
 ```shell
 sudo ctr-starlight optimizer off && \
-ctr-starlight report --server $STARLIGHT_PROXY --plain-http
+sudo ctr-starlight report --profile myproxy
 ```
 
 
 ### 8. Clear all the cache and reset the environment
 ```shell
-sudo ./demo/reset.sh
+# This script will kill containerd and starlight.
+# And then it removes ALL contents
+# in /var/lib/containerd, /var/lib/starlight, and /tmp/test-redis-data (the redis data directory)
+# and unmount all the mount points in /var/lib/starlight/mounts
+sudo ./demo/reset.sh 
+
+# restart the processes
+sudo systemctl start starlight containerd
 ```
 
 
 ### 9. Deploying and update container
 
-Start a container using Starlight
+Start a container using Starlight (This time should be much faster)
 ```shell
-sudo ctr-starlight pull redis:6.2.1-starlight && \
+sudo ctr-starlight pull --profile myproxy cloud.cluster.local/redis:6.2.1-starlight && \
 mkdir /tmp/test-redis-data && \
-sudo ctr-starlight create \
-	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-	--env-file ./demo/config/all.env \
-	--net-host \
-	redis:6.2.1-starlight \
-	redis:6.2.1-starlight \
-    instance3 && \
+sudo ctr c create \
+   --snapshotter=starlight \
+   --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+   --env-file ./demo/config/all.env \
+   --net-host \
+   cloud.cluster.local/redis:6.2.1-starlight \
+   instance3 /usr/local/bin/redis-server
 sudo ctr task start instance3
 ```
 
-Update a container using Starlight
+Update a container using Starlight (also way faster)
 ```shell
-sudo ctr-starlight pull redis:6.2.1-starlight redis:6.2.2-starlight && \
-sudo ctr-starlight create \
-	--mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
-	--env-file ./demo/config/all.env \
-	--net-host \
-	redis:6.2.2-starlight \
-	redis:6.2.2-starlight \
-    instance4 && \
+sudo ctr-starlight pull --profile myproxy cloud.cluster.local/redis:6.2.2-starlight && \
+sudo ctr c create \
+   --snapshotter=starlight \
+   --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
+   --env-file ./demo/config/all.env \
+   --net-host \
+   cloud.cluster.local/redis:6.2.2-starlight \
+   instance4 /usr/local/bin/redis-server
 sudo ctr task start instance4
 ```
-
-### Secure the Cloud
