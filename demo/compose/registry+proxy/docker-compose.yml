@@ -38,6 +38,7 @@ services:
     image: registry:2
     ports:
     - 5000:5000
+    - 80:5000
     environment:
     - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
     volumes:

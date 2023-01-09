@@ -1,9 +1,9 @@
 
 # Starlight: Fast Container Provisioning
 
-[![Docker Image](https://img.shields.io/github/actions/workflow/status/mc256/starlight/docker-image.yml?branch=master&label=Proxy%20Docker%20Image&logo=docker&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/docker-image.yml)
-[![Helm Chart](https://img.shields.io/github/actions/workflow/status/mc256/starlight/helm-chart.yml?branch=master&label=Proxy%20Helm%20Chart&logo=helm&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/helm-chart.yml)
-[![Debian Package](https://img.shields.io/github/actions/workflow/status/mc256/starlight/debian-package.yml?branch=master&label=Snapshotter%20Debian%20Package&logo=debian&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/workflows/debian-package.yml)
+[![Docker Image](https://img.shields.io/github/actions/workflow/status/mc256/starlight/docker-image.yml?branch=master&label=Proxy%20Docker%20Image&logo=docker&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/docker-image.yml)
+[![Helm Chart](https://img.shields.io/github/actions/workflow/status/mc256/starlight/helm-chart.yml?branch=master&label=Proxy%20Helm%20Chart&logo=helm&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/helm-chart.yml)
+[![Debian Package](https://img.shields.io/github/actions/workflow/status/mc256/starlight/debian-package.yml?branch=master&label=Snapshotter%20Debian%20Package&logo=debian&logoColor=white&style=flat-square)](https://github.com/mc256/starlight/actions/debian-package.yml)
 [![Release](https://img.shields.io/github/v/release/mc256/starlight?label=starlight&style=flat-square)](https://github.com/mc256/starlight/releases)
 <img align="right" src="docs/images/provisioning-time-wan.png">
 
