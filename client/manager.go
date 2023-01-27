@@ -309,7 +309,7 @@ func (m *Manager) Init(ctr *containerd.Client, client *Client, ctx context.Conte
 		}
 		// create filesystem template
 		for _, f := range m.RequestedFiles {
-			if _, isInPayload := f.InPayload(); isInPayload {
+			if f.InPayload() {
 				f.Ready = &m.Contents[f.PayloadOrder].Signal
 			} else {
 				f.Ready = nil

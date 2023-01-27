@@ -61,21 +61,22 @@ func (c *Content) GetPath() string {
 type ReferencedFile struct {
 	File
 
-	// Stack in the existing image from bottom to top
+	// Stack in the existing image from bottom to top, 0-indexed
 	Stack int64 `json:"S"`
 
 	// if the file is available on the client then ReferenceFsId is non-zero,
 	// expecting the file is available on the client and can be accessed using the File.Digest .
-	// (This is Serial not Stack)
+	// (This is the Serial index in the database `filesystem.id`)
 	ReferenceFsId int64 `json:"R,omitempty"`
 
 	// if the file is not available on the client but on other layers in the requested image，
 	// then ReferenceFsId is zero and ReferenceStack is non-zero,
 	// expecting the file content in the delta bundle body
-	// (This is Stack not Serial)
+	// (This is Stack not Serial, 0-indexed)
 	ReferenceStack int64 `json:"T,omitempty"`
 
-	// if the file is not available on the client then PayloadOrder is non-zero shows when this file can be ready
+	// PayloadOrder is set if the file is not available on the client, then PayloadOrder is non-zero.
+	// It indicates the order of the file in the delta bundle body (payload)
 	PayloadOrder int `json:"O,omitempty"`
 
 	// if Ready is nil or closed, means the file is ready
@@ -183,22 +184,9 @@ func (r *ReferencedFile) IsReferencingLocalFilesystem() (serial int64, yes bool)
 	return 0, false
 }
 
-// ------------------------------------------
-// used in extract from the delta bundle
-//
-
-func (r *ReferencedFile) ExistingFsIndex() (layerSerial int64, existing bool) {
-	if r.ReferenceFsId > 0 {
-		return r.ReferenceFsId, true
-	}
-	return -1, false
-}
-
-func (r *ReferencedFile) InPayload() (stack int64, inPayload bool) {
-	if r.ReferenceStack > 0 {
-		return r.ReferenceStack, true
-	}
-	return -1, false
+// InPayload returns true if the content of the file is in the delta bundle (payload)
+func (r *ReferencedFile) InPayload() bool {
+	return r.PayloadOrder > 0
 }
 
 type FileChunk struct {

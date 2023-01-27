@@ -40,7 +40,7 @@ The development and operational pipelines remain unchanged.
 <br>[See how Starlight works ➡️](https://github.com/mc256/starlight/blob/master/docs/starlight-workflow.md) or [read our NSDI 2022 paper](https://www.usenix.org/conference/nsdi22/presentation/chen-jun-lin).
 
 ## Architecture
-Starlight is implemented on top of **containerd**. It it comprised of cloud and worker components.
+Starlight is implemented on top of **containerd**. It is comprised of cloud and worker components.
 * A **proxy** server on the cloud side mediates between Starlight workers and any standard registry server.
 * On the worker side, a **command line tool** tells Starlight to PULL containers.
 * A **Starlight daemon** (snapshotter plugin) runs belongs the containerd of each worker node.

@@ -3,10 +3,11 @@
 To finish this guide, you will need TWO machines (or VMs) far away from each other. 
 One acts as the Cloud, and the other acts as the Edge. You will need to identify the IP address of the Cloud server.
 
-The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v0.3.1`.
+The following instructions have been tested using AWS EC2 t2.micro with Ubuntu 22.04 LTS and `starlight v0.3.2`.
 
-`git checkout v0.3.1`
+`git checkout v0.3.2`
 
+---
 
 ## The "Cloud"
 
@@ -74,8 +75,10 @@ If you are using AWS EC2, please add the following ports to the Security Group w
     But for simplicity, this part is ignored in this example.
 
 
-3. Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
-    
+3. Adjust the TCP window size (Optional). 
+   If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
+   If you skip this step, the connection will be much slower (the impact on speed is worse for other methods!).
+
     ```shell
     cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
     net.core.wmem_max=125829120
@@ -91,7 +94,9 @@ If you are using AWS EC2, please add the following ports to the Security Group w
     sudo sysctl -p
     ```
 
-🙌 That's it. Please obtain the IP address of this machine and run the following commands on the Edge server.
+🙌 That's it. Please obtain the IP address of this machine.
+
+---
 
 ## The "Edge"
 
@@ -134,7 +139,7 @@ go version
 # go version go1.18.3 linux/amd64
 ```
 
-### 2. Tune the network
+### 2. (Optional) Tune the network
 
 Adjust the TCP window size. If the edge node is far away, we will need to adjust the TCP window size so that the connection can speed up to the speed limit faster. (You could calculate the best TCP window size using https://www.speedguide.net/bdp.php later)
 

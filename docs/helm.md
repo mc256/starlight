@@ -4,7 +4,7 @@
 
 ```shell
 helm show values oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.2.7 > ./my-values.yaml
+     --version 0.3.2 > ./my-values.yaml
 ```
 
 Take a look at `./my-values.yaml` and edit it to your liking. 
@@ -17,7 +17,7 @@ Then give it a shot:
 helm upgrade --install -f ./my-values.yaml \
      starlight \
      oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.2.7
+     --version 0.3.2
 ```
 
 ## Prerequisites
@@ -30,6 +30,8 @@ The current deployment has been tested in this environment:
 - ReadWriteOnce volumes persistence storage
 - Linux kernel 5.15.0+ (edge node)
 
+How to set up an easy kubernetes cluster on your local machine? 
+Check out [this blog post](https://note.mc256.dev/2023/01/how-to-setup-kubernetes-k3s-in-two-nodes.html).
 
 ## Install
 
