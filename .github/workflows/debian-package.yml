@@ -1,16 +1,23 @@
 name: Debian Package
 on:
+  # PR testing before merge
   pull_request:
     types: 
     - opened
     - edited
     - synchronize
+  # For Testing
   push:
     branches:
       - feature_debian_*
+  # For Release
+  workflow_run:
+    workflows: ["Versioning"]
+    types:
+      - completed
 jobs:
   build:
-    name: Build Starlight Daemon
+    name: Starlight Daemon
     #runs-on: self-hosted
     runs-on: ubuntu-latest
     steps:

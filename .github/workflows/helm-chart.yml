@@ -1,18 +1,24 @@
 name: Helm Chart
 on:
+  # PR testing before merge
   pull_request:
     types: 
     - opened
     - edited
     - synchronize
+  # For Testing
   push:
-    # For Testing
     branches:
       - feature_helm_*
       - fix_helm_*
+  # For Release
+  workflow_run:
+    workflows: ["Versioning"]
+    types:
+      - completed
 jobs:
   release:
-    name: Build Helm Chart
+    name: Helm Chart
     # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
     # see: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
     permissions:

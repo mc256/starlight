@@ -1,19 +1,26 @@
 name: Docker Image
 on:
+  # PR testing before merge
   pull_request:
     types: 
     - opened
     - edited
     - synchronize
+  # For Testing
   push:
     branches:
       - feature_container_*
       - fix_container_*
       - feature_docker_*
       - fix_docker_*
+  # For Release
+  workflow_run:
+    workflows: ["Versioning"]
+    types:
+      - completed
 jobs:
   proxy:
-    name: Build Starlight Proxy
+    name: Starlight Proxy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,7 +61,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   cli:
-    name: Build Starlight CLI
+    name: Starlight CLI
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
