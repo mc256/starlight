@@ -1,17 +1,23 @@
 name: Debian Package
 on:
+  pull_request:
+    types: 
+    - opened
+    - edited
+    - synchronize
   push:
     branches:
       - feature_debian_*
-    tags:
-      - 'v*.*.*'
 jobs:
   build:
+    name: Build Starlight Daemon
     #runs-on: self-hosted
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Build deb package
         env:
           APT_UPLOAD_AUTH: ${{ secrets.APT_UPLOAD_AUTH }}
