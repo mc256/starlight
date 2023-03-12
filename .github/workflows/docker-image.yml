@@ -27,6 +27,13 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Get SemVer
+        id: get-version
+        run: |
+          echo "semver="`git describe --tags --match "v*" | cut -d '-' -f 1 || echo "v0.0.0"` >> $GITHUB_OUTPUT
+          echo "major="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 1` >> $GITHUB_OUTPUT
+          echo "minor="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 2` >> $GITHUB_OUTPUT
+          echo "patch="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 3` >> $GITHUB_OUTPUT
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -43,9 +50,9 @@ jobs:
           # generate Docker tags based on the following events/attributes
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ steps.get-version.outputs.major }}.${{ steps.get-version.outputs.minor }}.${{ steps.get-version.outputs.patch }}
+            type=raw,value=${{ steps.get-version.outputs.major }}.${{ steps.get-version.outputs.minor }}
+            type=raw,value=${{ steps.get-version.outputs.major }}
             type=sha
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -70,6 +77,13 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Get SemVer
+        id: get-version
+        run: |
+          echo "semver="`git describe --tags --match "v*" | cut -d '-' -f 1 || echo "v0.0.0"` >> $GITHUB_OUTPUT
+          echo "major="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 1` >> $GITHUB_OUTPUT
+          echo "minor="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 2` >> $GITHUB_OUTPUT
+          echo "patch="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 3` >> $GITHUB_OUTPUT
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -86,9 +100,9 @@ jobs:
           # generate Docker tags based on the following events/attributes
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ steps.get-version.outputs.major }}.${{ steps.get-version.outputs.minor }}.${{ steps.get-version.outputs.patch }}
+            type=raw,value=${{ steps.get-version.outputs.major }}.${{ steps.get-version.outputs.minor }}
+            type=raw,value=${{ steps.get-version.outputs.major }}
             type=sha
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
