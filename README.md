@@ -177,10 +177,9 @@ Starlight is not complete. Our roadmap:
 | Version                                                  | Status  | Scheduled Release |
 |----------------------------------------------------------|---------|-------------------|
 | [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) |         |                   |
-| [v0.2.7](https://github.com/mc256/starlight/tree/v0.2.7) | stable  |                   |
-| [v0.3.0](https://github.com/mc256/starlight/tree/)       | develop | 2022-12-15        |
-| v0.4.0                                                   |         | 2023-01-15        |
-| v0.5.0                                                   |         | 2023-02-15        |
+| [v0.2.7](https://github.com/mc256/starlight/tree/v0.2.7) |         |                   |
+| [v0.3.2](https://github.com/mc256/starlight/tree/v0.3.2) | stable  |                   |
+| [v0.4.0](https://github.com/mc256/starlight)             | develop | 2023-03-30        |
 
 Feature List:
 - [x] Scalable database backend (v0.2)

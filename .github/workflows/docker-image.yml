@@ -1,20 +1,25 @@
 name: Docker Image
 on:
+  pull_request:
+    types: 
+    - opened
+    - edited
+    - synchronize
   push:
     branches:
       - feature_container_*
       - fix_container_*
       - feature_docker_*
       - fix_docker_*
-    tags:
-      - 'v*.*.*'
 jobs:
   proxy:
-    name: Push Starlight Proxy Container image to GitHub Packages
+    name: Build Starlight Proxy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -30,7 +35,8 @@ jobs:
             ghcr.io/mc256/starlight/proxy
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}},enable={{is_default_branch}}
             type=sha
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -48,11 +54,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   cli:
-    name: Push Starlight CLI Container image to GitHub Packages
+    name: Build Starlight CLI
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
@@ -68,7 +76,8 @@ jobs:
             ghcr.io/mc256/starlight/cli
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}},enable={{is_default_branch}}
             type=sha
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -85,3 +94,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+    

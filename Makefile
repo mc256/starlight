@@ -4,7 +4,7 @@
 TARGETS=starlight-proxy starlight-daemon ctr-starlight
 COMMONENVVAR=GOOS=$(shell uname -s | tr A-Z a-z)
 BUILDENVVAR=CGO_ENABLED=0
-VERSION=$(shell git describe --tags --match "v*" || echo "v0.0.0")
+VERSION=$(shell git describe --tags --match "v*" | cut -d "-" -f 1 || echo "v0.0.0")
 VERSIONNUMBER=$(shell echo $(VERSION) | sed 's/v//g')
 COMPILEDATE=$(shell date +%Y%m%d)
 
