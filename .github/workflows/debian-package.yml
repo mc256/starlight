@@ -15,6 +15,9 @@ on:
     workflows: ["Versioning"]
     types:
       - completed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     name: Starlight Daemon
