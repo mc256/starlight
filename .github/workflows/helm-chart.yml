@@ -10,6 +10,9 @@ on:
     branches:
       - feature_helm_*
       - fix_helm_*
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   release:
     name: Build Helm Chart

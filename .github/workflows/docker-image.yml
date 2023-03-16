@@ -11,6 +11,9 @@ on:
       - fix_container_*
       - feature_docker_*
       - fix_docker_*
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   proxy:
     name: Build Starlight Proxy
