@@ -9,7 +9,7 @@ VERSIONNUMBER=$(shell echo $(VERSION) | sed 's/v//g')
 COMPILEDATE=$(shell date +%Y%m%d)
 
 
-.PHONY: build clean starlight-proxy starlight-daemon ctr-starlight
+.PHONY: build clean starlight-proxy starlight-daemon ctr-starlight test
 .SILENT: install-systemd-service
 
 ######################################################################
@@ -17,6 +17,10 @@ COMPILEDATE=$(shell date +%Y%m%d)
 ######################################################################
 .PHONY: build
 build: starlight-proxy starlight-daemon ctr-starlight
+
+.PHONY: test
+test:
+	go test -v ./...
 
 .PHONY: starlight-proxy
 starlight-proxy:
