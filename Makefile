@@ -20,6 +20,7 @@ build: starlight-proxy starlight-daemon ctr-starlight
 
 .PHONY: test
 test:
+	go mod tidy
 	go test -v ./...
 
 .PHONY: starlight-proxy
