@@ -7,6 +7,7 @@ package send
 
 import (
 	"fmt"
+
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util/common"
 )
@@ -34,7 +35,7 @@ func (il *ImageLayer) Size() int64 {
 }
 
 func (il *ImageLayer) String() string {
-	return fmt.Sprintf("[%05d:%02d]%s-%d", il.Serial, il.StackIndex, il.Hash, il.Size)
+	return fmt.Sprintf("[%05d:%02d]%s-%d", il.Serial, il.StackIndex, il.Hash, il.Size())
 }
 
 type Content struct {
