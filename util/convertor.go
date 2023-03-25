@@ -4,12 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
-	"github.com/mc256/starlight/util/common"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
 	"os"
@@ -17,6 +11,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
+	"github.com/mc256/starlight/util/common"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	goreg "github.com/google/go-containerregistry/pkg/v1"
@@ -119,6 +120,10 @@ func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.O
 		return nil, err
 	}
 	return c, nil
+}
+
+func (c *Convertor) String() string {
+	return fmt.Sprintf("Convertor{src=%s, dst=%s}", c.src, c.dst)
 }
 
 func (c *Convertor) GetSrc() name.Reference {

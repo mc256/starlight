@@ -8,9 +8,10 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"github.com/containerd/containerd/log"
 	"net/http"
 	"testing"
+
+	"github.com/containerd/containerd/log"
 )
 
 func TestNewExtractor(t *testing.T) {
@@ -32,6 +33,8 @@ func TestNewExtractor(t *testing.T) {
 }
 
 func TestExtractor_SaveToC(t *testing.T) {
+	t.Skip("for dev only")
+
 	ctx := context.Background()
 	cfg, _, _, _ := LoadConfig("")
 	server := &Server{

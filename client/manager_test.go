@@ -9,18 +9,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd"
-	fusefs "github.com/hanwen/go-fuse/v2/fs"
-	"github.com/mc256/starlight/client/fs"
-	"github.com/opencontainers/go-digest"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/containerd/containerd"
+	fusefs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/mc256/starlight/client/fs"
+	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -36,6 +37,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestManager_Extract(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -81,6 +83,7 @@ func TestManager_Extract(t *testing.T) {
 }
 
 func TestManager_Init(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -116,6 +119,7 @@ func TestManager_Init(t *testing.T) {
 }
 
 func TestManager_NewStarlightFS(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -157,6 +161,7 @@ func TestManager_NewStarlightFS(t *testing.T) {
 }
 
 func TestManager_NewStarlightFSMultiple(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -210,6 +215,7 @@ func TestManager_NewStarlightFSMultiple(t *testing.T) {
 }
 
 func TestManager_NewStarlightFSMultiple2(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -263,6 +269,7 @@ func TestManager_NewStarlightFSMultiple2(t *testing.T) {
 }
 
 func TestManager_NewStarlightFSMultiple3(t *testing.T) {
+	t.Skip("for dev only")
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
@@ -320,6 +327,7 @@ func TestManager_NewStarlightFSMultiple3(t *testing.T) {
 }
 
 func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
+	t.Skip("for dev only")
 	ctx := context.TODO()
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
@@ -387,6 +395,7 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 }
 
 func TestFilePath(t *testing.T) {
+	t.Skip("for dev only")
 	fmt.Println(filepath.Dir("etc/hosts"))
 	fmt.Println(filepath.Dir("etc"))
 	fmt.Println(filepath.Dir(""))
@@ -394,6 +403,7 @@ func TestFilePath(t *testing.T) {
 }
 
 func TestChannel(t *testing.T) {
+	t.Skip("for dev only")
 	ch := make(chan int, 1)
 	ch <- 1
 	close(ch)
