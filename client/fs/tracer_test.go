@@ -28,30 +28,24 @@ import (
 	"github.com/mc256/starlight/util"
 )
 
+// Test trace collection
 func TestLoadTraces(t *testing.T) {
 	ctx := util.ConfigLogger()
-	tc, err := NewTraceCollection(ctx, "/tmp")
+	tc, err := NewTraceCollection(ctx, os.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to create trace collection: %v", err)
 	}
+
 
 	buf, err := json.MarshalIndent(tc, "", "\t")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to marshal json: %v", err)
 	}
 	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
-}
 
-func TestLoadTraces2(t *testing.T) {
-	ctx := util.ConfigLogger()
-	tc, err := NewTraceCollection(ctx, "/root/traces2")
+	// check if file exists
+	_, err = os.Stat(path.Join(os.TempDir(), "group-optimize.json"))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("file does not exists: %v", err)
 	}
-
-	buf, err := json.MarshalIndent(tc, "", "\t")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
 }

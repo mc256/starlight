@@ -21,11 +21,12 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"testing"
+
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/test"
 	"github.com/mc256/starlight/util/common"
-	"net/http"
-	"testing"
 )
 
 func InitDatabase() (context.Context, *Configuration, *Server) {
@@ -48,6 +49,8 @@ func InitDatabase() (context.Context, *Configuration, *Server) {
 }
 
 func TestDatabase_GetImageByDigest(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 	b := &Builder{
 		server: server,
@@ -61,6 +64,8 @@ func TestDatabase_GetImageByDigest(t *testing.T) {
 }
 
 func TestDatabase_GetImage(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 	b := &Builder{
 		server: server,
@@ -74,6 +79,8 @@ func TestDatabase_GetImage(t *testing.T) {
 }
 
 func TestNewBuilder(t *testing.T) {
+	t.Skip("for dev only")
+
 	//ctx, cfg, server := InitDatabase()
 	_, _, server := InitDatabase()
 
@@ -89,6 +96,8 @@ func TestNewBuilder(t *testing.T) {
 }
 
 func TestNewBuilder2(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server,
@@ -103,6 +112,8 @@ func TestNewBuilder2(t *testing.T) {
 }
 
 func TestNewBuilder3(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server,
@@ -122,6 +133,8 @@ func TestNewBuilder3(t *testing.T) {
 }
 
 func TestBuilder_WriteHeader(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
@@ -145,6 +158,8 @@ func TestBuilder_WriteHeader(t *testing.T) {
 }
 
 func TestBuilder_WriteBody(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
@@ -168,6 +183,8 @@ func TestBuilder_WriteBody(t *testing.T) {
 }
 
 func TestBuilder_WriteBody2(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "", "starlight/mariadb:10.9.2", "linux/amd64")
@@ -191,6 +208,8 @@ func TestBuilder_WriteBody2(t *testing.T) {
 }
 
 func TestBuilder_WriteBody3(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server, "", "starlight/redis:6.2.7", "linux/amd64")

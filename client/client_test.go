@@ -9,6 +9,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/fs"
+	"io/ioutil"
+	"os"
+	"syscall"
+	"testing"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/platforms"
@@ -16,14 +22,11 @@ import (
 	"github.com/mc256/starlight/client/snapshotter"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"io/fs"
-	"io/ioutil"
-	"os"
-	"syscall"
-	"testing"
 )
 
 func TestImageFilter(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, p, _, _ := LoadConfig("/sandbox/etc/starlight/starlight-daemon.json")
 	fmt.Println("config path: ", p)
 	c, err := NewClient(context.Background(), cfg)
@@ -60,6 +63,8 @@ func TestImageFilter(t *testing.T) {
 }
 
 func TestClient_RemoveImage(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, p, _, _ := LoadConfig("/sandbox/etc/starlight/starlight-daemon.json")
 	fmt.Println("config path: ", p)
 	c, err := NewClient(context.Background(), cfg)
@@ -87,6 +92,8 @@ func TestClient_RemoveImage(t *testing.T) {
 }
 
 func TestClient_PullImageNotUpdate(t *testing.T) {
+	t.Skip("for dev only")
+
 	// Standard image pull
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
@@ -113,6 +120,8 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 }
 
 func TestClient_TestSnapshotter(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -134,6 +143,8 @@ func TestClient_TestSnapshotter(t *testing.T) {
 }
 
 func TestClient_TestSnapshotterAdd(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -157,6 +168,8 @@ func TestClient_TestSnapshotterAdd(t *testing.T) {
 }
 
 func TestClient_FindBaseImage(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -178,6 +191,8 @@ func TestClient_FindBaseImage(t *testing.T) {
 }
 
 func TestClient_PullImageWithUpdate(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -212,6 +227,8 @@ func TestClient_PullImageWithUpdate(t *testing.T) {
 }
 
 func TestClient_CreateImageService(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -237,6 +254,8 @@ func TestClient_CreateImageService(t *testing.T) {
 }
 
 func Test_WriteContent(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -281,6 +300,8 @@ func Test_WriteContent(t *testing.T) {
 }
 
 func TestClient_scanExistingFilesystems(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -299,6 +320,8 @@ func TestClient_scanExistingFilesystems(t *testing.T) {
 }
 
 func TestClient_scanSnapshots(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -314,6 +337,8 @@ func TestClient_scanSnapshots(t *testing.T) {
 }
 
 func TestClient_LoadImage(t *testing.T) {
+	t.Skip("for dev only")
+
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 	c, err := NewClient(context.Background(), cfg)
 	if err != nil {
@@ -337,6 +362,8 @@ func TestClient_LoadImage(t *testing.T) {
 }
 
 func TestPlatform(t *testing.T) {
+	t.Skip("for dev only")
+
 	fmt.Println(platforms.DefaultString())
 }
 
@@ -354,6 +381,8 @@ func TestPlatform(t *testing.T) {
 */
 
 func TestTransportEndpointNotConnected(t *testing.T) {
+	t.Skip("for dev only")
+
 	_, err := os.Stat("/var/lib/starlight/mnt/4/slfs")
 	if err.(*fs.PathError).Err == syscall.ENOTCONN {
 		t.Log("not connected")
@@ -363,6 +392,8 @@ func TestTransportEndpointNotConnected(t *testing.T) {
 }
 
 func TestInsecureReference(t *testing.T) {
+	t.Skip("for dev only")
+
 	n, _ := name.ParseReference("172.31.92.41:5000/redis:6.2.2-starlight")
 	fmt.Println(n)
 

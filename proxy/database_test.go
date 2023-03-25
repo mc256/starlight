@@ -9,10 +9,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mc256/starlight/client/fs"
-	"github.com/mc256/starlight/util/send"
 	"io/ioutil"
 	"testing"
+
+	"github.com/mc256/starlight/client/fs"
+	"github.com/mc256/starlight/util/send"
 )
 
 var (
@@ -31,6 +32,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestDatabase_Init(t *testing.T) {
+	t.Skip("for dev only")
+
 	ctx := context.Background()
 	db, err := NewDatabase(ctx, "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
 	if err != nil {
@@ -46,6 +49,8 @@ func TestDatabase_Init(t *testing.T) {
 }
 
 func TestDatabase_GetFiles(t *testing.T) {
+	t.Skip("for dev only")
+
 	// TOCEntry to
 	fl, err := db.GetUniqueFiles([]*send.ImageLayer{{Serial: 201}, {Serial: 211}, {Serial: 203}})
 	if err != nil {
@@ -58,6 +63,8 @@ func TestDatabase_GetFiles(t *testing.T) {
 }
 
 func TestDatabase_GetFilesWithRanks(t *testing.T) {
+	t.Skip("for dev only")
+
 	// TOCEntry to
 	fl, err := db.GetFilesWithRanks(45)
 	if err != nil {
@@ -70,6 +77,8 @@ func TestDatabase_GetFilesWithRanks(t *testing.T) {
 }
 
 func TestDatabase_UpdateFileRanks(t *testing.T) {
+	t.Skip("for dev only")
+
 	p := "/tmp/group-optimize.json"
 	b, err := ioutil.ReadFile(p)
 	if err != nil {

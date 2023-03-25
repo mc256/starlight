@@ -16,6 +16,8 @@ import (
 )
 
 func TestSnapshotList(t *testing.T) {
+	t.Skip("for dev only")
+
 	socket := "/run/k3s/containerd/containerd.sock"
 	ns := "k8s.io"
 

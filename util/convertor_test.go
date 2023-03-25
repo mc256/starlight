@@ -3,10 +3,11 @@ package util
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"testing"
 )
 
 const (
@@ -14,10 +15,17 @@ const (
 	dstRef = "harbor.yuri.moe/public/redis:6.2.1"
 )
 
+// TestConvertorConstructor does not requires any network connection
 func TestConvertorConstructor(t *testing.T) {
 	ctx := context.Background()
 
+	const (
+		srcRef = "docker.io/library/redis:6.2.1"
+		dstRef = "harbor.yuri.moe/public/redis:6.2.1"
+	)
+
 	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{}, "all")
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +33,10 @@ func TestConvertorConstructor(t *testing.T) {
 	return
 }
 
+// TestToStarlightImage Image does requires network connection
 func TestToStarlightImage(t *testing.T) {
+	t.Skip("for dev only")
+
 	ctx := context.Background()
 
 	c, err := NewConvertor(ctx, srcRef, dstRef, []name.Option{}, []name.Option{}, []remote.Option{

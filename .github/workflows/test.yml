@@ -1,0 +1,41 @@
+name: Go Testing
+on:
+  # PR testing before merge
+  pull_request:
+    types: 
+    - opened
+    - edited
+    - synchronize
+  # For Testing
+  push:
+    branches:
+      - feature_debian_*
+  # For Release
+  workflow_run:
+    workflows: ["Versioning"]
+    types:
+      - completed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Test All
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version-file: './go.mod'
+      - name: Install Buildessentials
+        run: |
+          sudo apt update -y
+          sudo apt upgrade -y
+          sudo apt install build-essential make -y
+      - name: Test
+        run: |
+          make test
