@@ -38,5 +38,4 @@ jobs:
           sudo apt install build-essential make -y
       - name: Test
         run: |
-          make 
           make test
