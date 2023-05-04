@@ -37,8 +37,10 @@ var (
 			Required: false,
 		},
 		&cli.StringFlag{
-			Name:     "platform",
-			Usage:    "chose what platforms to convert, e.g. 'linux/amd64,linux/arm64', use comma to separate. 'all' means all platforms in the source image",
+			Name: "platform",
+			Usage: "chose what platforms to convert, e.g. 'linux/amd64,linux/arm64', use comma to separate. " +
+				"'all' means all platforms in the source image. " +
+				"If image is not multi-platform, this flag will be ignored. ",
 			Value:    "all",
 			Required: false,
 		},
