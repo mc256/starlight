@@ -134,18 +134,23 @@ func (c *Convertor) GetDst() name.Reference {
 	return c.dst
 }
 
-func (c *Convertor) readImage() (goreg.ImageIndex, error) {
+func (c *Convertor) readImageDescriptor() (*remote.Descriptor, error) {
 	log.G(c.ctx).WithFields(logrus.Fields{"image": c.src}).Info("fetching container image")
 	desc, err := remote.Get(c.src, c.optsRemote...)
 	if err != nil {
 		return nil, err
 	}
-	return desc.ImageIndex()
+	return desc, nil
 }
 
-func (c *Convertor) writeImage(image goreg.ImageIndex) error {
+func (c *Convertor) writeImage(image goreg.Image) error {
 	log.G(c.ctx).WithFields(logrus.Fields{"image": c.dst}).Info("uploading converted container image")
-	return remote.WriteIndex(c.dst, image, c.optsRemote...)
+	return remote.Write(c.dst, image, c.optsRemote...)
+}
+
+func (c *Convertor) writeImageIndex(imageIndex goreg.ImageIndex) error {
+	log.G(c.ctx).WithFields(logrus.Fields{"imageIndex": c.dst}).Info("uploading converted container image")
+	return remote.WriteIndex(c.dst, imageIndex, c.optsRemote...)
 }
 
 func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
@@ -214,6 +219,67 @@ func (c *Convertor) toStarlightLayer(idx, layerIdx int, layers []goreg.Layer,
 	return nil
 }
 
+func (c *Convertor) convertSingleImage(img goreg.Image) (goreg.Image, error) {
+	// config
+	cfg, err := img.ConfigFile()
+	history := cfg.History
+	if err != nil {
+		return nil, err
+	}
+	addendum := make([]mutate.Addendum, len(history))
+
+	// layer
+	var layers []goreg.Layer
+	if layers, err = img.Layers(); err != nil {
+		return nil, err
+	}
+	layerMap := make([]int, len(history))
+	count := 0
+	for i, h := range history {
+		if h.EmptyLayer {
+			layerMap[i] = -1
+		} else {
+			layerMap[i] = count
+			count += 1
+		}
+	}
+
+	var addendumMux sync.Mutex
+	var errGrp errgroup.Group
+
+	for i, h := range history {
+		i, h := i, h
+		errGrp.Go(func() error {
+			return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
+		})
+	}
+
+	if err := errGrp.Wait(); err != nil {
+		return nil, errors.Wrapf(err, "failed to convert the image to Starlight format")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Clean up things that will be changed
+	cfg.RootFS.DiffIDs = []goreg.Hash{}
+	cfg.History = []goreg.History{}
+
+	// Set the configuration file to
+	configuredImage, err := mutate.ConfigFile(empty.Image, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write container image to the registry (or other places)
+	if slImg, err := mutate.Append(configuredImage, addendum...); err != nil {
+		return nil, err
+	} else {
+		return slImg, nil
+	}
+}
+
 func (c *Convertor) ToStarlightImage() (err error) {
 	// platform filter
 	var (
@@ -226,7 +292,7 @@ func (c *Convertor) ToStarlightImage() (err error) {
 			var plt v1.Platform
 			plt, err = platforms.Parse(p)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "failed to parse platform")
 			}
 			log.G(c.ctx).WithFields(logrus.Fields{"platform": p}).Info("requested platform")
 			requestedPlatforms = append(requestedPlatforms, &goreg.Platform{
@@ -254,130 +320,121 @@ func (c *Convertor) ToStarlightImage() (err error) {
 		return false
 	}
 
-	// image
+	// image descriptor
 	var (
-		imgIdx, retIdx goreg.ImageIndex
-		idxMan         *goreg.IndexManifest
+		imgDesc *remote.Descriptor
 	)
-	if imgIdx, err = c.readImage(); err != nil {
-		return err
+	if imgDesc, err = c.readImageDescriptor(); err != nil {
+		return errors.Wrapf(err, "failed to read image")
 	}
 
-	if idxMan, err = imgIdx.IndexManifest(); err != nil {
-		return err
-	}
+	if imgDesc.MediaType == types.DockerManifestSchema2 {
+		// single manifest image
+		// "application/vnd.docker.distribution.manifest.v2+json"
+		var (
+			img goreg.Image
+		)
 
-	retIdx = mutate.AppendManifests(empty.Index)
-	var idxAddendumMux sync.Mutex
-	var idxErrGrp errgroup.Group
+		if img, err = imgDesc.Image(); err != nil {
+			return errors.Wrapf(err, "failed to read image")
+		}
 
-	for _, m := range idxMan.Manifests {
-		m := m
-		idxErrGrp.Go(func() error {
-			req := hasPlatform(m.Platform)
-			log.G(c.ctx).WithFields(logrus.Fields{
-				"platform": m.Platform,
-				"digest":   m.Digest.String(),
-				"size":     m.Size,
-				"skip":     !req,
-			}).Info("found platform")
+		log.G(c.ctx).WithFields(logrus.Fields{}).Info("found single image")
 
-			if !req {
-				return nil
-			}
+		// convert image
+		var slImg goreg.Image
+		if slImg, err = c.convertSingleImage(img); err != nil {
+			return errors.Wrapf(err, "failed to convert image format")
+		}
 
-			img, err := imgIdx.Image(m.Digest)
-			if err != nil {
-				return err
-			}
+		_, err = slImg.Digest()
+		if err != nil {
+			return err
+		}
 
-			// config
-			cfg, err := img.ConfigFile()
-			history := cfg.History
-			if err != nil {
-				return err
-			}
-			addendum := make([]mutate.Addendum, len(history))
+		// Write the image to the registry
+		if err := c.writeImage(slImg); err != nil {
+			return errors.Wrapf(err, "failed to upload image")
+		}
 
-			// layer
-			var layers []goreg.Layer
-			if layers, err = img.Layers(); err != nil {
-				return err
-			}
-			layerMap := make([]int, len(history))
-			count := 0
-			for i, h := range history {
-				if h.EmptyLayer {
-					layerMap[i] = -1
-				} else {
-					layerMap[i] = count
-					count += 1
+		return nil
+
+	} else {
+		// image index
+		// "application/vnd.docker.distribution.manifest.list.v2+json"
+		var (
+			imgIdx, retIdx goreg.ImageIndex
+			idxMan         *goreg.IndexManifest
+		)
+
+		if imgIdx, err = imgDesc.ImageIndex(); err != nil {
+			return errors.Wrapf(err, "failed to read image index")
+		}
+
+		if idxMan, err = imgIdx.IndexManifest(); err != nil {
+			return errors.Wrapf(err, "failed to read index manifest")
+		}
+
+		retIdx = mutate.AppendManifests(empty.Index)
+		var idxAddendumMux sync.Mutex
+		var idxErrGrp errgroup.Group
+
+		for _, m := range idxMan.Manifests {
+			m := m
+			idxErrGrp.Go(func() error {
+				req := hasPlatform(m.Platform)
+				log.G(c.ctx).WithFields(logrus.Fields{
+					"platform": m.Platform,
+					"digest":   m.Digest.String(),
+					"size":     m.Size,
+					"skip":     !req,
+				}).Info("found platform")
+
+				if !req {
+					return nil
 				}
-			}
 
-			var addendumMux sync.Mutex
-			var errGrp errgroup.Group
+				img, err := imgIdx.Image(m.Digest)
+				if err != nil {
+					return err
+				}
 
-			for i, h := range history {
-				i, h := i, h
-				errGrp.Go(func() error {
-					return c.toStarlightLayer(i, layerMap[i], layers, addendum, &addendumMux, h)
+				var (
+					slImg goreg.Image
+					h     goreg.Hash
+				)
+
+				if slImg, err = c.convertSingleImage(img); err != nil {
+					return errors.Wrapf(err, "failed to convert image format")
+				}
+
+				h, err = slImg.Digest()
+				if err != nil {
+					return err
+				}
+
+				idxAddendumMux.Lock()
+				defer idxAddendumMux.Unlock()
+
+				retIdx = mutate.AppendManifests(retIdx, mutate.IndexAddendum{
+					Add: slImg,
+					Descriptor: goreg.Descriptor{
+						MediaType:   m.MediaType,
+						Size:        m.Size,
+						Digest:      h,
+						URLs:        m.URLs,
+						Annotations: m.Annotations,
+						Platform:    m.Platform,
+					},
 				})
-			}
-
-			if err := errGrp.Wait(); err != nil {
-				return errors.Wrapf(err, "failed to convert the image to Starlight format")
-			}
-
-			if err != nil {
-				return err
-			}
-
-			// Clean up things that will be changed
-			cfg.RootFS.DiffIDs = []goreg.Hash{}
-			cfg.History = []goreg.History{}
-
-			// Set the configuration file to
-			configuredImage, err := mutate.ConfigFile(empty.Image, cfg)
-			if err != nil {
-				return err
-			}
-
-			// Write container image to the registry (or other places)
-			slImg, err := mutate.Append(configuredImage, addendum...)
-			if err != nil {
-				return err
-			}
-
-			var (
-				h goreg.Hash
-			)
-			h, err = slImg.Digest()
-			if err != nil {
-				return err
-			}
-
-			idxAddendumMux.Lock()
-			defer idxAddendumMux.Unlock()
-
-			retIdx = mutate.AppendManifests(retIdx, mutate.IndexAddendum{
-				Add: slImg,
-				Descriptor: goreg.Descriptor{
-					MediaType:   m.MediaType,
-					Size:        m.Size,
-					Digest:      h,
-					URLs:        m.URLs,
-					Annotations: m.Annotations,
-					Platform:    m.Platform,
-				},
+				return nil
 			})
-			return nil
-		})
-	}
+		}
 
-	if err := idxErrGrp.Wait(); err != nil {
-		return errors.Wrapf(err, "failed to convert the OCI image to Starlight format")
-	}
+		if err := idxErrGrp.Wait(); err != nil {
+			return errors.Wrapf(err, "failed to convert the OCI image to Starlight format")
+		}
 
-	return c.writeImage(retIdx)
+		return c.writeImageIndex(retIdx)
+	}
 }
