@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/mc256/starlight/client/fs"
@@ -80,7 +80,7 @@ func TestDatabase_UpdateFileRanks(t *testing.T) {
 	t.Skip("for dev only")
 
 	p := "/tmp/group-optimize.json"
-	b, err := ioutil.ReadFile(p)
+	b, err := os.ReadFile(p)
 	if err != nil {
 		t.Error(err)
 		return

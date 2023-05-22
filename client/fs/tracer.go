@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mc256/starlight/util"
 	"io"
 	"io/ioutil"
 	"os"
@@ -30,6 +29,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/mc256/starlight/util"
 
 	"github.com/containerd/containerd/log"
 	"github.com/sirupsen/logrus"
@@ -205,7 +206,7 @@ func NewTraceCollection(ctx context.Context, p string) (*TraceCollection, error)
 
 	for _, f := range files {
 		if path.Ext(f.Name()) == ".json" {
-			buf, err := ioutil.ReadFile(path.Join(p, f.Name()))
+			buf, err := os.ReadFile(path.Join(p, f.Name()))
 			if err != nil {
 				log.G(ctx).
 					WithField("file", f.Name()).

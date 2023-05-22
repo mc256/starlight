@@ -7,12 +7,12 @@ package proxy
 
 import (
 	"encoding/json"
+	"os"
+	"path"
+
 	"github.com/google/uuid"
 	"github.com/mc256/starlight/util"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"os"
-	"path"
 )
 
 type Configuration struct {
@@ -50,14 +50,14 @@ func LoadConfig(cfgPath string) (c *Configuration, p string, n bool, error error
 		p = cfgPath
 	}
 
-	b, err := ioutil.ReadFile(p)
+	b, err := os.ReadFile(p)
 	n = false
 	if err != nil {
 		n = true
 
 		buf, _ := json.Marshal(c)
 
-		if err = ioutil.WriteFile(p, buf, 0644); err == nil {
+		if err = os.WriteFile(p, buf, 0644); err == nil {
 			return
 		} else {
 			error = errors.Wrapf(err, "cannot create config file")
@@ -79,7 +79,7 @@ func (c *Configuration) SaveConfig() error {
 
 	p := path.Join(etcPath, "proxy_config.json")
 	buf, _ := json.MarshalIndent(c, " ", " ")
-	err := ioutil.WriteFile(p, buf, 0644)
+	err := os.WriteFile(p, buf, 0644)
 	if err == nil {
 		return nil
 	}

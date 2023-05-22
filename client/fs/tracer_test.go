@@ -20,7 +20,6 @@ package fs
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -36,12 +35,11 @@ func TestLoadTraces(t *testing.T) {
 		t.Fatalf("failed to create trace collection: %v", err)
 	}
 
-
 	buf, err := json.MarshalIndent(tc, "", "\t")
 	if err != nil {
 		t.Fatalf("failed to marshal json: %v", err)
 	}
-	_ = ioutil.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
+	_ = os.WriteFile(path.Join(os.TempDir(), "group-optimize.json"), buf, 0644)
 
 	// check if file exists
 	_, err = os.Stat(path.Join(os.TempDir(), "group-optimize.json"))

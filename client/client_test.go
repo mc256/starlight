@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -270,7 +269,7 @@ func Test_WriteContent(t *testing.T) {
 	}
 	cs := client.ContentStore()
 
-	mf, err := ioutil.ReadFile("/root/manifest.json")
+	mf, err := os.ReadFile("/root/manifest.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -369,7 +368,7 @@ func TestPlatform(t *testing.T) {
 
 /*
 	// for debug purpose
-	_ = ioutil.WriteFile("/tmp/starlight-test.json", sta, 0644)
+	_ = os.WriteFile("/tmp/starlight-test.json", sta, 0644)
 	f, err := os.OpenFile("/tmp/starlight-test.tar.gz", os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open file")
