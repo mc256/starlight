@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -57,7 +56,7 @@ func (l StarlightLayer) MediaType() (types.MediaType, error) {
 
 func (l StarlightLayer) Compressed() (io.ReadCloser, error) {
 	// see issue https://github.com/google/go-containerregistry/pull/768
-	return ioutil.NopCloser(l.R), nil
+	return io.NopCloser(l.R), nil
 }
 
 func (l StarlightLayer) Uncompressed() (io.ReadCloser, error) {

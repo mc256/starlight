@@ -278,7 +278,7 @@ func (c *Client) handleManifest(buf *bytes.Buffer) (manifest *v1.Manifest, b []b
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to decompress manifest")
 	}
-	man, err := ioutil.ReadAll(r)
+	man, err := io.ReadAll(r)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to read manifest")
 	}
@@ -351,7 +351,7 @@ func (c *Client) handleConfig(buf *bytes.Buffer) (config *v1.Image, b []byte, er
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to decompress config")
 	}
-	cfg, err := ioutil.ReadAll(r)
+	cfg, err := io.ReadAll(r)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to read config")
 	}
@@ -386,7 +386,7 @@ func (c *Client) handleStarlightHeader(buf *bytes.Buffer) (header *Manager, h []
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to decompress starlight header")
 	}
-	h, err = ioutil.ReadAll(r)
+	h, err = io.ReadAll(r)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to read starlight header")
 	}
