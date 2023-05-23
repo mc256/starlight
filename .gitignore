@@ -26,3 +26,6 @@ sandbox/
 vendor/
 
 my-values.yaml
+
+# environment file
+.env
