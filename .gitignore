@@ -19,7 +19,7 @@ out/
 .sandbox/
 sandbox/
 
-# GoLand
+# GoLand and VSCode
 .idea
 .vscode
 

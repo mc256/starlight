@@ -68,10 +68,10 @@ func TestToStarlightImageECR(t *testing.T) {
 		t.Skip(">>>>> Skip: no container registry credentials for ECR")
 	}
 
+	test.LoadEnvironmentVariables()
 	if os.Getenv("TEST_ECR_IMAGE_FROM") == "" {
 		t.Skip(">>>>> Skip: no TEST_ECR_IMAGE_FROM environment variable")
 	}
-
 	if os.Getenv("TEST_ECR_IMAGE_TO") == "" {
 		t.Skip(">>>>> Skip: no TEST_ECR_IMAGE_TO environment variable")
 	}

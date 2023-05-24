@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 // IsDevEnvironment returns true if the STARLIGHT_ENV environment variable starts with "DEV".
@@ -45,4 +48,13 @@ func HasLoginAWSECR() bool {
 
 func HasLoginStarlightGoharbor() bool {
 	return checkDockerConfig("harbor.starlight.mc256.dev")
+}
+
+func LoadEnvironmentVariables() {
+	// in case the running path is not the root of the project
+	dir, _ := os.Getwd()
+	for !strings.HasSuffix(dir, "starlight") {
+		dir = path.Dir(dir)
+	}
+	godotenv.Load(path.Join(dir, ".env"))
 }
