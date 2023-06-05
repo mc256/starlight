@@ -139,9 +139,7 @@ func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 		// chunks
 		for k, v := range chunks {
 			extEntry := entBuffer[k]
-			for _, c := range v {
-				extEntry.Chunks = append(extEntry.Chunks, c)
-			}
+			extEntry.Chunks = append(extEntry.Chunks, v...)
 		}
 
 		err = ex.server.db.InsertFiles(txn, layerRef, entBuffer)
