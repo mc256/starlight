@@ -11,6 +11,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
@@ -22,14 +30,6 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"io"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Manager should be unmarshalled from a json file and then Populate() should be called to populate other fields
@@ -189,7 +189,7 @@ func (m *Manager) Extract(r *io.ReadCloser) (err error) {
 			Complete: complete,
 		}
 		buf, _ := json.Marshal(msg)
-		if err := ioutil.WriteFile(filepath.Join(layer.Local, "completed.json"), buf, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(layer.Local, "completed.json"), buf, 0644); err != nil {
 			return errors.Wrapf(err, "failed to mark layer %d-%s as completed", idx, layer.Hash)
 		}
 		m.completedStack[idx] = true
@@ -271,9 +271,9 @@ func (m *Manager) CreateSnapshots(c *Client) (chainIds []digest.Digest, err erro
 // Init populates the manager with the necessary information and data structures.
 // Use json.Unmarshal to unmarshal the json file from data storage into a Manager struct.
 //
-//  - ready: if set to false, we will then use Extract() to get the content of the file
-//  - cfg: configuration of the client
-//  - image, manifest, imageConfig: information about the image (maybe we don't need this)
+//   - ready: if set to false, we will then use Extract() to get the content of the file
+//   - cfg: configuration of the client
+//   - image, manifest, imageConfig: information about the image (maybe we don't need this)
 //
 // do not change any outside state, only the manager itself
 func (m *Manager) Init(ctr *containerd.Client, client *Client, ctx context.Context, cfg *Configuration, ready bool,

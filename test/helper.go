@@ -3,8 +3,8 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 func PrettyPrintJson(obj interface{}) {
@@ -22,7 +22,7 @@ func (w *FakeResponseWriter) Header() http.Header {
 }
 
 func (w *FakeResponseWriter) Write(b []byte) (int, error) {
-	err := ioutil.WriteFile(fmt.Sprintf("../sandbox/%s.tar.gz", w.id), b, 0644)
+	err := os.WriteFile(fmt.Sprintf("../sandbox/%s.tar.gz", w.id), b, 0644)
 	if err != nil {
 		return 0, err
 	}
@@ -31,7 +31,7 @@ func (w *FakeResponseWriter) Write(b []byte) (int, error) {
 
 func (w *FakeResponseWriter) WriteHeader(statusCode int) {
 	b, _ := json.MarshalIndent(w.header, "", "  ")
-	_ = ioutil.WriteFile(fmt.Sprintf("../sandbox/%s.json", w.id), b, 0644)
+	_ = os.WriteFile(fmt.Sprintf("../sandbox/%s.json", w.id), b, 0644)
 	fmt.Printf("status code: %d", statusCode)
 }
 

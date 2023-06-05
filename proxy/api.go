@@ -22,17 +22,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/log"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/sirupsen/logrus"
 )
 
 type StarlightProxy struct {
@@ -66,7 +66,7 @@ func (a *StarlightProxy) Ping() (int64, string, string, error) {
 		return -1, "", "", err
 	}
 
-	response, err := ioutil.ReadAll(resp.Body)
+	response, err := io.ReadAll(resp.Body)
 	version := resp.Header.Get("Starlight-Version")
 
 	var r ApiResponse
@@ -124,7 +124,7 @@ func (a *StarlightProxy) Notify(ref name.Reference, insecure bool) error {
 		return err
 	}
 
-	response, err := ioutil.ReadAll(resp.Body)
+	response, err := io.ReadAll(resp.Body)
 	version := resp.Header.Get("Starlight-Version")
 
 	if resp.StatusCode != 200 {
@@ -192,7 +192,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 
 	version := resp.Header.Get("Starlight-Version")
 	if resp.StatusCode == 400 {
-		response, _ := ioutil.ReadAll(resp.Body)
+		response, _ := io.ReadAll(resp.Body)
 		e := strings.TrimSpace(string(response))
 		log.G(a.ctx).
 			WithFields(logrus.Fields{
@@ -204,7 +204,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 		return nil, 0, 0, 0, "", "", fmt.Errorf(e)
 	}
 	if resp.StatusCode != 200 || version == "" {
-		response, err := ioutil.ReadAll(resp.Body)
+		response, err := io.ReadAll(resp.Body)
 		log.G(a.ctx).
 			WithFields(logrus.Fields{
 				"code":     fmt.Sprintf("%d", resp.StatusCode),
@@ -268,7 +268,7 @@ func (a *StarlightProxy) Report(body io.Reader) error {
 		return err
 	}
 
-	response, err := ioutil.ReadAll(resp.Body)
+	response, err := io.ReadAll(resp.Body)
 	version := resp.Header.Get("Starlight-Version")
 
 	if resp.StatusCode != 200 {

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,7 +40,7 @@ func TestManager_Extract(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -87,7 +86,7 @@ func TestManager_Init(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -123,7 +122,7 @@ func TestManager_NewStarlightFS(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -165,7 +164,7 @@ func TestManager_NewStarlightFSMultiple(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -219,7 +218,7 @@ func TestManager_NewStarlightFSMultiple2(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -273,7 +272,7 @@ func TestManager_NewStarlightFSMultiple3(t *testing.T) {
 	cfg, _, _, _ := LoadConfig("/root/daemon.json")
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -338,7 +337,7 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 	)
 
 	// Starlight header
-	b, err := ioutil.ReadFile("/tmp/starlight-test.json")
+	b, err := os.ReadFile("/tmp/starlight-test.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -350,7 +349,7 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 	}
 
 	// imageConfig
-	b, err = ioutil.ReadFile("/tmp/starlight-test-config.json")
+	b, err = os.ReadFile("/tmp/starlight-test-config.json")
 	if err != nil {
 		t.Error(err)
 		return
@@ -362,7 +361,7 @@ func TestManager_NewStarlightSnapshotterTest(t *testing.T) {
 	}
 
 	// manifest
-	b, err = ioutil.ReadFile("/tmp/starlight-test-manifest.json")
+	b, err = os.ReadFile("/tmp/starlight-test-manifest.json")
 	if err != nil {
 		t.Error(err)
 		return

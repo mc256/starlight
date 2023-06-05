@@ -19,10 +19,13 @@ out/
 .sandbox/
 sandbox/
 
-# GoLand
+# GoLand and VSCode
 .idea
 .vscode
 
 vendor/
 
 my-values.yaml
+
+# environment file
+.env
