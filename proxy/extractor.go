@@ -155,8 +155,11 @@ func (ex *Extractor) saveLayer(imageSerial, idx int64, layer v1.Layer) error {
 }
 
 func (ex *Extractor) saveToCPerImage(img v1.Image, m v1.Descriptor) error {
-	plt := m.Platform
-	pltStr := path.Join(plt.OS, plt.Architecture, plt.Variant)
+	pltStr := "uni-arch"
+	if plt := m.Platform; plt != nil {
+		pltStr = path.Join(plt.OS, plt.Architecture, plt.Variant)
+	}
+
 	log.G(ex.server.ctx).WithFields(logrus.Fields{
 		"image":    ex.ParsedName,
 		"tag":      ex.ParsedTag,
