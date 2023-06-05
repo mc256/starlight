@@ -293,15 +293,15 @@ func (c *Convertor) ToStarlightImage() (err error) {
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse platform")
 			}
-			log.G(c.ctx).WithFields(logrus.Fields{"platform": p}).Info("requested platform")
 			requestedPlatforms = append(requestedPlatforms, &goreg.Platform{
 				Architecture: plt.Architecture,
 				OS:           plt.OS,
 				OSVersion:    plt.OSVersion,
 				OSFeatures:   plt.OSFeatures,
 				Variant:      plt.Variant,
-				Features:     nil,
+				Features:     plt.OSFeatures,
 			})
+			log.G(c.ctx).WithFields(logrus.Fields{"platform": p}).Info("requested platform")
 		}
 	} else {
 		log.G(c.ctx).WithFields(logrus.Fields{"platform": "all"}).Info("requested platform")
@@ -386,7 +386,7 @@ func (c *Convertor) ToStarlightImage() (err error) {
 					"platform": m.Platform,
 					"digest":   m.Digest.String(),
 					"size":     m.Size,
-					"skip":     !req,
+					"_skip":    !req,
 				}).Info("found platform")
 
 				if !req {
@@ -426,6 +426,11 @@ func (c *Convertor) ToStarlightImage() (err error) {
 						Platform:    m.Platform,
 					},
 				})
+				log.G(c.ctx).WithFields(logrus.Fields{
+					"platform": m.Platform,
+					"digest":   h.String(),
+					"size":     m.Size,
+				}).Info("converted platform")
 				return nil
 			})
 		}

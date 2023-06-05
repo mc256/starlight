@@ -47,7 +47,7 @@ func HasLoginAWSECR() bool {
 }
 
 func HasLoginStarlightGoharbor() bool {
-	return checkDockerConfig("harbor.starlight.mc256.dev")
+	return checkDockerConfig(os.Getenv("STARLIGHT_CONTAINER_REGISTRY"))
 }
 
 func LoadEnvironmentVariables() {
