@@ -174,12 +174,13 @@ If you find Starlight useful in your work, please cite our NSDI 2022 paper:
 ## Roadmap
 Starlight is not complete. Our roadmap:
 
-| Version                                                  | Status  | Scheduled Release |
-|----------------------------------------------------------|---------|-------------------|
-| [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) |         |                   |
-| [v0.2.7](https://github.com/mc256/starlight/tree/v0.2.7) |         |                   |
-| [v0.3.2](https://github.com/mc256/starlight/tree/v0.3.2) | stable  |                   |
-| [v0.4.0](https://github.com/mc256/starlight)             | develop | 2023-03-30        |
+| Version                                                  | Status       | Release Date|
+|----------------------------------------------------------|--------------|-------------------|
+| [v0.1.3](https://github.com/mc256/starlight/tree/v0.1.3) |              |2022-10-12|
+| [v0.2.7](https://github.com/mc256/starlight/tree/v0.2.7) |              |2022-11-27|
+| [v0.3.2](https://github.com/mc256/starlight/tree/v0.3.2) |              |2023-01-27|
+| [v0.4.7](https://github.com/mc256/starlight/tree/v0.4.7) | stable       |2023-06-05|
+| [v0.5.x](https://github.com/mc256/starlight)             | in progress  |  |
 
 Feature List:
 - [x] Scalable database backend (v0.2)
@@ -191,12 +192,13 @@ Feature List:
     - [x] Starlight Proxy authentication (v0.2)
   - [x] New Starlight Snapshotter / Content Plugin for containerd (v0.2)
   - [x] initContainer tool (v0.3)
-- [ ] OCI container registry support (v0.4)
+- [x] OCI container registry support (v0.5)
   - [x] Goharbor support (v0.2)
   - [x] Multiple platforms image support (v0.2) 
-  - [ ] Goharbor Hook/ Scanner for automatic image conversion (v0.4)
   - [x] Jointly optimizing multiple containers deployments (v0.4)
-  - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.4)
-- [ ] Starlight new features (v0.5)
-  - [ ] Resume interrupted pull connection (v0.4)
-  - [ ] Garbage Collection (v0.4)
+- [ ] Argo CI/CD support (v0.6)
+  - [ ] Hook/ Scanner for automatic image conversion (v0.5)
+  - [ ] Converting containers that have already been fully retrieved using Starlight to use OverlayFS. (v0.5)
+- [ ] Starlight new features (v0.6)
+  - [ ] Resume interrupted pull connection (v0.5)
+  - [ ] Garbage Collection (v0.5)

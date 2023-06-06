@@ -18,6 +18,7 @@ spec:
       labels:
         {{- include "starlight.proxySelectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "starlight.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

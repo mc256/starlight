@@ -4,7 +4,7 @@
 
 ```shell
 helm show values oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.3.2 > ./my-values.yaml
+     --version 0.4.7 > ./my-values.yaml
 ```
 
 Take a look at `./my-values.yaml` and edit it to your liking. 
@@ -17,7 +17,7 @@ Then give it a shot:
 helm upgrade --install -f ./my-values.yaml \
      starlight \
      oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.3.2
+     --version 0.4.7
 ```
 
 ## Prerequisites
