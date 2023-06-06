@@ -131,6 +131,8 @@ edgeNodeSelector:
   # kubernetes.io/arch: arm64
   # kubernetes.io/hostname: edge
 
+edgeAffinity: {}
+
 ########################################################################
 # OTHER CONFIGURATIONS
 ########################################################################
