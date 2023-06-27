@@ -8,15 +8,17 @@ package pull
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
 )
 
 func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*30)
 	defer cancel()
 	resp, err := client.PullImage(ctx, ref)
@@ -25,9 +27,26 @@ func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
 		return
 	}
 	if resp.Success {
-		if !quiet {
-			fmt.Printf("pulling image: %s\n", resp.Message)
+		if quiet {
+			return
 		}
+		end := time.Now()
+
+		if resp.GetBaseImage() == "" {
+			fmt.Printf("requested to pull image %s successfully in %dms \n",
+				ref.Reference,
+				end.Sub(start).Milliseconds(),
+			)
+		} else {
+			fmt.Printf("requested to pull image %s successfully based on %s in %dms \n",
+				ref.Reference, resp.GetBaseImage(),
+				end.Sub(start).Milliseconds(),
+			)
+		}
+		if ref.DisableEarlyStart {
+			fmt.Printf("entire image %s has been downloaded because early start is disabled\n", ref.Reference)
+		}
+		fmt.Printf("delta image size: %d bytes\n", resp.GetTotalImageSize())
 	} else {
 		fmt.Printf("pull image failed: %s\n", resp.Message)
 	}
@@ -56,10 +75,11 @@ func Action(ctx context.Context, c *cli.Context) error {
 
 	// pull image
 	pullImage(pb.NewDaemonClient(conn), &pb.ImageReference{
-		Reference:   ref,
-		Base:        base,
-		ProxyConfig: c.String("profile"),
-		Namespace:   c.String("namespace"),
+		Reference:         ref,
+		Base:              base,
+		ProxyConfig:       c.String("profile"),
+		Namespace:         c.String("namespace"),
+		DisableEarlyStart: c.Bool("disable-early-start"),
 	}, c.Bool("quiet"))
 	return nil
 }
@@ -75,6 +95,12 @@ func Command() *cli.Command {
 		},
 		Flags: append(
 			auth.ProxyFlags,
+			&cli.BoolFlag{
+				Name:    "disable-early-start",
+				Aliases: []string{"w"},
+				Value:   false,
+				Usage:   "block until the entire image is pulled to the local filesystem",
+			},
 		),
 		ArgsUsage: "[flags] [BaseImage] PullImage",
 	}

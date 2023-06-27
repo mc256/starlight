@@ -32,6 +32,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -157,10 +158,13 @@ func parseNumber(k, s string) (int64, error) {
 	return n, nil
 }
 
+func getHeaderInt64(h *http.Header, k string) (int64, error) {
+	return parseNumber(k, h.Get(k))
+}
+
 func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	reader io.ReadCloser,
-	manifestSize, configSize, starlightHeaderSize int64,
-	digest, slDigest string,
+	metadata *common.DeltaImageMetadata,
 	err error) {
 	u := url.URL{
 		Scheme: a.protocol,
@@ -187,7 +191,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	req.Header.Set("Content-Type", "application/octet-stream")
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return nil, 0, 0, 0, "", "", err
+		return nil, nil, err
 	}
 
 	version := resp.Header.Get("Starlight-Version")
@@ -201,7 +205,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 				"response": e,
 			}).
 			Error("server error")
-		return nil, 0, 0, 0, "", "", fmt.Errorf(e)
+		return nil, nil, fmt.Errorf(e)
 	}
 	if resp.StatusCode != 200 || version == "" {
 		response, err := io.ReadAll(resp.Body)
@@ -213,7 +217,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 			}).
 			WithError(err).
 			Error("server error")
-		return nil, 0, 0, 0, "", "", err
+		return nil, nil, err
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
@@ -224,32 +228,39 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 		"platform": platform,
 	}).Info("reading delta image")
 
-	manifestSize, err = parseNumber("Manifest-Size", resp.Header.Get("Manifest-Size"))
+	res := &common.DeltaImageMetadata{}
+
+	res.ManifestSize, err = getHeaderInt64(&resp.Header, "Manifest-Size")
 	if err != nil {
-		return nil, 0, 0, 0, "", "", err
+		return nil, nil, err
 	}
 
-	configSize, err = parseNumber("Config-Size", resp.Header.Get("Config-Size"))
+	res.ConfigSize, err = getHeaderInt64(&resp.Header, "Config-Size")
 	if err != nil {
-		return nil, 0, 0, 0, "", "", err
+		return nil, nil, err
 	}
 
-	starlightHeaderSize, err = parseNumber("Starlight-Header-Size", resp.Header.Get("Starlight-Header-Size"))
+	res.StarlightHeaderSize, err = getHeaderInt64(&resp.Header, "Starlight-Header-Size")
 	if err != nil {
-		return nil, 0, 0, 0, "", "", err
+		return nil, nil, err
 	}
 
-	digest = resp.Header.Get("Digest")
-	if digest == "" {
-		return nil, 0, 0, 0, "", "", fmt.Errorf("header Digest not found")
+	res.ContentLength, err = getHeaderInt64(&resp.Header, "Content-Length")
+	if err != nil {
+		return nil, nil, err
 	}
 
-	slDigest = resp.Header.Get("Starlight-Digest")
-	if slDigest == "" {
-		return nil, 0, 0, 0, "", "", fmt.Errorf("header Starlight-Digest not found")
+	res.Digest = resp.Header.Get("Digest")
+	if res.Digest == "" {
+		return nil, nil, fmt.Errorf("header Digest not found")
 	}
 
-	return resp.Body, manifestSize, configSize, starlightHeaderSize, digest, slDigest, nil
+	res.StarlightDigest = resp.Header.Get("Starlight-Digest")
+	if res.StarlightDigest == "" {
+		return nil, nil, fmt.Errorf("header Starlight-Digest not found")
+	}
+
+	return resp.Body, res, nil
 }
 
 func (a *StarlightProxy) Report(body io.Reader) error {
