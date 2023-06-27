@@ -94,12 +94,14 @@ message ImageReference {
   string base = 2;
   string proxyConfig = 3;
   string namespace = 4;
+  bool disableEarlyStart = 5;
 }
 
 message ImagePullResponse {
   bool success = 1;
   string message = 2;
   string baseImage = 3;
+  int64 totalImageSize = 4;
 }
 
 // Optimize

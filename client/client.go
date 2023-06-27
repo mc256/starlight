@@ -469,11 +469,14 @@ func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
 }
 
 type PullFinishedMessage struct {
-	img  *images.Image
-	base string
-	err  error
+	img       *images.Image
+	imageSize int64
+	base      string
+	err       error
 }
 
+// for testing only
+// pullImageSync pulls an image and blocks until it is finished loading the hot files
 func (c *Client) pullImageSync(ctr *containerd.Client, base containerd.Image,
 	ref, platform, proxyCfg string) (img *images.Image, err error) {
 	msg := make(chan PullFinishedMessage)
@@ -486,7 +489,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 	// connect to containerd
 	ctr, err := containerd.New(c.cfg.Containerd, containerd.WithDefaultNamespace(ns))
 	if err != nil {
-		*ret <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to connect to containerd")}
+		*ret <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to connect to containerd")}
 		return
 	}
 	defer ctr.Close()
@@ -495,7 +498,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 	var baseImg containerd.Image
 	baseImg, err = c.FindBaseImage(ctr, base, ref)
 	if err != nil {
-		*ret <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to identify base image")}
+		*ret <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to identify base image")}
 		return
 	}
 
@@ -521,7 +524,7 @@ func (c *Client) PullImage(
 	reqFilter := getImageFilter(ref, false)
 	img, err := c.findImage(ctr, reqFilter)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to check requested image %s", ref)}
+		*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to check requested image %s", ref)}
 		return
 	}
 
@@ -529,11 +532,11 @@ func (c *Client) PullImage(
 		labels := img.Labels()
 		if _, has := labels[util.ContentLabelCompletion]; has {
 			if _, err = c.LoadImage(ctr, img.Target().Digest); err != nil {
-				*ready <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to load image %s", ref)}
+				*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to load image %s", ref)}
 				return
 			}
 			meta := img.Metadata()
-			*ready <- PullFinishedMessage{&meta, "", fmt.Errorf("requested image %s already exists", ref)}
+			*ready <- PullFinishedMessage{&meta, 0, "", fmt.Errorf("requested image %s already exists", ref)}
 			return
 
 		}
@@ -546,7 +549,7 @@ func (c *Client) PullImage(
 			log.G(c.ctx).
 				WithField("image", ref).
 				Info("failed to remove incomplete image")
-			*ready <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to remove unfinished image %s", ref)}
+			*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to remove unfinished image %s", ref)}
 			return
 		}
 	}
@@ -564,9 +567,9 @@ func (c *Client) PullImage(
 	}
 
 	// pull image
-	body, mSize, cSize, sSize, md, sld, err := p.DeltaImage(baseRef, ref, platform)
+	body, res, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, "", errors.Wrapf(err, "failed to pull image %s", ref)}
+		*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to pull image %s", ref)}
 		return
 	}
 	defer func() {
@@ -579,28 +582,34 @@ func (c *Client) PullImage(
 	}()
 
 	log.G(c.ctx).
-		WithField("manifest", mSize).
-		WithField("config", cSize).
-		WithField("starlight", sSize).
-		WithField("digest", md).
-		WithField("sl_digest", sld).
+		// Size in bytes
+		WithField("_manifest", res.ManifestSize).
+		WithField("_config", res.ConfigSize).
+		WithField("_starlight", res.StarlightHeaderSize).
+		WithField("_total", res.ContentLength).
+		// Digests
+		WithField("d", res.Digest).
+		WithField("d_sl", res.StarlightDigest).
+		// Base image
+		WithField("base", baseRef).
+		//////////////////////////
 		Infof("pulling image %s", ref)
 
 	// 1. check manager in memory, if it exists, remove it and re-pull the image
 	// (This behavior is different from LoadImage() which does not remove the manager in memory)
 	c.managerMapLock.Lock()
 	defer func() {
-		if _, ok := c.managerMap[md]; !ok {
+		if _, ok := c.managerMap[res.Digest]; !ok {
 			// something went wrong, the lock has not been released, unlock it
 			c.managerMapLock.Unlock()
 		}
 	}()
-	if _, ok := c.managerMap[md]; ok {
+	if _, ok := c.managerMap[res.Digest]; ok {
 		log.G(c.ctx).
-			WithField("manifest", mSize).
-			WithField("sl_digest", sld).
+			WithField("manifest", res.ManifestSize).
+			WithField("sl_digest", res.StarlightDigest).
 			Warn("found in cache. remove and re-pull")
-		delete(c.managerMap, md)
+		delete(c.managerMap, res.Digest)
 	}
 
 	// check if the image is in containerd's image pool
@@ -617,76 +626,76 @@ func (c *Client) PullImage(
 	cs := ctr.ContentStore()
 
 	// manifest
-	buf, err = c.readBody(body, mSize)
+	buf, err = c.readBody(body, res.ManifestSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to read manifest")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read manifest")}
 		return
 	}
 	manifest, man, err = c.handleManifest(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to handle manifest")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle manifest")}
 		return
 	}
-	err = c.storeManifest(cs, pcn, md, ref,
-		manifest.Config.Digest.String(), sld,
+	err = c.storeManifest(cs, pcn, res.Digest, ref,
+		manifest.Config.Digest.String(), res.StarlightDigest,
 		man)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to store manifest")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store manifest")}
 		return
 	}
 
 	// config
-	buf, err = c.readBody(body, cSize)
+	buf, err = c.readBody(body, res.ConfigSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to read config")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read config")}
 		return
 	}
 	imageConfig, con, err = c.handleConfig(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to handle config")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle config")}
 		return
 	}
 	err = c.storeConfig(cs, pcn, ref, manifest.Config.Digest, con)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to store config")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store config")}
 		return
 	}
 
 	// starlight header
-	buf, err = c.readBody(body, sSize)
+	buf, err = c.readBody(body, res.StarlightHeaderSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to read starlight header")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read starlight header")}
 		return
 	}
 	star, sta, err := c.handleStarlightHeader(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to handle starlight header")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle starlight header")}
 		return
 	}
-	err = c.storeStarlightHeader(cs, pcn, ref, sld, sta)
+	err = c.storeStarlightHeader(cs, pcn, ref, res.StarlightDigest, sta)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to store starlight header")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store starlight header")}
 		return
 	}
 
 	// create image
-	mdd := digest.Digest(md)
+	imageDigest := digest.Digest(res.Digest)
 	ctrImg, err = is.Create(localCtx, images.Image{
 		Name: ref,
 		Target: v1.Descriptor{
 			MediaType: util.ImageMediaTypeManifestV2,
-			Digest:    mdd,
+			Digest:    imageDigest,
 			Size:      int64(len(man)),
 		},
 		Labels: map[string]string{
 			util.ImageLabelPuller:            "starlight",
-			util.ImageLabelStarlightMetadata: sld,
+			util.ImageLabelStarlightMetadata: res.StarlightDigest,
 		},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	})
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to create image %s", ref)}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to create image %s", ref)}
 		return
 	}
 
@@ -696,12 +705,12 @@ func (c *Client) PullImage(
 
 	// 3. create manager
 	// keep going and download layers
-	star.Init(ctr, c, c.ctx, c.cfg, false, manifest, imageConfig, mdd)
+	star.Init(ctr, c, c.ctx, c.cfg, false, manifest, imageConfig, imageDigest)
 
 	// create manager
-	c.managerMap[md] = star
+	c.managerMap[res.Digest] = star
 	log.G(c.ctx).
-		WithField("manifest", md).
+		WithField("manifest", res.Digest).
 		Info("client: added manager")
 	c.managerMapLock.Unlock()
 
@@ -712,13 +721,13 @@ func (c *Client) PullImage(
 			log.G(c.ctx).
 				WithError(err).
 				Error("failed to set optimizer on")
-			*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to enable optimizer")}
+			*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to enable optimizer")}
 			return
 		}
 	}
 
 	if err = star.PrepareDirectories(c); err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to initialize directories")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to initialize directories")}
 		return
 	}
 
@@ -730,7 +739,7 @@ func (c *Client) PullImage(
 		log.G(c.ctx).
 			WithError(err).
 			Error("failed to create snapshots")
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to create snapshots")}
+		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to create snapshots")}
 		return
 	}
 
@@ -740,19 +749,25 @@ func (c *Client) PullImage(
 	// 5. Send signal
 	// Image is ready (content is still on the way)
 	// close(*ready)
-	*ready <- PullFinishedMessage{&ctrImg, baseRef, nil}
+	//
+	// wola! we are done here.
+	*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
 
 	// 6. Extract file content
 	// download content
 	log.G(c.ctx).
-		WithField("m", md).
+		WithField("m", res.Digest).
 		Info("start decompressing content")
+
 	if err = star.Extract(&body); err != nil {
-		*ready <- PullFinishedMessage{nil, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
+		if ready != nil { // second signal
+			*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
+		}
 		return
 	}
+
 	log.G(c.ctx).
-		WithField("m", md).
+		WithField("m", res.Digest).
 		Info("content decompression completed")
 
 	// 7. Mark image as completed
@@ -769,14 +784,16 @@ func (c *Client) PullImage(
 	}
 
 	// update garbage collection labels
-	if err = c.updateManifest(ctr, md, chainIds, t); err != nil {
+	if err = c.updateManifest(ctr, res.Digest, chainIds, t); err != nil {
 		log.G(c.ctx).
 			WithError(err).
 			Error("failed to update manifest")
 		return
 	}
 
-	return
+	if ready != nil { // second signal
+		*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
+	}
 }
 
 // LoadImage loads image manifest from content store to the memory,
@@ -1095,239 +1112,6 @@ func (c *Client) StartSnapshotter() {
 }
 
 // -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// CLI gRPC server
-
-type StarlightDaemonAPIServer struct {
-	pb.UnimplementedDaemonServer
-	client *Client
-}
-
-func (s *StarlightDaemonAPIServer) GetVersion(ctx context.Context, req *pb.Request) (*pb.Version, error) {
-	return &pb.Version{
-		Version: util.Version,
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) AddProxyProfile(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"protocol": req.Protocol,
-		"address":  req.Address,
-		"username": req.Username,
-	}).Debug("grpc: add proxy profile")
-
-	s.client.cfg.Proxies[req.ProfileName] = &ProxyConfig{
-		Protocol: req.Protocol,
-		Address:  req.Address,
-		Username: req.Username,
-		Password: req.Password,
-	}
-	if err := s.client.cfg.SaveConfig(); err != nil {
-		log.G(s.client.ctx).WithError(err).Errorf("failed to save config")
-		return &pb.AuthResponse{
-			Success: false,
-			Message: "failed to save config",
-		}, nil
-	}
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"protocol": req.Protocol,
-		"address":  req.Address,
-		"username": req.Username,
-	}).Info("add auth profile")
-	return &pb.AuthResponse{
-		Success: true,
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) GetProxyProfiles(ctx context.Context, req *pb.Request) (resp *pb.GetProxyProfilesResponse, err error) {
-	log.G(s.client.ctx).Debug("grpc: get proxy profiles")
-
-	profiles := []*pb.GetProxyProfilesResponse_Profile{}
-	for name, proxy := range s.client.cfg.Proxies {
-		profiles = append(profiles, &pb.GetProxyProfilesResponse_Profile{
-			Name:     name,
-			Protocol: proxy.Protocol,
-			Address:  proxy.Address,
-		})
-	}
-	return &pb.GetProxyProfilesResponse{
-		Profiles: profiles,
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageReference) (resp *pb.ImagePullResponse, err error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"base":   ref.Base,
-		"ref":    ref.Reference,
-		"socket": s.client.cfg.Containerd,
-	}).Debug("grpc: pull image")
-
-	ns := ref.Namespace
-	if ns == "" {
-		ns = s.client.cfg.Namespace
-	}
-
-	ready := make(chan PullFinishedMessage)
-	go s.client.pullImageGrpc(ns, ref.Base, ref.Reference, ref.ProxyConfig, &ready)
-	ret := <-ready
-
-	if ret.err != nil {
-		if ret.img != nil {
-			return &pb.ImagePullResponse{
-				Success:   true,
-				Message:   ret.err.Error(),
-				BaseImage: ret.base,
-			}, nil
-		} else {
-			return &pb.ImagePullResponse{
-				Success:   false,
-				Message:   ret.err.Error(),
-				BaseImage: ret.base,
-			}, nil
-		}
-	}
-
-	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: ret.base}, nil
-}
-
-func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {
-	okRes, failRes := make(map[string]string), make(map[string]string)
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"enable": req.Enable,
-	}).Debug("grpc: set optimizer")
-
-	s.client.optimizerLock.Lock()
-	defer s.client.optimizerLock.Unlock()
-
-	s.client.managerMapLock.Lock()
-	defer s.client.managerMapLock.Unlock()
-
-	if req.Enable {
-
-		s.client.defaultOptimizer = true
-		s.client.defaultOptimizeGroup = req.Group
-
-		for d, m := range s.client.managerMap {
-			if st, err := m.SetOptimizerOn(req.Group); err != nil {
-				log.G(s.client.ctx).
-					WithField("group", req.Group).
-					WithField("md", d).
-					WithField("start", st).
-					WithError(err).
-					Error("failed to set optimizer on")
-				failRes[d] = err.Error()
-			} else {
-				okRes[d] = time.Now().Format(time.RFC3339)
-			}
-		}
-
-	} else {
-
-		s.client.defaultOptimizer = false
-		s.client.defaultOptimizeGroup = ""
-
-		for d, m := range s.client.managerMap {
-			if et, err := m.SetOptimizerOff(); err != nil {
-				log.G(s.client.ctx).
-					WithField("md", d).
-					WithField("duration", et).
-					WithError(err).
-					Error("failed to set optimizer off")
-				failRes[d] = err.Error()
-			} else {
-				okRes[d] = fmt.Sprintf("collected %.3fs file access traces", et.Seconds())
-			}
-		}
-	}
-
-	return &pb.OptimizeResponse{
-		Success: true,
-		Message: "completed request",
-		Okay:    okRes,
-		Failed:  failRes,
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) ReportTraces(ctx context.Context, req *pb.ReportTracesRequest) (*pb.ReportTracesResponse, error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"profile": req.ProxyConfig,
-	}).Debug("grpc: report")
-
-	tc, err := fs.NewTraceCollection(s.client.ctx, s.client.cfg.TracesDir)
-	if err != nil {
-		return &pb.ReportTracesResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	err = s.client.UploadTraces(req.ProxyConfig, tc)
-	if err != nil {
-		return &pb.ReportTracesResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	return &pb.ReportTracesResponse{
-		Success: true,
-		Message: "uploaded traces",
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) NotifyProxy(ctx context.Context, req *pb.NotifyRequest) (*pb.NotifyResponse, error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"profile": req.ProxyConfig,
-	}).Debug("grpc: notify")
-
-	reference, err := name.ParseReference(req.Reference)
-	if err != nil {
-		return &pb.NotifyResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	err = s.client.Notify(req.ProxyConfig, reference, true)
-	if err != nil {
-		return &pb.NotifyResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	return &pb.NotifyResponse{
-		Success: true,
-		Message: reference.String(),
-	}, nil
-}
-
-func (s *StarlightDaemonAPIServer) PingTest(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
-	log.G(s.client.ctx).WithFields(logrus.Fields{
-		"profile": req.ProxyConfig,
-	}).Debug("grpc: ping test")
-
-	rtt, proto, server, err := s.client.Ping(req.ProxyConfig)
-	if err != nil {
-		return &pb.PingResponse{
-			Success: false,
-			Message: err.Error(),
-		}, nil
-	}
-
-	return &pb.PingResponse{
-		Success: true,
-		Message: fmt.Sprintf("ok! - %s://%s", proto, server),
-		Latency: rtt,
-	}, nil
-}
-
-func newStarlightDaemonAPIServer(client *Client) *StarlightDaemonAPIServer {
-	c := &StarlightDaemonAPIServer{client: client}
-	return c
-}
-
 func (c *Client) InitCLIServer() (err error) {
 	log.G(c.ctx).
 		Debug("starlight CLI service starting")
