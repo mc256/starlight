@@ -567,7 +567,7 @@ func (c *Client) PullImage(
 	}
 
 	// pull image
-	body, mSize, cSize, sSize, md, sld, err := p.DeltaImage(baseRef, ref, platform)
+	body, res, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to pull image %s", ref)}
 		return
@@ -582,28 +582,34 @@ func (c *Client) PullImage(
 	}()
 
 	log.G(c.ctx).
-		WithField("manifest", mSize).
-		WithField("config", cSize).
-		WithField("starlight", sSize).
-		WithField("digest", md).
-		WithField("sl_digest", sld).
+		// Size in bytes
+		WithField("_manifest", res.ManifestSize).
+		WithField("_config", res.ConfigSize).
+		WithField("_starlight", res.StarlightHeaderSize).
+		WithField("_total", res.ContentLength).
+		// Digests
+		WithField("d", res.Digest).
+		WithField("d_sl", res.StarlightDigest).
+		// Base image
+		WithField("base", baseRef).
+		//////////////////////////
 		Infof("pulling image %s", ref)
 
 	// 1. check manager in memory, if it exists, remove it and re-pull the image
 	// (This behavior is different from LoadImage() which does not remove the manager in memory)
 	c.managerMapLock.Lock()
 	defer func() {
-		if _, ok := c.managerMap[md]; !ok {
+		if _, ok := c.managerMap[res.Digest]; !ok {
 			// something went wrong, the lock has not been released, unlock it
 			c.managerMapLock.Unlock()
 		}
 	}()
-	if _, ok := c.managerMap[md]; ok {
+	if _, ok := c.managerMap[res.Digest]; ok {
 		log.G(c.ctx).
-			WithField("manifest", mSize).
-			WithField("sl_digest", sld).
+			WithField("manifest", res.ManifestSize).
+			WithField("sl_digest", res.StarlightDigest).
 			Warn("found in cache. remove and re-pull")
-		delete(c.managerMap, md)
+		delete(c.managerMap, res.Digest)
 	}
 
 	// check if the image is in containerd's image pool
@@ -620,7 +626,7 @@ func (c *Client) PullImage(
 	cs := ctr.ContentStore()
 
 	// manifest
-	buf, err = c.readBody(body, mSize)
+	buf, err = c.readBody(body, res.ManifestSize)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read manifest")}
 		return
@@ -630,8 +636,8 @@ func (c *Client) PullImage(
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle manifest")}
 		return
 	}
-	err = c.storeManifest(cs, pcn, md, ref,
-		manifest.Config.Digest.String(), sld,
+	err = c.storeManifest(cs, pcn, res.Digest, ref,
+		manifest.Config.Digest.String(), res.StarlightDigest,
 		man)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store manifest")}
@@ -639,7 +645,7 @@ func (c *Client) PullImage(
 	}
 
 	// config
-	buf, err = c.readBody(body, cSize)
+	buf, err = c.readBody(body, res.ConfigSize)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read config")}
 		return
@@ -656,7 +662,7 @@ func (c *Client) PullImage(
 	}
 
 	// starlight header
-	buf, err = c.readBody(body, sSize)
+	buf, err = c.readBody(body, res.StarlightHeaderSize)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read starlight header")}
 		return
@@ -666,24 +672,24 @@ func (c *Client) PullImage(
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle starlight header")}
 		return
 	}
-	err = c.storeStarlightHeader(cs, pcn, ref, sld, sta)
+	err = c.storeStarlightHeader(cs, pcn, ref, res.StarlightDigest, sta)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store starlight header")}
 		return
 	}
 
 	// create image
-	mdd := digest.Digest(md)
+	imageDigest := digest.Digest(res.Digest)
 	ctrImg, err = is.Create(localCtx, images.Image{
 		Name: ref,
 		Target: v1.Descriptor{
 			MediaType: util.ImageMediaTypeManifestV2,
-			Digest:    mdd,
+			Digest:    imageDigest,
 			Size:      int64(len(man)),
 		},
 		Labels: map[string]string{
 			util.ImageLabelPuller:            "starlight",
-			util.ImageLabelStarlightMetadata: sld,
+			util.ImageLabelStarlightMetadata: res.StarlightDigest,
 		},
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -699,12 +705,12 @@ func (c *Client) PullImage(
 
 	// 3. create manager
 	// keep going and download layers
-	star.Init(ctr, c, c.ctx, c.cfg, false, manifest, imageConfig, mdd)
+	star.Init(ctr, c, c.ctx, c.cfg, false, manifest, imageConfig, imageDigest)
 
 	// create manager
-	c.managerMap[md] = star
+	c.managerMap[res.Digest] = star
 	log.G(c.ctx).
-		WithField("manifest", md).
+		WithField("manifest", res.Digest).
 		Info("client: added manager")
 	c.managerMapLock.Unlock()
 
@@ -743,19 +749,25 @@ func (c *Client) PullImage(
 	// 5. Send signal
 	// Image is ready (content is still on the way)
 	// close(*ready)
-	*ready <- PullFinishedMessage{&ctrImg, baseRef, nil}
+	//
+	// wola! we are done here.
+	*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
 
 	// 6. Extract file content
 	// download content
 	log.G(c.ctx).
-		WithField("m", md).
+		WithField("m", res.Digest).
 		Info("start decompressing content")
+
 	if err = star.Extract(&body); err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
+		if ready != nil { // second signal
+			*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
+		}
 		return
 	}
+
 	log.G(c.ctx).
-		WithField("m", md).
+		WithField("m", res.Digest).
 		Info("content decompression completed")
 
 	// 7. Mark image as completed
@@ -772,14 +784,16 @@ func (c *Client) PullImage(
 	}
 
 	// update garbage collection labels
-	if err = c.updateManifest(ctr, md, chainIds, t); err != nil {
+	if err = c.updateManifest(ctr, res.Digest, chainIds, t); err != nil {
 		log.G(c.ctx).
 			WithError(err).
 			Error("failed to update manifest")
 		return
 	}
 
-	return
+	if ready != nil { // second signal
+		*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
+	}
 }
 
 // LoadImage loads image manifest from content store to the memory,
