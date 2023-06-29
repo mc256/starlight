@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "starlight.fullname-registry" . }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "starlight.registryLabels" . | nindent 4 }}
 spec:
