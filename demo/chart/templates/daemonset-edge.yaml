@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "starlight.fullname-edge" . }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "starlight.edgeLabels" . | nindent 4 }}
     kubernetes.io/cluster-service: "true"
@@ -19,7 +20,9 @@ spec:
       labels:
         {{- include "starlight.edgeSelectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.serviceAccount.enabled}}
       serviceAccountName: {{ include "starlight.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

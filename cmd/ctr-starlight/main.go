@@ -45,9 +45,10 @@ func init() {
 func main() {
 	app := NewApp()
 	if err := app.Run(os.Args); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: \n%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ctr-starlight: %v\n", err)
 		os.Exit(1)
 	}
+	os.Exit(0)
 }
 
 func NewApp() *cli.App {
@@ -93,7 +94,7 @@ https://github.com/mc256/starlight
 			Required:    false,
 		},
 	}
-	app.Commands = append([]*cli.Command{
+	app.Commands = []*cli.Command{
 		cmdVersion.Command(),   // 1. confirm the version of starlight-daemon
 		cmdAddProxy.Command(),  // 2. add starlight proxy to the daemon
 		cmdListProxy.Command(), // 3. list proxy profiles in daemon
@@ -103,7 +104,7 @@ https://github.com/mc256/starlight
 		cmdOptimizer.Command(), // 7. turn on/off filesystem traces
 		cmdReport.Command(),    // 8. upload filesystem traces to starlight proxy
 		cmdPull.Command(),      // 9. pull starlight image
-	})
+	}
 
 	return app
 }

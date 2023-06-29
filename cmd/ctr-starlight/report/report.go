@@ -21,23 +21,23 @@ package report
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
 )
 
 // report uses the daemon client to report traces, it does not report directly to the proxy
 // Because it does not handle the credential and authentication of the proxy.
-func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
+func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	resp, err := client.ReportTraces(ctx, req)
 	if err != nil {
-		fmt.Printf("report traces failed: %v\n", err)
-		return
+		return fmt.Errorf("report traces failed: %v", err)
 	}
 	if resp.Success {
 		if !quiet {
@@ -46,6 +46,7 @@ func report(client pb.DaemonClient, req *pb.ReportTracesRequest, quiet bool) {
 	} else {
 		fmt.Printf("report traces failed: %s\n", resp.Message)
 	}
+	return nil
 }
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
@@ -60,10 +61,9 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	defer conn.Close()
 
 	// report
-	report(pb.NewDaemonClient(conn), &pb.ReportTracesRequest{
+	return report(pb.NewDaemonClient(conn), &pb.ReportTracesRequest{
 		ProxyConfig: c.String("profile"),
 	}, c.Bool("quiet"))
-	return nil
 }
 
 func Command() *cli.Command {

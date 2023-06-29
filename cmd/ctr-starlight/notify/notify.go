@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	pb "github.com/mc256/starlight/client/api"
@@ -18,11 +19,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func notify(client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) {
+func notify(client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) error {
 	resp, err := client.NotifyProxy(context.Background(), req)
 	if err != nil {
-		fmt.Printf("notify starlight proxy server failed: %v\n", err)
-		return
+		return fmt.Errorf("notify starlight proxy server failed: %v", err)
 	}
 	if resp.Success {
 		if !quiet {
@@ -31,6 +31,7 @@ func notify(client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) {
 	} else {
 		fmt.Printf("notify starlight proxy server failed: %v\n", resp)
 	}
+	return nil
 }
 
 func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference) (err error) {
@@ -45,13 +46,11 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 	defer conn.Close()
 
 	// notify
-	notify(pb.NewDaemonClient(conn), &pb.NotifyRequest{
+	return notify(pb.NewDaemonClient(conn), &pb.NotifyRequest{
 		ProxyConfig: c.String("profile"),
 		Insecure:    c.Bool("insecure") || c.Bool("insecure-destination"),
 		Reference:   reference.String(),
 	}, c.Bool("quiet"))
-
-	return nil
 }
 
 func Action(ctx context.Context, c *cli.Context) (err error) {

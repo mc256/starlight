@@ -9,7 +9,6 @@ VERSIONNUMBER=$(shell echo $(VERSION) | sed 's/v//g')
 COMPILEDATE=$(shell date +%Y%m%d)
 
 
-.PHONY: build clean starlight-proxy starlight-daemon ctr-starlight test
 .SILENT: install-systemd-service
 
 ######################################################################
@@ -56,6 +55,12 @@ starlight-proxy-for-alpine:
 .PHONY: helm-package
 helm-package:
 	helm package ./demo/chart --version $(VERSIONNUMBER) -d /tmp
+
+.PHONE: helm-template
+helm-template:
+	@if [ ! -d ./sandbox ]; then mkdir ./sandbox; fi
+	@if [ ! -f ./sandbox/values.yaml ]; then cp ./demo/values.yaml ./sandbox/values.yaml; fi
+	@helm template ./demo/chart --version $(VERSIONNUMBER) -f ./sandbox/values.yaml
 
 .PHONY: push-helm-package
 push-helm-package:

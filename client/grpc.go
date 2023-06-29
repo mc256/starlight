@@ -96,32 +96,40 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 
 	if ret.err != nil {
 		if ret.img != nil {
+			// requested image is already pulled
 			return &pb.ImagePullResponse{
 				Success:        true,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.imageSize,
+				TotalImageSize: ret.meta.ContentLength,
 			}, nil
 		} else {
 			return &pb.ImagePullResponse{
 				Success:        false,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.imageSize,
+				TotalImageSize: ret.meta.ContentLength,
 			}, nil
 		}
 	}
 
 	// wait for the entire delta image to be pulled to the local filesystem
 	// holding on the second signal from the pullImageGrpc goroutine
-	if ref.DisableEarlyStart { 
+	if ref.DisableEarlyStart {
 		ret := <-ready // second signal
-		if ret.err != nil {
+		if ret.img != nil {
+			return &pb.ImagePullResponse{
+				Success:        true,
+				Message:        ret.err.Error(),
+				BaseImage:      ret.base,
+				TotalImageSize: ret.meta.ContentLength,
+			}, nil
+		} else {
 			return &pb.ImagePullResponse{
 				Success:        false,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.imageSize,
+				TotalImageSize: ret.meta.ContentLength,
 			}, nil
 		}
 	}
