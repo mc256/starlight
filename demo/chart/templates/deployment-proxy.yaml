@@ -76,6 +76,8 @@ spec:
             value: {{ .Values.starlightProxy.dbConnection | quote | default "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" }}
           - name: REGISTRY
             value: {{ .Values.starlightProxy.defaultRegistry | quote | default "http://container-registry.default.svc.cluster.local:5000" }}
+          - name: DOCKER_CONFIG
+            value: /opt/.docker/config.json
           volumeMounts:
             - mountPath: /opt/.docker/config.json
               name: dockerconfig
