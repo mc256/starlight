@@ -21,6 +21,10 @@ starlightProxy:
   defaultRegistry: "http://container-registry.default.svc.cluster.local:5000"
   resources: {}
 
+  # If you are using a private registry, you need to specify the secret name here
+  dockerConfigSecret: ""
+  
+
 # ---------------------------------------------------------------------
 # Metadata database - PostgreSQL
 # ---------------------------------------------------------------------
@@ -89,8 +93,13 @@ ingress:
     # kubernetes.io/tls-acme: "true"
     # set to the largest layer size for uploading container image
     nginx.ingress.kubernetes.io/proxy-body-size: 512m
-  # Set it to your domain name(s)
-  hosts: [ starlight.lan ]
+    # if you want to protect the starlight proxy with basic auth, please uncomment the following lines
+    # and create a secret named `registry-auth`:
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: registry-auth
+
+  hosts: 
+  - starlight.lan
   tls: []
 
 # select nodes in the cloud
@@ -129,6 +138,9 @@ edgeTolerations: []
 
 edgeNodeSelector: 
   kubernetes.io/os: linux 
+  # install starlight daemon on the edge node with label `starlight: true`
+  # set the label with `kubectl label node YOUREDGENODE node-role.kubernetes.io/starlight=ture`
+  node-role.kubernetes.io/starlight: "ture"
   # kubernetes.io/arch: arm64
   # kubernetes.io/hostname: edge
 

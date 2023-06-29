@@ -8,12 +8,13 @@ package version
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
 )
 
 func getVersion(client pb.DaemonClient) (string, error) {

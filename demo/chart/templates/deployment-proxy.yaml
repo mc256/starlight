@@ -28,13 +28,17 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }} 
-      {{- if and (eq .Values.postgres.enabled true) (eq  .Values.postgres.persistence.enabled true) }}
       volumes:
+        {{- if and (eq .Values.postgres.enabled true) (eq  .Values.postgres.persistence.enabled true) }}
         - name: starlight-pv
           persistentVolumeClaim:
             {{- $newClaimName := include "starlight.fullname" .}}
             claimName: {{ .Values.postgres.persistence.existingClaim | default  $newClaimName }}
-      {{- end }}
+        {{- end }}
+        - name: dockerconfig
+          secret:
+            secretName: dockerconfig
+            optional: true
       containers:
       ##############################################################
       ##############################################################
@@ -72,6 +76,11 @@ spec:
             value: {{ .Values.starlightProxy.dbConnection | quote | default "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" }}
           - name: REGISTRY
             value: {{ .Values.starlightProxy.defaultRegistry | quote | default "http://container-registry.default.svc.cluster.local:5000" }}
+          volumeMounts:
+            - mountPath: /opt/.docker/config.json
+              name: dockerconfig
+              subPath: config.json
+
         {{- if .Values.postgres.enabled }}
         ############################################################
         - name: starlight-metadata

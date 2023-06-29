@@ -59,8 +59,7 @@ func Action(context *cli.Context) (err error) {
 	}
 
 	// send to proxy server
-	err = listProxyProfile(pb.NewDaemonClient(conn))
-	if err != nil {
+	if err = listProxyProfile(pb.NewDaemonClient(conn)); err != nil {
 		return err
 	}
 

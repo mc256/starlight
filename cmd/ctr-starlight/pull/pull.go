@@ -17,20 +17,28 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
+func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) error {
+	if ref.DisableEarlyStart {
+		fmt.Printf("early start is disabled\n")
+	}
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*30)
 	defer cancel()
 	resp, err := client.PullImage(ctx, ref)
 	if err != nil {
-		fmt.Printf("pull image failed: %v\n", err)
-		return
+		return fmt.Errorf("pull image failed: %v", err)
 	}
 	if resp.Success {
 		if quiet {
-			return
+			return nil
 		}
 		end := time.Now()
+
+		if resp.GetMessage() != "" {
+			// it is likely that the image is already pulled
+			fmt.Printf("%s\n", resp.GetMessage())
+			return nil
+		}
 
 		if resp.GetBaseImage() == "" {
 			fmt.Printf("requested to pull image %s successfully in %dms \n",
@@ -43,13 +51,11 @@ func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) {
 				end.Sub(start).Milliseconds(),
 			)
 		}
-		if ref.DisableEarlyStart {
-			fmt.Printf("entire image %s has been downloaded because early start is disabled\n", ref.Reference)
-		}
-		fmt.Printf("delta image size: %d bytes\n", resp.GetTotalImageSize())
+		fmt.Printf("delta image size: %d bytes\n", resp.TotalImageSize)
 	} else {
 		fmt.Printf("pull image failed: %s\n", resp.Message)
 	}
+	return nil
 }
 
 func Action(ctx context.Context, c *cli.Context) error {
@@ -74,14 +80,13 @@ func Action(ctx context.Context, c *cli.Context) error {
 	defer conn.Close()
 
 	// pull image
-	pullImage(pb.NewDaemonClient(conn), &pb.ImageReference{
+	return pullImage(pb.NewDaemonClient(conn), &pb.ImageReference{
 		Reference:         ref,
 		Base:              base,
 		ProxyConfig:       c.String("profile"),
 		Namespace:         c.String("namespace"),
 		DisableEarlyStart: c.Bool("disable-early-start"),
 	}, c.Bool("quiet"))
-	return nil
 }
 
 func Command() *cli.Command {

@@ -58,7 +58,9 @@ helm-package:
 
 .PHONE: helm-template
 helm-template:
-	helm template ./demo/chart --version $(VERSIONNUMBER) 
+	@if [ ! -d ./sandbox ]; then mkdir ./sandbox; fi
+	@if [ ! -f ./sandbox/values.yaml ]; then cp ./demo/values.yaml ./sandbox/values.yaml; fi
+	@helm template ./demo/chart --version $(VERSIONNUMBER) -f ./sandbox/values.yaml
 
 .PHONY: push-helm-package
 push-helm-package:

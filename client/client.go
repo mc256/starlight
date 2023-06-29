@@ -469,10 +469,10 @@ func (c *Client) UploadTraces(proxyCfg string, tc *fs.TraceCollection) error {
 }
 
 type PullFinishedMessage struct {
-	img       *images.Image
-	imageSize int64
-	base      string
-	err       error
+	img  *images.Image
+	meta *common.DeltaImageMetadata
+	base string
+	err  error
 }
 
 // for testing only
@@ -489,7 +489,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 	// connect to containerd
 	ctr, err := containerd.New(c.cfg.Containerd, containerd.WithDefaultNamespace(ns))
 	if err != nil {
-		*ret <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to connect to containerd")}
+		*ret <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to connect to containerd")}
 		return
 	}
 	defer ctr.Close()
@@ -498,7 +498,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 	var baseImg containerd.Image
 	baseImg, err = c.FindBaseImage(ctr, base, ref)
 	if err != nil {
-		*ret <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to identify base image")}
+		*ret <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to identify base image")}
 		return
 	}
 
@@ -524,7 +524,7 @@ func (c *Client) PullImage(
 	reqFilter := getImageFilter(ref, false)
 	img, err := c.findImage(ctr, reqFilter)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to check requested image %s", ref)}
+		*ready <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to check requested image %s", ref)}
 		return
 	}
 
@@ -532,11 +532,11 @@ func (c *Client) PullImage(
 		labels := img.Labels()
 		if _, has := labels[util.ContentLabelCompletion]; has {
 			if _, err = c.LoadImage(ctr, img.Target().Digest); err != nil {
-				*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to load image %s", ref)}
+				*ready <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to load image %s", ref)}
 				return
 			}
 			meta := img.Metadata()
-			*ready <- PullFinishedMessage{&meta, 0, "", fmt.Errorf("requested image %s already exists", ref)}
+			*ready <- PullFinishedMessage{&meta, nil, "", fmt.Errorf("requested image %s already exists", ref)}
 			return
 
 		}
@@ -549,7 +549,7 @@ func (c *Client) PullImage(
 			log.G(c.ctx).
 				WithField("image", ref).
 				Info("failed to remove incomplete image")
-			*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to remove unfinished image %s", ref)}
+			*ready <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to remove unfinished image %s", ref)}
 			return
 		}
 	}
@@ -569,7 +569,7 @@ func (c *Client) PullImage(
 	// pull image
 	body, res, err := p.DeltaImage(baseRef, ref, platform)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, "", errors.Wrapf(err, "failed to pull image %s", ref)}
+		*ready <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to pull image %s", ref)}
 		return
 	}
 	defer func() {
@@ -628,53 +628,53 @@ func (c *Client) PullImage(
 	// manifest
 	buf, err = c.readBody(body, res.ManifestSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read manifest")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to read manifest")}
 		return
 	}
 	manifest, man, err = c.handleManifest(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle manifest")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to handle manifest")}
 		return
 	}
 	err = c.storeManifest(cs, pcn, res.Digest, ref,
 		manifest.Config.Digest.String(), res.StarlightDigest,
 		man)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store manifest")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to store manifest")}
 		return
 	}
 
 	// config
 	buf, err = c.readBody(body, res.ConfigSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read config")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to read config")}
 		return
 	}
 	imageConfig, con, err = c.handleConfig(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle config")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to handle config")}
 		return
 	}
 	err = c.storeConfig(cs, pcn, ref, manifest.Config.Digest, con)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store config")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to store config")}
 		return
 	}
 
 	// starlight header
 	buf, err = c.readBody(body, res.StarlightHeaderSize)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to read starlight header")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to read starlight header")}
 		return
 	}
 	star, sta, err := c.handleStarlightHeader(buf)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to handle starlight header")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to handle starlight header")}
 		return
 	}
 	err = c.storeStarlightHeader(cs, pcn, ref, res.StarlightDigest, sta)
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to store starlight header")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to store starlight header")}
 		return
 	}
 
@@ -695,7 +695,7 @@ func (c *Client) PullImage(
 		UpdatedAt: time.Now(),
 	})
 	if err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to create image %s", ref)}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to create image %s", ref)}
 		return
 	}
 
@@ -721,13 +721,13 @@ func (c *Client) PullImage(
 			log.G(c.ctx).
 				WithError(err).
 				Error("failed to set optimizer on")
-			*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to enable optimizer")}
+			*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to enable optimizer")}
 			return
 		}
 	}
 
 	if err = star.PrepareDirectories(c); err != nil {
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to initialize directories")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to initialize directories")}
 		return
 	}
 
@@ -739,7 +739,7 @@ func (c *Client) PullImage(
 		log.G(c.ctx).
 			WithError(err).
 			Error("failed to create snapshots")
-		*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to create snapshots")}
+		*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to create snapshots")}
 		return
 	}
 
@@ -751,7 +751,7 @@ func (c *Client) PullImage(
 	// close(*ready)
 	//
 	// wola! we are done here.
-	*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
+	*ready <- PullFinishedMessage{&ctrImg, res, baseRef, nil}
 
 	// 6. Extract file content
 	// download content
@@ -761,7 +761,7 @@ func (c *Client) PullImage(
 
 	if err = star.Extract(&body); err != nil {
 		if ready != nil { // second signal
-			*ready <- PullFinishedMessage{nil, 0, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
+			*ready <- PullFinishedMessage{nil, nil, baseRef, errors.Wrapf(err, "failed to extract starlight image")}
 		}
 		return
 	}
@@ -792,7 +792,7 @@ func (c *Client) PullImage(
 	}
 
 	if ready != nil { // second signal
-		*ready <- PullFinishedMessage{&ctrImg, res.ContentLength, baseRef, nil}
+		*ready <- PullFinishedMessage{&ctrImg, res, baseRef, nil}
 	}
 }
 

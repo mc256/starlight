@@ -8,20 +8,20 @@ package optimizer
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"time"
 )
 
-func optimizer(client pb.DaemonClient, req *pb.OptimizeRequest, quiet bool) {
+func optimizer(client pb.DaemonClient, req *pb.OptimizeRequest, quiet bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	resp, err := client.SetOptimizer(ctx, req)
 	if err != nil {
-		fmt.Printf("set optimizer status failed: %v\n", err)
-		return
+		return fmt.Errorf("set optimizer status failed: %v", err)
 	}
 	if resp.Success {
 		if !quiet {
@@ -36,6 +36,7 @@ func optimizer(client pb.DaemonClient, req *pb.OptimizeRequest, quiet bool) {
 	} else {
 		fmt.Printf("set optimizer status failed: %s\n", resp.Message)
 	}
+	return nil
 }
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
@@ -66,12 +67,10 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 	defer conn.Close()
 
 	// set optimizer
-	optimizer(pb.NewDaemonClient(conn), &pb.OptimizeRequest{
+	return optimizer(pb.NewDaemonClient(conn), &pb.OptimizeRequest{
 		Enable: a,
 		Group:  c.String("group"),
 	}, c.Bool("quiet"))
-
-	return nil
 }
 
 func Command() *cli.Command {

@@ -80,9 +80,11 @@ ON THE WORKER NODE:
   If using k3s, please create `/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl` and add the configuration.
   You will need to change `containerd` socket address to `/run/k3s/containerd/containerd.sock` in `/etc/starlight/proxy.json`.
 
-3. and restart the container
+3. and restart the container 
 
-  sudo systemctl restart containerd
+  sudo systemctl restart containerd starlight
+
+  if using k3s, please restart k3s-agent using `sudo systemctl restart k3s-agent starlight`
 
 
 4. Add Starlight Proxy to the edge node, test to see if it works
@@ -91,7 +93,7 @@ ON THE WORKER NODE:
   {{- end }}
   ctr-starlight test in-cluster
 
-5. Convert Container Images (on the edge node)
+5. Convert Container Images
 
   ctr-starlight convert \
     --insecure-destination --profile in-cluster --notify \
