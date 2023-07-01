@@ -18,7 +18,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util/common"
 	"github.com/mc256/starlight/util/send"

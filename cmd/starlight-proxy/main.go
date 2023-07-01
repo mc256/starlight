@@ -20,14 +20,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"regexp"
+	"sync"
+
 	"github.com/containerd/containerd/log"
 	"github.com/mc256/starlight/proxy"
 	"github.com/mc256/starlight/util"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"os"
-	"regexp"
-	"sync"
 )
 
 func init() {
@@ -177,7 +178,6 @@ func DefaultAction(context *cli.Context, cfg *proxy.Configuration) (err error) {
 	if h := context.String("host"); h != "" {
 		cfg.ListenAddress = h
 	}
-	log.G(c).Infof("listen on %s:%d", cfg.ListenAddress, cfg.ListenPort)
 
 	if pc := context.String("postgres"); pc != "" {
 		cfg.PostgresConnectionString = pc
