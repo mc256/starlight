@@ -82,8 +82,8 @@ func (a *Server) cacheTimeoutValidator() {
 	time.Sleep(time.Second)
 }
 
-func (a *Server) root(w http.ResponseWriter, req *http.Request) {
-	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("root")
+func (a *Server) home(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("home page")
 
 	header := w.Header()
 	header.Set("Content-Type", "application/json")
@@ -295,7 +295,7 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 	http.HandleFunc("/starlight/notify", server.notify)
 	http.HandleFunc("/starlight/report", server.report)
 	http.HandleFunc("/health-check", server.healthCheck)
-	http.HandleFunc("/", server.root)
+	http.HandleFunc("/", server.home)
 
 	go func() {
 		defer wg.Done()
