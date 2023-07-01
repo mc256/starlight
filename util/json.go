@@ -25,17 +25,20 @@ import (
 
 func ExportToJsonFile(v interface{}, p string) error {
 	fh, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE, 0644)
-	defer fh.Close()
 	if err != nil {
 		return err
 	}
+	defer fh.Close()
 
 	buf, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
 		return err
 	}
 
-	_, _ = fh.Write(buf)
+	_, err = fh.Write(buf)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return fh.Sync()
 }
