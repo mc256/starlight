@@ -24,6 +24,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"sort"
+
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/util"
@@ -32,10 +37,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"io"
-	"math"
-	"net/http"
-	"sort"
 )
 
 ////////////////////////////////////////////////
@@ -326,6 +327,11 @@ func (b *Builder) computeDelta() error {
 			unavailable = append(unavailable, layer)
 		}
 	}
+
+	log.G(b.server.ctx).
+		WithField("available", len(available)).
+		WithField("unavailable", len(unavailable)).
+		Trace("compute delta")
 
 	// 1. compute the set of existing files from available layers
 	existingFiles, err := b.server.db.GetUniqueFiles(available)

@@ -22,15 +22,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util"
 	"github.com/mc256/starlight/util/common"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type transition struct {
@@ -81,8 +82,8 @@ func (a *Server) cacheTimeoutValidator() {
 	time.Sleep(time.Second)
 }
 
-func (a *Server) root(w http.ResponseWriter, req *http.Request) {
-	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("root")
+func (a *Server) home(w http.ResponseWriter, req *http.Request) {
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("home page")
 
 	header := w.Header()
 	header.Set("Content-Type", "application/json")
@@ -286,7 +287,7 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 			break
 		}
 	}
-	log.G(ctx).Debug("database initialized")
+	log.G(ctx).Info("database initialized")
 
 	// create router
 	http.HandleFunc("/scanner", server.scanner)
@@ -294,12 +295,13 @@ func NewServer(ctx context.Context, wg *sync.WaitGroup, cfg *Configuration) (*Se
 	http.HandleFunc("/starlight/notify", server.notify)
 	http.HandleFunc("/starlight/report", server.report)
 	http.HandleFunc("/health-check", server.healthCheck)
-	http.HandleFunc("/", server.root)
+	http.HandleFunc("/", server.home)
 
 	go func() {
 		defer wg.Done()
 		defer server.db.Close()
 
+		log.G(ctx).Infof("listen on %s:%d", cfg.ListenAddress, cfg.ListenPort)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.G(ctx).WithField("error", err).Error("server exit with error")
 		}

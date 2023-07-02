@@ -11,25 +11,30 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/google/go-containerregistry/pkg/name"
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
+	"github.com/mc256/starlight/util"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func notify(client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) error {
+func notify(ctx context.Context, client pb.DaemonClient, req *pb.NotifyRequest, quiet bool) error {
 	resp, err := client.NotifyProxy(context.Background(), req)
 	if err != nil {
 		return fmt.Errorf("notify starlight proxy server failed: %v", err)
 	}
 	if resp.Success {
 		if !quiet {
-			fmt.Printf("notify starlight proxy server success: converted %s\n", resp.GetMessage())
+			//("notify starlight proxy server success: converted %s\n", resp.GetMessage())
+			log.G(ctx).
+				WithField("reference", resp.GetMessage()).
+				Infof("notify starlight proxy server success")
 		}
 	} else {
-		fmt.Printf("notify starlight proxy server failed: %v\n", resp)
+		return errors.New(resp.GetMessage())
 	}
 	return nil
 }
@@ -40,13 +45,12 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
 	conn, err := grpc.Dial(address, opts)
 	if err != nil {
-		fmt.Printf("connect to starlight daemon failed: %v\n", err)
-		return nil
+		return fmt.Errorf("failed to connect starlight daemon: %v", err)
 	}
 	defer conn.Close()
 
 	// notify
-	return notify(pb.NewDaemonClient(conn), &pb.NotifyRequest{
+	return notify(ctx, pb.NewDaemonClient(conn), &pb.NotifyRequest{
 		ProxyConfig: c.String("profile"),
 		Insecure:    c.Bool("insecure") || c.Bool("insecure-destination"),
 		Reference:   reference.String(),
@@ -54,6 +58,12 @@ func SharedAction(ctx context.Context, c *cli.Context, reference name.Reference)
 }
 
 func Action(ctx context.Context, c *cli.Context) (err error) {
+	// logger
+	ns := c.String("namespace")
+	util.ConfigLoggerWithLevel(c.String("log-level"))
+	ctx = namespaces.WithNamespace(ctx, ns)
+
+	// Parse the reference
 	options := []name.Option{}
 
 	if c.NArg() != 1 {
@@ -62,8 +72,7 @@ func Action(ctx context.Context, c *cli.Context) (err error) {
 
 	argRef := c.Args().Get(0)
 	if argRef == "" {
-		log.G(ctx).Fatal("no image reference provided")
-		return nil
+		return errors.New("no image reference provided")
 	}
 
 	reference, err := name.ParseReference(argRef, options...)

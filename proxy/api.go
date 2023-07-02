@@ -89,7 +89,7 @@ func (a *StarlightProxy) Ping() (int64, string, string, error) {
 		return -1, "", "", err
 	}
 
-	rtt := time.Now().Sub(t).Milliseconds()
+	rtt := time.Since(t).Milliseconds()
 
 	log.G(a.ctx).WithFields(logrus.Fields{
 		"code":    200,

@@ -10,18 +10,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
+	"path"
+	"time"
+
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"github.com/mc256/starlight/client/fs"
 	"github.com/mc256/starlight/util/common"
 	"github.com/mc256/starlight/util/send"
 	"github.com/pkg/errors"
-	"math"
-	"path"
-	"time"
 )
 
 type Database struct {
@@ -72,6 +72,7 @@ func (d *Database) InitDatabase() error {
 		);
 		
 		comment on column image.nlayer is 'number of the non-empty layers';
+		comment on table image is 'Each row represents an image where (image, hash) is unique. Each layer references back to the id column of this table.';
 		
 		create table if not exists layer
 		(
@@ -86,6 +87,10 @@ func (d *Database) InitDatabase() error {
 			foreign key (image) references image
 				on delete cascade
 		);
+		
+		comment on column layer."stackIndex" is 'the index of the layer in the image';
+		comment on table layer is 'Each row represents a layer where (image, stackIndex) is unique. Each file references back to the id column of this table.';
+
 		
 		create table if not exists filesystem
 		(
@@ -119,6 +124,9 @@ func (d *Database) InitDatabase() error {
 					on delete cascade
 		);
 		
+		comment on column file."order" is 'the order of the file in uploaded filesystem access traces';
+		comment on table file is 'Each row represents a file where (file, fs) is unique. Each row references to the filesystem table.';
+
 		create index if not exists fki_filesystem_fk
 			on file (fs);
 		
@@ -134,6 +142,8 @@ func (d *Database) InitDatabase() error {
 			constraint "primary"
 				primary key (name, tag, platform)
 		);
+
+		comment on table tag is 'Each row represents a tag where (name, tag, platform) is unique. Each row references to the image table.';
 
 	`); err != nil {
 		return err

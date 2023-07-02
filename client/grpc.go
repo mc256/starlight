@@ -97,18 +97,28 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 	if ret.err != nil {
 		if ret.img != nil {
 			// requested image is already pulled
+			log.G(s.client.ctx).WithFields(logrus.Fields{
+				"_base":   ret.base,
+				"_ref":    ref.Reference,
+				"message": ret.err.Error(),
+			}).Warn("image already pulled")
 			return &pb.ImagePullResponse{
 				Success:        true,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.meta.ContentLength,
+				TotalImageSize: -1,
 			}, nil
 		} else {
+			log.G(s.client.ctx).WithFields(logrus.Fields{
+				"_base":   ret.base,
+				"_ref":    ref.Reference,
+				"message": ret.err.Error(),
+			}).Error("failed to pull image")
 			return &pb.ImagePullResponse{
 				Success:        false,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.meta.ContentLength,
+				TotalImageSize: -1,
 			}, nil
 		}
 	}
@@ -117,24 +127,27 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 	// holding on the second signal from the pullImageGrpc goroutine
 	if ref.DisableEarlyStart {
 		ret := <-ready // second signal
-		if ret.img != nil {
-			return &pb.ImagePullResponse{
-				Success:        true,
-				Message:        ret.err.Error(),
-				BaseImage:      ret.base,
-				TotalImageSize: ret.meta.ContentLength,
-			}, nil
-		} else {
+		if ret.err != nil {
+			log.G(s.client.ctx).WithFields(logrus.Fields{
+				"_base":   ret.base,
+				"_ref":    ref.Reference,
+				"message": ret.err.Error(),
+			}).Error("failed to pull image")
 			return &pb.ImagePullResponse{
 				Success:        false,
 				Message:        ret.err.Error(),
 				BaseImage:      ret.base,
-				TotalImageSize: ret.meta.ContentLength,
+				TotalImageSize: -1,
 			}, nil
 		}
+
+	}
+	imageSize := int64(0)
+	if ret.meta != nil {
+		imageSize = ret.meta.ContentLength
 	}
 
-	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: ret.base}, nil
+	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: ret.base, TotalImageSize: imageSize}, nil
 }
 
 func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {

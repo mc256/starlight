@@ -21,6 +21,8 @@ package convert
 import (
 	"context"
 	"errors"
+	"fmt"
+
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -83,8 +85,16 @@ func Action(ctx context.Context, c *cli.Context) error {
 		err = notify.SharedAction(ctx, c, convertor.GetDst())
 		if err != nil {
 			log.G(ctx).WithError(err).Error("fail to notify the converted image")
-			return nil
+			flags := " "
+			if dstInsecure {
+				flags += "--insecure "
+			}
+			if c.String("profile") != "" {
+				flags += fmt.Sprintf("--profile=%s ", c.String("profile"))
+			}
+			return fmt.Errorf("fail to notify the converted image, try again using `ctr-starlight%snotify %s`", flags, slImg)
 		}
+		log.G(ctx).Info("notified starlight proxy")
 	}
 
 	return nil

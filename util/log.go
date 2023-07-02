@@ -20,10 +20,11 @@ package util
 
 import (
 	"context"
-	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/containerd/containerd/log"
+	"github.com/sirupsen/logrus"
 )
 
 func ConfigLogger() (ctx context.Context) {
@@ -46,27 +47,24 @@ func ConfigLoggerWithLevel(level string) (ctx context.Context) {
 
 	case "fatal":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.FatalLevel)
-		break
+		return
 	case "error":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.ErrorLevel)
-		break
+		return
 	case "warning":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.WarnLevel)
-		break
+		return
 	case "info":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.InfoLevel)
-		break
+		return
 	case "debug":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.DebugLevel)
-		break
+		return
 	case "trace":
 		log.GetLogger(ctx).Logger.SetLevel(logrus.TraceLevel)
-		break
+		return
 	default:
 		log.GetLogger(ctx).Logger.SetLevel(logrus.InfoLevel)
-		break
+		return
 	}
-
-	return
-
 }

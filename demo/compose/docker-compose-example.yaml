@@ -1,5 +1,8 @@
 version: "3"
 services:
+  ################################################################
+  # proxy
+  ################################################################
   proxy:
     image: "ghcr.io/mc256/starlight/proxy:latest"
     ports:
@@ -11,11 +14,13 @@ services:
       - STARLIGHT_PORT=8090
       - LOG_LEVEL=info
       - DB_CONNECTION_STRING=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
-      # - REGISTRY=http://registry:5000 # proxy parsing has some issue
     restart: always
     depends_on:
       - db
       - registry
+  ################################################################
+  # db
+  ################################################################
   db:
     image: postgres:latest
     ports:
@@ -25,7 +30,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - "./metadata:/var/lib/postgresql/data"
+      - "./data_db:/var/lib/postgresql/data"
   dbadmin:
     image: adminer:latest
     ports:
@@ -34,6 +39,9 @@ services:
       - ADMINER_DEFAULT_SERVER=postgres
     depends_on:
         - db
+  ################################################################
+  # registry
+  ################################################################
   registry:
     image: registry:2
     ports:

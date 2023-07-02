@@ -61,7 +61,10 @@ const (
 
 	// ---------------------------------------------------------------------------------
 	// Switch to false in `Makefile` when build for production environment
-	production        = false
+	production = false
+	// Please leave this line unchanged, we need exactly one space around the equal sign.
+
+	// find the project root directory
 	ProjectIdentifier = "module github.com/mc256/starlight"
 )
 
@@ -93,7 +96,7 @@ func FindProjectRoot() string {
 
 // GetEtcConfigPath return a path to the configuration json
 func GetEtcConfigPath() string {
-	if production || os.Getenv("PRODUCTION") != "" {
+	if production {
 		return "/etc/starlight/"
 	} else {
 		return filepath.Join(FindProjectRoot(), "sandbox", "etc", "starlight")
