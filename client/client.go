@@ -588,8 +588,8 @@ func (c *Client) PullImage(
 		WithField("_starlight", res.StarlightHeaderSize).
 		WithField("_total", res.ContentLength).
 		// Digests
-		WithField("d", res.Digest).
-		WithField("d_sl", res.StarlightDigest).
+		WithField("digest", res.Digest).
+		WithField("digest_sl", res.StarlightDigest).
 		// Base image
 		WithField("base", baseRef).
 		//////////////////////////
