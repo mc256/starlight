@@ -582,6 +582,47 @@ func (d *Database) GetFilesWithRanks(imageSerial int64) ([]*send.RankedFile, err
 	return fl, nil
 }
 
+func (d *Database) GetFilesWithoutRanks(imageSerial int64) ([]*send.RankedFile, error) {
+	rows, err := d.db.Query(`
+		SELECT 
+			L."stackIndex", 
+		    FIS.id,
+			FI.metadata
+		FROM layer AS L
+		LEFT JOIN filesystem AS FIS ON FIS.id = L.layer
+		RIGHT JOIN file AS FI ON FI.fs = FIS.id
+		WHERE image=$1
+		ORDER BY L."stackIndex" ASC`, imageSerial)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	fl := make([]*send.RankedFile, 0)
+	for rows.Next() {
+		var (
+			stackIndex, fsId int64
+			metadata         []byte
+			file             send.File
+		)
+		if err = rows.Scan(&stackIndex, &fsId, &metadata); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan file")
+		}
+		if err = json.Unmarshal(metadata, &file); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse ToC Entry")
+		}
+		file.FsId = fsId
+
+		fl = append(fl, &send.RankedFile{
+			File:  file,
+			Stack: stackIndex,
+			Rank:  math.MaxFloat64,
+		})
+	}
+
+	return fl, nil
+}
+
 func ParseImageReference(ref name.Reference, defaultRegistry string) (imageName, identifier string) {
 	imageName = ref.Context().RepositoryStr()
 	if ref.Context().RegistryStr() != defaultRegistry {

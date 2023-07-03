@@ -50,6 +50,8 @@ type Builder struct {
 	manifest, config []byte
 	manifestDigest   string
 
+	disableSorting bool
+
 	unavailableLayers, availableLayers []*send.ImageLayer
 }
 
@@ -358,7 +360,11 @@ func (b *Builder) computeDelta() error {
 		Info("find existing file contents")
 
 	// 2. compute the set of requested files from non-existing layers
-	b.RequestedFiles, err = b.server.db.GetFilesWithRanks(b.Destination.Serial)
+	if b.disableSorting {
+		b.RequestedFiles, err = b.server.db.GetFilesWithoutRanks(b.Destination.Serial)
+	} else {
+		b.RequestedFiles, err = b.server.db.GetFilesWithRanks(b.Destination.Serial)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to get requested files")
 	}
@@ -417,7 +423,11 @@ func (b *Builder) computeDelta() error {
 		}
 	}
 
-	sort.Sort(send.ByRank(b.Contents))
+	if !b.disableSorting {
+		sort.Sort(send.ByRank(b.Contents))
+	} else {
+		log.G(b.server.ctx).WithField("builder", b).Info("sorting disabled as requested")
+	}
 
 	b.BodyLength = int64(0)
 	for idx, c := range b.Contents {
@@ -497,7 +507,7 @@ func (b *Builder) Load() error {
 	return nil
 }
 
-func NewBuilder(server *Server, src, dst, plt string) (b *Builder, err error) {
+func NewBuilder(server *Server, src, dst, plt string, disableSorting bool) (b *Builder, err error) {
 	b = &Builder{
 		server: server,
 	}
@@ -543,6 +553,8 @@ func NewBuilder(server *Server, src, dst, plt string) (b *Builder, err error) {
 	for _, u := range b.unavailableLayers {
 		u.Available = false
 	}
+
+	b.disableSorting = disableSorting
 
 	return b, nil
 }

@@ -29,6 +29,12 @@ import (
 	"github.com/mc256/starlight/util/common"
 )
 
+//
+// To run this test, you need to set the environment in <PROJECT_ROOT>/sandbox/etc/starlight/proxy_config.json
+// you will need a running postgresql database with container images imported by starlight-proxy
+//
+
+// InitDatabase initializes the database for testing
 func InitDatabase() (context.Context, *Configuration, *Server) {
 	ctx := context.Background()
 	cfg, _, _, _ := LoadConfig("")
@@ -49,14 +55,14 @@ func InitDatabase() (context.Context, *Configuration, *Server) {
 }
 
 func TestDatabase_GetImageByDigest(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 	b := &Builder{
 		server: server,
 	}
 
-	i, err := b.getImageByDigest("starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965")
+	// if it is a multi-arch image, the digest is the platform digest
+	// docker pull harbor.yuri.moe/starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a
+	i, err := b.getImageByDigest("starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a")
 	if err != nil {
 		t.Error(err)
 	}
@@ -64,8 +70,6 @@ func TestDatabase_GetImageByDigest(t *testing.T) {
 }
 
 func TestDatabase_GetImage(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 	b := &Builder{
 		server: server,
@@ -79,15 +83,28 @@ func TestDatabase_GetImage(t *testing.T) {
 }
 
 func TestNewBuilder(t *testing.T) {
-	t.Skip("for dev only")
-
-	//ctx, cfg, server := InitDatabase()
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server,
-		"starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965",
+		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
 		"starlight/redis:7.0.5",
-		"linux/amd64")
+		"linux/amd64",
+		false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(b)
+}
+
+func TestNewBuilderWithDisabledSorting(t *testing.T) {
+	_, _, server := InitDatabase()
+
+	b, err := NewBuilder(server,
+		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
+		"starlight/redis:7.0.5",
+		"linux/amd64",
+		true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,14 +113,14 @@ func TestNewBuilder(t *testing.T) {
 }
 
 func TestNewBuilder2(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
+	// docker pull harbor.yuri.moe/starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798
 	b, err := NewBuilder(server,
-		"starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838",
+		"starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798",
 		"starlight/redis:7.0.5",
-		"linux/amd64")
+		"linux/amd64",
+		false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -112,14 +129,13 @@ func TestNewBuilder2(t *testing.T) {
 }
 
 func TestNewBuilder3(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
 	b, err := NewBuilder(server,
 		"",
 		"starlight/redis:7.0.5",
-		"linux/amd64")
+		"linux/amd64",
+		false)
 	if err != nil {
 		t.Error(err)
 		return
@@ -133,11 +149,10 @@ func TestNewBuilder3(t *testing.T) {
 }
 
 func TestBuilder_WriteHeader(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
+	// docker pull harbor.yuri.moe/starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6
+	b, err := NewBuilder(server, "starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6", "starlight/mariadb:10.11.4", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -158,11 +173,9 @@ func TestBuilder_WriteHeader(t *testing.T) {
 }
 
 func TestBuilder_WriteBody(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "starlight/mariadb@sha256:1115e2247474b2edb81fad9f5cba70c372c6cfa40130b041ee7f09c8bb726838", "starlight/mariadb:10.9.2", "linux/amd64")
+	b, err := NewBuilder(server, "starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6", "starlight/mariadb:10.11.4", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -183,11 +196,9 @@ func TestBuilder_WriteBody(t *testing.T) {
 }
 
 func TestBuilder_WriteBody2(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "", "starlight/mariadb:10.9.2", "linux/amd64")
+	b, err := NewBuilder(server, "", "starlight/mariadb:10.11.4", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -208,11 +219,9 @@ func TestBuilder_WriteBody2(t *testing.T) {
 }
 
 func TestBuilder_WriteBody3(t *testing.T) {
-	t.Skip("for dev only")
-
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "", "starlight/redis:6.2.7", "linux/amd64")
+	b, err := NewBuilder(server, "", "starlight/redis:7.0.5", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
 	}

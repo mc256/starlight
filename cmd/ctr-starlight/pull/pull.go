@@ -34,24 +34,22 @@ func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) error
 		}
 		end := time.Now()
 
-		if resp.GetMessage() != "" {
-			// it is likely that the image is already pulled
-			fmt.Printf("%s\n", resp.GetMessage())
-			return nil
-		}
+		fmt.Printf("%s\n", resp.GetMessage())
 
 		if resp.GetBaseImage() == "" {
-			fmt.Printf("requested to pull image %s successfully in %dms \n",
+			fmt.Printf("requested to pull image %s in %dms \n",
 				ref.Reference,
 				end.Sub(start).Milliseconds(),
 			)
 		} else {
-			fmt.Printf("requested to pull image %s successfully based on %s in %dms \n",
+			fmt.Printf("requested to pull image %s based on %s in %dms \n",
 				ref.Reference, resp.GetBaseImage(),
 				end.Sub(start).Milliseconds(),
 			)
 		}
-		fmt.Printf("delta image size: %d bytes\n", resp.TotalImageSize)
+		if resp.TotalImageSize > -1 {
+			fmt.Printf("delta image size: %d bytes\n", resp.TotalImageSize)
+		}
 	} else {
 		fmt.Printf("pull image failed: %s\n", resp.Message)
 	}

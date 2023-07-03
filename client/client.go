@@ -480,12 +480,12 @@ type PullFinishedMessage struct {
 func (c *Client) pullImageSync(ctr *containerd.Client, base containerd.Image,
 	ref, platform, proxyCfg string) (img *images.Image, err error) {
 	msg := make(chan PullFinishedMessage)
-	c.PullImage(ctr, base, ref, platform, proxyCfg, &msg)
+	c.PullImage(ctr, base, ref, platform, proxyCfg, &msg, false)
 	ret := <-msg
 	return ret.img, ret.err
 }
 
-func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinishedMessage) {
+func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinishedMessage, disableEarlyStart bool) {
 	// connect to containerd
 	ctr, err := containerd.New(c.cfg.Containerd, containerd.WithDefaultNamespace(ns))
 	if err != nil {
@@ -506,7 +506,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 	log.G(c.ctx).WithFields(logrus.Fields{
 		"ref": ref,
 	}).Info("pulling image")
-	c.PullImage(ctr, baseImg, ref, platforms.DefaultString(), proxy, ret)
+	c.PullImage(ctr, baseImg, ref, platforms.DefaultString(), proxy, ret, disableEarlyStart)
 }
 
 // PullImage pulls an image from a registry and stores it in the content store
@@ -515,6 +515,7 @@ func (c *Client) pullImageGrpc(ns, base, ref, proxy string, ret *chan PullFinish
 func (c *Client) PullImage(
 	ctr *containerd.Client, base containerd.Image,
 	ref, platform, proxyCfg string, ready *chan PullFinishedMessage,
+	disableEarlyStart bool,
 ) {
 	// init vars
 	is := ctr.ImageService()
@@ -567,7 +568,7 @@ func (c *Client) PullImage(
 	}
 
 	// pull image
-	body, res, err := p.DeltaImage(baseRef, ref, platform)
+	body, res, err := p.DeltaImage(baseRef, ref, platform, disableEarlyStart)
 	if err != nil {
 		*ready <- PullFinishedMessage{nil, nil, "", errors.Wrapf(err, "failed to pull image %s", ref)}
 		return

@@ -122,13 +122,19 @@ func (a *Server) delta(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 	log.G(a.ctx).WithFields(logrus.Fields{"action": "delta", "ip": ip}).Info("request received")
 
-	f, t, plt := q.Get("from"), q.Get("to"), q.Get("platform")
+	f, t, plt, srt := q.Get("from"), q.Get("to"), q.Get("platform"), q.Get("disableSorting")
 	if t == "" || plt == "" {
 		a.error(w, req, "missing parameters")
 		return
 	}
 
-	b, err := NewBuilder(a, f, t, plt)
+	// disable sorting
+	nonsrt := false
+	if srt == "true" {
+		nonsrt = true
+	}
+
+	b, err := NewBuilder(a, f, t, plt, nonsrt)
 	if err != nil {
 		a.error(w, req, err.Error())
 		return

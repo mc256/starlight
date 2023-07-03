@@ -162,7 +162,7 @@ func getHeaderInt64(h *http.Header, k string) (int64, error) {
 	return parseNumber(k, h.Get(k))
 }
 
-func (a *StarlightProxy) DeltaImage(from, to, platform string) (
+func (a *StarlightProxy) DeltaImage(from, to, platform string, disableEarlyStart bool) (
 	reader io.ReadCloser,
 	metadata *common.DeltaImageMetadata,
 	err error) {
@@ -175,6 +175,10 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string) (
 	q.Set("from", from)
 	q.Set("to", to)
 	q.Set("platform", platform)
+	if disableEarlyStart {
+		// if early start is disabled, we should disable sorting on the proxy side as well
+		q.Set("disableSorting", "true")
+	}
 	u.RawQuery = q.Encode()
 
 	log.G(a.ctx).WithFields(logrus.Fields{
