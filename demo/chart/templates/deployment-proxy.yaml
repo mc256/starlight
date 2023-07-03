@@ -52,13 +52,16 @@ spec:
               containerPort: 8090
               protocol: TCP
           livenessProbe:
-            periodSeconds: 60
+            initialDelaySeconds: 5
+            periodSeconds: 10
             httpGet:
-              path: /
+              path: /health-check
               port: 8090
           readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
             httpGet:
-              path: /
+              path: /health-check
               port: 8090
           resources:
             {{- toYaml .Values.starlightProxy.resources | nindent 12}}
