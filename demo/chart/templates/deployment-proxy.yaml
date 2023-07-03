@@ -64,7 +64,7 @@ spec:
             {{- toYaml .Values.starlightProxy.resources | nindent 12}}
           #command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
           command: ["/opt/starlight-proxy"]
-          # args: ["--config", "/etc/starlight/proxy_config.json"]
+          # args: ["--config", "/etc/starlight/starlight-proxy.json"]
           env:
           - name: STARLIGHT_HOST
             value: "0.0.0.0"

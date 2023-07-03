@@ -45,6 +45,6 @@ jobs:
       - name: Test
         run: |
           mkdir -p `pwd`/sandbox/etc/starlight
-          echo '${{ secrets.STARLIGHT_PROXY_CONFIG_JSON }}' > `pwd`/sandbox/etc/starlight/proxy_config.json
+          echo '${{ secrets.STARLIGHT_PROXY_CONFIG_JSON }}' > `pwd`/sandbox/etc/starlight/starlight-proxy.json
           ls -al `pwd`
           make test

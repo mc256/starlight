@@ -30,7 +30,7 @@ import (
 )
 
 //
-// To run this test, you need to set the environment in <PROJECT_ROOT>/sandbox/etc/starlight/proxy_config.json
+// To run this test, you need to set the environment in <PROJECT_ROOT>/sandbox/etc/starlight/starlight-proxy.json
 // you will need a running postgresql database with container images imported by starlight-proxy
 //
 

@@ -17,11 +17,12 @@ import (
 )
 
 var (
-	db *Database
+	db  *Database
+	cfg *Configuration
 )
 
 func TestMain(m *testing.M) {
-	cfg, _, _, _ := LoadConfig("")
+	cfg, _, _, _ = LoadConfig("")
 	ctx := context.Background()
 	var err error
 	db, err = NewDatabase(ctx, cfg.PostgresConnectionString)
@@ -32,10 +33,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestDatabase_Init(t *testing.T) {
-	t.Skip("for dev only")
-
 	ctx := context.Background()
-	db, err := NewDatabase(ctx, "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+	db, err := NewDatabase(ctx, cfg.PostgresConnectionString)
 	if err != nil {
 		t.Error(err)
 		return
@@ -49,31 +48,23 @@ func TestDatabase_Init(t *testing.T) {
 }
 
 func TestDatabase_GetFiles(t *testing.T) {
-	t.Skip("for dev only")
-
-	// TOCEntry to
-	fl, err := db.GetUniqueFiles([]*send.ImageLayer{{Serial: 201}, {Serial: 211}, {Serial: 203}})
+	fl, err := db.GetUniqueFiles([]*send.ImageLayer{{Serial: 33}, {Serial: 34}, {Serial: 35}})
 	if err != nil {
 		t.Error(err)
 	}
 	for _, f := range fl {
 		fmt.Println(f)
 	}
-
 }
 
 func TestDatabase_GetFilesWithRanks(t *testing.T) {
-	t.Skip("for dev only")
-
-	// TOCEntry to
-	fl, err := db.GetFilesWithRanks(45)
+	fl, err := db.GetFilesWithRanks(5)
 	if err != nil {
 		t.Error(err)
 	}
 	for _, f := range fl {
 		fmt.Println(f)
 	}
-
 }
 
 func TestDatabase_UpdateFileRanks(t *testing.T) {

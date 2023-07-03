@@ -221,7 +221,7 @@ func (a *StarlightProxy) DeltaImage(from, to, platform string, disableEarlyStart
 			}).
 			WithError(err).
 			Error("server error")
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("server error: %s", string(response))
 	}
 
 	log.G(a.ctx).WithFields(logrus.Fields{
