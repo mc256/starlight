@@ -645,6 +645,13 @@ func (c *Client) PullImage(
 		return
 	}
 
+	// compute orignal image size using manifest
+	res.OriginalLength = res.ManifestSize
+	for _, layer := range manifest.Layers {
+		res.OriginalLength += layer.Size
+	}
+	res.OriginalLength += res.ConfigSize
+
 	// config
 	buf, err = c.readBody(body, res.ConfigSize)
 	if err != nil {

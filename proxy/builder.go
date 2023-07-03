@@ -127,7 +127,11 @@ func (b *Builder) WriteHeader(w http.ResponseWriter, req *http.Request) error {
 		Info("generated response header")
 
 	// output header
+	//
+	// Content-Length equeals
+	// compressed(Starlight-Header-Size) + compressed(Manifest-Size) + compressed((Config-Size) + Payload-Size
 	httpLength := cw.GetWrittenSize() + b.BodyLength
+
 	header := w.Header()
 	header.Set("Content-Type", "application/octet-stream")
 	header.Set("Content-Length", fmt.Sprintf("%d", httpLength))

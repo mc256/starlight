@@ -13,13 +13,14 @@ import (
 	pb "github.com/mc256/starlight/client/api"
 	"github.com/mc256/starlight/cmd/ctr-starlight/auth"
 	"github.com/urfave/cli/v2"
+	"github.com/vbauerster/mpb/v8/decor"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) error {
 	if ref.DisableEarlyStart {
-		fmt.Printf("early start is disabled\n")
+		fmt.Printf("early start has been disabled, this may take a while\n")
 	}
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*30)
@@ -34,21 +35,32 @@ func pullImage(client pb.DaemonClient, ref *pb.ImageReference, quiet bool) error
 		}
 		end := time.Now()
 
-		fmt.Printf("%s\n", resp.GetMessage())
-
-		if resp.GetBaseImage() == "" {
-			fmt.Printf("requested to pull image %s in %dms \n",
-				ref.Reference,
-				end.Sub(start).Milliseconds(),
-			)
+		if resp.GetMessage() == "ok" {
+			if resp.GetBaseImage() == "" {
+				fmt.Printf("requested to pull image %s in %dms \n",
+					ref.Reference,
+					end.Sub(start).Milliseconds(),
+				)
+			} else {
+				fmt.Printf("requested to pull image %s based on %s in %dms \n",
+					ref.Reference, resp.GetBaseImage(),
+					end.Sub(start).Milliseconds(),
+				)
+			}
 		} else {
-			fmt.Printf("requested to pull image %s based on %s in %dms \n",
-				ref.Reference, resp.GetBaseImage(),
-				end.Sub(start).Milliseconds(),
-			)
+			fmt.Printf("%s\n", resp.GetMessage())
 		}
+
 		if resp.TotalImageSize > -1 {
-			fmt.Printf("delta image size: %d bytes\n", resp.TotalImageSize)
+			// https://github.com/containers/image/blob/1dca20b9a8417764c0ce9bd4680ce102259ea2ca/copy/progress_bars.go#L24
+			// This only includes the HTTP response body, not the HTTP headers.
+			skipSize := resp.OriginalImageSize - resp.TotalImageSize
+			fmt.Printf("delta image %.1f / original %.1f (skipped: %.1f = %.2f%%)\n",
+				decor.SizeB1024(resp.TotalImageSize),
+				decor.SizeB1024(resp.OriginalImageSize),
+				decor.SizeB1024(skipSize),
+				float64(skipSize)/float64(resp.OriginalImageSize)*100,
+			)
 		}
 	} else {
 		fmt.Printf("pull image failed: %s\n", resp.Message)

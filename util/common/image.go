@@ -10,6 +10,7 @@ type DeltaImageMetadata struct {
 	ConfigSize          int64
 	StarlightHeaderSize int64
 	ContentLength       int64
+	OriginalLength      int64
 
 	Digest          string
 	StarlightDigest string
