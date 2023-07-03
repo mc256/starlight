@@ -99,8 +99,8 @@ create-deb-package: change-version-number set-production starlight-daemon ctr-st
 install-protobuf:
 	sudo apt update
 	sudo apt install protobuf-compiler -y
-	go get -u github.com/golang/protobuf/protoc-gen-go
-	go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
 	echo "You need to add $(go env GOPATH)/bin to your PATH"
 
 .PHONY: update-protobuf

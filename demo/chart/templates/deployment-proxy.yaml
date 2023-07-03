@@ -52,19 +52,22 @@ spec:
               containerPort: 8090
               protocol: TCP
           livenessProbe:
-            periodSeconds: 60
+            initialDelaySeconds: 5
+            periodSeconds: 10
             httpGet:
-              path: /
+              path: /health-check
               port: 8090
           readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
             httpGet:
-              path: /
+              path: /health-check
               port: 8090
           resources:
             {{- toYaml .Values.starlightProxy.resources | nindent 12}}
           #command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
           command: ["/opt/starlight-proxy"]
-          # args: ["--config", "/etc/starlight/proxy_config.json"]
+          # args: ["--config", "/etc/starlight/starlight-proxy.json"]
           env:
           - name: STARLIGHT_HOST
             value: "0.0.0.0"

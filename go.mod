@@ -23,11 +23,18 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.7.0
 	google.golang.org/grpc v1.47.0
 )
 
 require google.golang.org/protobuf v1.28.0
+
+require (
+	github.com/VividCortex/ewma v1.2.0 // indirect
+	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/rivo/uniseg v0.4.4 // indirect
+)
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
@@ -55,6 +62,7 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/opencontainers/selinux v1.10.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/vbauerster/mpb/v8 v8.4.0
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect

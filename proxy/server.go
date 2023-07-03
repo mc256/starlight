@@ -241,7 +241,7 @@ func (a *Server) respond(w http.ResponseWriter, req *http.Request, res *ApiRespo
 }
 
 func (a *Server) healthCheck(w http.ResponseWriter, req *http.Request) {
-	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Info("health check")
+	log.G(a.ctx).WithFields(logrus.Fields{"ip": a.getIpAddress(req)}).Trace("health check")
 
 	header := w.Header()
 	header.Set("Content-Type", "application/json")

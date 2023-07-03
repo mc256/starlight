@@ -69,7 +69,7 @@ information about Starlight, please visit our repository at https://github.com/m
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:        "config",
-			DefaultText: "/etc/starlight/proxy_config.json",
+			DefaultText: "/etc/starlight/starlight-proxy.json",
 			Aliases:     []string{"c"},
 			EnvVars:     []string{"STARLIGHT_PROXY_CONFIG"},
 			Usage:       "json configuration file.",
@@ -117,19 +117,6 @@ information about Starlight, please visit our repository at https://github.com/m
 			Usage:       "Default container registry",
 			Required:    false,
 		},
-		// ----
-		// &cli.BoolFlag{
-		// 	Name:        "goharbor",
-		// 	DefaultText: fmt.Sprintf("%v", cfg.EnableHarborScanner),
-		// 	Usage:       "integrate goharbor and enable auto container image conversion",
-		// 	Required:    false,
-		// },
-		// &cli.StringFlag{
-		// 	Name:        "goharbor-apikey",
-		// 	DefaultText: cfg.HarborApiKey,
-		// 	Usage:       "api key for verify the scan requests",
-		// 	Required:    false,
-		// },
 	}
 	app.Action = func(c *cli.Context) error {
 		return DefaultAction(c, cfg)

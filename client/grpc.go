@@ -140,14 +140,16 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 				TotalImageSize: -1,
 			}, nil
 		}
-
-	}
-	imageSize := int64(0)
-	if ret.meta != nil {
-		imageSize = ret.meta.ContentLength
 	}
 
-	return &pb.ImagePullResponse{Success: true, Message: "ok", BaseImage: ret.base, TotalImageSize: imageSize}, nil
+	// success
+	return &pb.ImagePullResponse{
+		Success:           true,
+		Message:           "ok",
+		BaseImage:         ret.base,
+		TotalImageSize:    ret.meta.ContentLength,
+		OriginalImageSize: ret.meta.OriginalLength,
+	}, nil
 }
 
 func (s *StarlightDaemonAPIServer) SetOptimizer(ctx context.Context, req *pb.OptimizeRequest) (*pb.OptimizeResponse, error) {

@@ -301,6 +301,6 @@ func NewExtractor(s *Server, image string, insecure bool) (r *Extractor, err err
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	r.ParsedName, r.ParsedTag = ParseImageReference(r.ref, r.server.config.DefaultRegistry)
+	r.ParsedName, r.ParsedTag = ParseImageReference(r.ref, r.server.config.DefaultRegistry, r.server.config.DefaultRegistryAlias)
 	return
 }

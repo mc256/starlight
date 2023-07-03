@@ -102,6 +102,7 @@ message ImagePullResponse {
   string message = 2;
   string baseImage = 3;
   int64 totalImageSize = 4;
+  int64 originalImageSize = 5;
 }
 
 // Optimize
