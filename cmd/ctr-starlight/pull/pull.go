@@ -73,8 +73,8 @@ func Action(ctx context.Context, c *cli.Context) error {
 	if c.NArg() == 1 {
 		ref = c.Args().Get(0)
 	} else if c.NArg() == 2 {
-		ref = c.Args().Get(0)
-		base = c.Args().Get(1)
+		base = c.Args().Get(0)
+		ref = c.Args().Get(1)
 	} else {
 		return fmt.Errorf("wrong number of arguments, expected 1 or 2, got %d", c.NArg())
 	}
