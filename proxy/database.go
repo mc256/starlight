@@ -623,9 +623,19 @@ func (d *Database) GetFilesWithoutRanks(imageSerial int64) ([]*send.RankedFile, 
 	return fl, nil
 }
 
-func ParseImageReference(ref name.Reference, defaultRegistry string) (imageName, identifier string) {
+func ParseImageReference(ref name.Reference, defaultRegistry string, registryAlias []string) (imageName, identifier string) {
 	imageName = ref.Context().RepositoryStr()
+	appendRegistry := false
 	if ref.Context().RegistryStr() != defaultRegistry {
+		appendRegistry = true
+	}
+	for _, alias := range registryAlias {
+		if ref.Context().RegistryStr() == alias {
+			appendRegistry = false
+			break
+		}
+	}
+	if appendRegistry {
 		imageName = path.Join(ref.Context().RegistryStr(), imageName)
 	}
 	identifier = ref.Identifier()

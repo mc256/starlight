@@ -28,7 +28,6 @@ import (
 	"math"
 	"net/http"
 	"sort"
-	"strings"
 
 	"github.com/containerd/containerd/log"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -228,10 +227,7 @@ func (b *Builder) getImage(ref, platform string) (img *send.Image, err error) {
 		return nil, err
 	}
 
-	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry)
-	for _, registryAlias := range b.server.config.DefaultRegistryAlias {
-		refName = strings.TrimPrefix(refName, registryAlias+"/")
-	}
+	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry, b.server.config.DefaultRegistryAlias)
 
 	img.Serial, err = b.server.db.GetImage(refName, refTag, platform)
 	if err != nil {
@@ -264,7 +260,7 @@ func (b Builder) getImageByDigest(refWithDigest string) (img *send.Image, err er
 	if err != nil {
 		return nil, err
 	}
-	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry)
+	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry, b.server.config.DefaultRegistryAlias)
 	img.Serial, err = b.server.db.GetImageByDigest(refName, refTag)
 	if err != nil {
 		return nil, err

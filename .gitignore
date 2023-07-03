@@ -21,7 +21,8 @@ sandbox/
 
 # GoLand and VSCode
 .idea
-.vscode
+# VSCode configuration example: https://gist.github.com/mc256/357a867b8b21bbcc571c5469d127a1d8
+.vscode 
 
 vendor/
 
