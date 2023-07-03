@@ -9,8 +9,8 @@ namespace: "default"
 # Image pull information
 starlightProxy:
   repository: "ghcr.io/mc256/starlight/proxy"
-  tag: "latest"
-  imagePullPolicy: IfNotPresent
+  tag: "0.5"
+  imagePullPolicy: Always
 
   # dbConnection specify
   # Default is set to the postgres instance in the same deployment.
@@ -122,8 +122,8 @@ edge:
   enabled: true
   # starlightCLI connects to the Starlight Daemon on the edge node via gRPC
   repository: "ghcr.io/mc256/starlight/cli"
-  imagePullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "0.5"
+  imagePullPolicy: Always
   # This keep the container running allows you to run some starlight-related commands on the edge node
   command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
   # Starlight CLI Default Environment Variables

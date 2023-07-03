@@ -91,7 +91,7 @@ func (s *StarlightDaemonAPIServer) PullImage(ctx context.Context, ref *pb.ImageR
 
 	ready := make(chan PullFinishedMessage)
 
-	go s.client.pullImageGrpc(ns, ref.Base, ref.Reference, ref.ProxyConfig, &ready)
+	go s.client.pullImageGrpc(ns, ref.Base, ref.Reference, ref.ProxyConfig, &ready, ref.DisableEarlyStart)
 	ret := <-ready
 
 	if ret.err != nil {
