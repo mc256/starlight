@@ -4,7 +4,7 @@
 
 ```shell
 helm show values oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.4.7 > ./my-values.yaml
+     --version 0.5.3 > ./my-values.yaml
 ```
 
 Take a look at `./my-values.yaml` and edit it to your liking. 
@@ -17,7 +17,7 @@ Then give it a shot:
 helm upgrade --install -f ./my-values.yaml \
      starlight \
      oci://ghcr.io/mc256/starlight/starlight \
-     --version 0.4.7
+     --version 0.5.3
 ```
 
 ## Prerequisites
@@ -58,8 +58,9 @@ in the default deployment for convenience and can be disabled by setting the par
 2. On the edge node we need to install **Starlight Daemon** and connect <sup>[1]</sup> it to **containerd**.
     ```shell
     export ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
-    wget https://github.com/mc256/starlight/releases/download/v{{ .Chart.Version }}/starlight_{{ .Chart.Version }}_$ARCH.deb
-    sudo dpkg -i starlight_{{ .Chart.Version }}_$ARCH.deb
+    export STARLIGHT_VERSION=0.5.3
+    wget https://github.com/mc256/starlight/releases/download/v$STARLIGHT_VERSION/starlight_$STARLIGHT_VERSION_$ARCH.deb
+    sudo dpkg -i starlight_$STARLIGHT_VERSION_$ARCH.deb
     ```
    
     if you are using k3s, change containerd's socket address in `/etc/starlight/daemon.json`
