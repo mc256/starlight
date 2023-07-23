@@ -24,6 +24,7 @@ import (
 
 	cmdAddProxy "github.com/mc256/starlight/cmd/ctr-starlight/addproxy"
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
+	cmdInstall "github.com/mc256/starlight/cmd/ctr-starlight/install"
 	cmdListProxy "github.com/mc256/starlight/cmd/ctr-starlight/listproxy"
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	cmdOptimizer "github.com/mc256/starlight/cmd/ctr-starlight/optimizer"
@@ -95,6 +96,7 @@ https://github.com/mc256/starlight
 		},
 	}
 	app.Commands = []*cli.Command{
+		cmdInstall.Command(),   // 0. configure starlight-daemon on the host (with containerd or k3s)
 		cmdVersion.Command(),   // 1. confirm the version of starlight-daemon
 		cmdAddProxy.Command(),  // 2. add starlight proxy to the daemon
 		cmdListProxy.Command(), // 3. list proxy profiles in daemon

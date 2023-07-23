@@ -27,11 +27,15 @@ require (
 	google.golang.org/grpc v1.53.0
 )
 
-require google.golang.org/protobuf v1.28.1
+require (
+	github.com/pelletier/go-toml v1.9.5
+	google.golang.org/protobuf v1.28.1
+)
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
+	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 )
