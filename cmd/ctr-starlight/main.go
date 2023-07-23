@@ -31,6 +31,7 @@ import (
 	cmdPing "github.com/mc256/starlight/cmd/ctr-starlight/ping"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
+	cmdReset "github.com/mc256/starlight/cmd/ctr-starlight/reset"
 	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
 
 	"github.com/mc256/starlight/util"
@@ -105,6 +106,7 @@ https://github.com/mc256/starlight
 		cmdNotify.Command(),    // 6. notify the proxy that the starlight image is available
 		cmdOptimizer.Command(), // 7. turn on/off filesystem traces
 		cmdReport.Command(),    // 8. upload filesystem traces to starlight proxy
+		cmdReset.Command(),     // !. reset starlight daemon
 		cmdPull.Command(),      // 9. pull starlight image
 	}
 
