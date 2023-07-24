@@ -24,12 +24,14 @@ import (
 
 	cmdAddProxy "github.com/mc256/starlight/cmd/ctr-starlight/addproxy"
 	cmdConvert "github.com/mc256/starlight/cmd/ctr-starlight/convert"
+	cmdInstall "github.com/mc256/starlight/cmd/ctr-starlight/install"
 	cmdListProxy "github.com/mc256/starlight/cmd/ctr-starlight/listproxy"
 	cmdNotify "github.com/mc256/starlight/cmd/ctr-starlight/notify"
 	cmdOptimizer "github.com/mc256/starlight/cmd/ctr-starlight/optimizer"
 	cmdPing "github.com/mc256/starlight/cmd/ctr-starlight/ping"
 	cmdPull "github.com/mc256/starlight/cmd/ctr-starlight/pull"
 	cmdReport "github.com/mc256/starlight/cmd/ctr-starlight/report"
+	cmdReset "github.com/mc256/starlight/cmd/ctr-starlight/reset"
 	cmdVersion "github.com/mc256/starlight/cmd/ctr-starlight/version"
 
 	"github.com/mc256/starlight/util"
@@ -95,6 +97,7 @@ https://github.com/mc256/starlight
 		},
 	}
 	app.Commands = []*cli.Command{
+		cmdInstall.Command(),   // 0. configure starlight-daemon on the host (with containerd or k3s)
 		cmdVersion.Command(),   // 1. confirm the version of starlight-daemon
 		cmdAddProxy.Command(),  // 2. add starlight proxy to the daemon
 		cmdListProxy.Command(), // 3. list proxy profiles in daemon
@@ -103,6 +106,7 @@ https://github.com/mc256/starlight
 		cmdNotify.Command(),    // 6. notify the proxy that the starlight image is available
 		cmdOptimizer.Command(), // 7. turn on/off filesystem traces
 		cmdReport.Command(),    // 8. upload filesystem traces to starlight proxy
+		cmdReset.Command(),     // !. reset starlight daemon
 		cmdPull.Command(),      // 9. pull starlight image
 	}
 

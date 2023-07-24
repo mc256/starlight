@@ -59,14 +59,14 @@ in the default deployment for convenience and can be disabled by setting the par
     ```shell
     export ARCH=$(dpkg --print-architecture) # one of amd64, arm64, armhf
     export STARLIGHT_VERSION=0.5.3
-    wget https://github.com/mc256/starlight/releases/download/v$STARLIGHT_VERSION/starlight_$STARLIGHT_VERSION_$ARCH.deb
-    sudo dpkg -i starlight_$STARLIGHT_VERSION_$ARCH.deb
+    wget https://github.com/mc256/starlight/releases/download/v"$STARLIGHT_VERSION"/starlight_"$STARLIGHT_VERSION"_$ARCH.deb
+    sudo dpkg -i starlight_"$STARLIGHT_VERSION"_$ARCH.deb
     ```
    
-    if you are using k3s, change containerd's socket address in `/etc/starlight/daemon.json`
+    if you are using k3s, change containerd's socket address in `/etc/starlight/daemon.json` to
     ```json
     { 
-      "containerd": "/run/containerd/containerd.sock"
+      "containerd": "/run/k3s/containerd/containerd.sock"
     }
     ```
 3. Configure **containerd** to use <sup>[2]</sup> Starlight as its default 
