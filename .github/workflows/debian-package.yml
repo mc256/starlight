@@ -45,7 +45,9 @@ jobs:
           curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
           sh /tmp/get-docker.sh
           docker run --privileged --rm tonistiigi/binfmt --install all
-          docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw harbor.yuri.moe/public/helper:latest
+          cd ./.github/.helper/ && docker build -t helper -f Dockerfile .
+          docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw helper
+          cd ../../
           export UPLOAD_URL=http://`docker inspect helper | grep "IPAddress" | grep -o -E '[0-9.]+' | head -n 1`:8080/
           make docker-buildx-multi-arch
       - name: Release

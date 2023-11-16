@@ -31,12 +31,6 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version-file: './go.mod'
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: harbor.yuri.moe
-          username: starlight
-          password: ${{ secrets.REGISTRY_PASSWORD }}
       - name: Install Buildessentials
         run: |
           sudo apt update -y
