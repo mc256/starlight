@@ -30,13 +30,17 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version-file: './go.mod'
-      - name: Login to GitHub Container Registry
+          go-version-file: './go.mod'    
+      - name: Login to Goharbor Container Registry
+        # This is needed for one of the test cases to check whether Starlight can integrate with Goharbor
+        # Please make sure that the registry is available
+        # status is available at: http://status-production.mc256.workers.dev
         uses: docker/login-action@v2
         with:
-          registry: harbor.yuri.moe
-          username: starlight
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry: ${{ secrets.GOHARBOR_REGISTRY }}
+          username: ${{ secrets.GOHARBOR_USERNAME }}
+          password: ${{ secrets.GOHARBOR_PASSWORD }}
+          logout: true
       - name: Install Buildessentials
         run: |
           sudo apt update -y
