@@ -39,6 +39,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+          logout: true
       - name: Configure Git
         run: |
           git config user.name "$GITHUB_ACTOR"
