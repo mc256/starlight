@@ -1,0 +1,193 @@
+# Starlight Proxy + Registry
+nameOverride: ""
+fullnameOverride: ""
+
+########################################################################
+# CLOUD
+########################################################################
+# Image pull information
+starlightProxy:
+  repository: "ghcr.io/mc256/starlight/proxy"
+  tag: "latest"
+  imagePullPolicy: Always
+
+  # dbConnection specify
+  # Default is set to the postgres instance in the same deployment.
+  dbConnection: "postgres://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable"
+  # logLevel is the log level for the proxy, options are: trace, debug, info, warn, error, fatal
+  logLevel: "info"
+  # defaultRegistry is the default registry when the full image name is not specified
+  defaultRegistry: "http://container-registry.default.svc.cluster.local:5000"
+  resources: {}
+
+# ---------------------------------------------------------------------
+# Metadata database - PostgreSQL
+# ---------------------------------------------------------------------
+# if disabled, please specify an existing database using `dbConnection` in the previous section
+postgres:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  tag: "latest"
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+  resources: {}
+
+# ---------------------------------------------------------------------
+# Metadata database management tool
+# ---------------------------------------------------------------------
+# A simple web UI for metadata database.
+# This database is mainly for debugging and testing purposes.
+# If you are not curious about what is in the database, you can disable it.
+# postgres.enabled must be true
+adminer:
+  enabled: true
+  imagePullPolicy: IfNotPresent
+  tag: "latest"
+  resources: {}
+
+# ---------------------------------------------------------------------
+# Vanilla Container Registry
+# ---------------------------------------------------------------------
+# Recommend to use https://goharbor.io/ in production.
+# But this is good enough for testing.
+registry:
+  enabled: true # If use other container registry, please specify `registryAddress`
+  repository: "registry"
+  imagePullPolicy: IfNotPresent
+  tag: "latest"
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+  resources: {}
+
+# ---------------------------------------------------------------------
+imagePullSecrets: []
+
+# Starlight Proxy Default Environment Variables
+# registryAddress: goharbor-core.default.svc.cluster.local/starlight
+logLevel: info
+
+# Service
+service:
+  # Recommended to use Cluster IP and put a reverse proxy in front of it.
+  type: ClusterIP
+  
+
+# Ingress
+ingress:
+  enabled: true
+  ingressClassName: "nginx-ayaka"
+  annotations:
+    # kubernetes.io/tls-acme: "true"
+    # set to the largest layer size for uploading container image
+    nginx.ingress.kubernetes.io/proxy-body-size: 512m
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  # Set it to your domain name(s)
+  hosts: [ starlight.mc256.dev ]
+  tls:
+    - secretName: starlight-tls
+      hosts: [ starlight.mc256.dev ]
+
+# select nodes in the cloud
+cloudTolerations: []
+  # allow pod deploying to master node
+  #- key: node-role.kubernetes.io/master
+  #  effect: NoSchedule
+
+cloudNodeSelector:
+  kubernetes.io/os: linux 
+  # kubernetes.io/arch: amd64
+  kubernetes.io/hostname: ayaka
+  
+cloudAffinity: {}
+
+########################################################################
+# EDGE
+########################################################################
+# The purpose of this deployment is to keep the Starlight CLI image on every edge node,
+# so that whever the user uses initContainer, there is a starlight CLI container for that.
+#
+# You still need to install the Starlight daemon (containerd snapshotter) and enable it on the edge node.
+#
+# ON THE WORKER NODE:
+# 1. Install the Starlight daemon
+#
+#   wget https://github.com/mc256/starlight/releases/download/v0.2.3/starlight_0.2.3_amd64.deb
+#   sudo dpkg -i starlight_0.2.3_amd64.deb
+#   sudo systemctl enable starlight
+#   sudo systemctl start starlight
+#
+#
+#
+# 2. Configure the containerd to use Starlight as the snapshotter
+#
+#   sudo mkdir -p /etc/containerd
+#   cat <<EOF | sudo tee /etc/containerd/config.toml
+#   [plugins]
+#     [plugins."io.containerd.grpc.v1.cri".containerd]
+#       snapshotter = "starlight"
+#   [proxy_plugins]
+#     [proxy_plugins.starlight]
+#       type = "snapshot"
+#       address = "/run/starlight/starlight-snapshotter.sock"
+#   EOF
+#
+# 3. and restart the container
+#   sudo systemctl restart containerd
+#
+#
+edge:
+  enabled: true
+  # starlightCLI connects to the Starlight Daemon on the edge node via gRPC
+  repository: "ghcr.io/mc256/starlight/cli"
+  imagePullPolicy: IfNotPresent
+  tag: "latest"
+  # This keep the container running allows you to run some starlight-related commands on the edge node
+  command:  ["/bin/sh", "-ec", "while :; do echo '.'; sleep 60 ; done"]
+  env:
+    - name: CONTAINERD_NAMESPACE
+      value: "k8s.io"
+    - name: PATH
+      value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt"
+  # Starlight CLI Default Environment Variables
+
+# select nodes in the edge
+edgeTolerations: []
+
+edgeNodeSelector: 
+  kubernetes.io/os: linux 
+  # kubernetes.io/arch: arm64
+  # kubernetes.io/hostname: edge
+
+########################################################################
+# OTHER CONFIGURATIONS
+########################################################################
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
