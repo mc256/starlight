@@ -29,8 +29,8 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=postgres
-    volumes:
-      - "./data_db:/var/lib/postgresql/data"
+    #volumes:
+    #  - "./data_db:/var/lib/postgresql/data"
   dbadmin:
     image: adminer:latest
     ports:
@@ -45,10 +45,9 @@ services:
   registry:
     image: registry:2
     ports:
-    - 5000:5000
-    - 80:5000
+    - 5001:5000 # Change to avoid conflict with Apple AirTunes server
     environment:
     - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
-    volumes:
-    - "./data_registry:/data:rw"
+    #volumes:
+    #- "./data_registry:/data:rw"
     restart: always

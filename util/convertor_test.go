@@ -135,6 +135,7 @@ func TestToStarlightImageGoharborWithAllPlatforms(t *testing.T) {
 }
 
 func TestToStarlightImageECR(t *testing.T) {
+
 	test.LoadEnvironmentVariables()
 	if test.HasLoginAWSECR() == false {
 		t.Skip(">>>>> Skip: no container registry credentials for ECR")

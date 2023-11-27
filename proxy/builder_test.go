@@ -54,14 +54,48 @@ func InitDatabase() (context.Context, *Configuration, *Server) {
 	return ctx, cfg, server
 }
 
+func PopulateDatabase(server *Server, images ...string) (err error) {
+	fmt.Printf("populate database with metadata\n")
+
+	// TODO: found some concurrency issue with the database
+	//       we cannot cache the same LAYER concurrently
+	//       this needs to be fixed
+
+	//var errGrp errgroup.Group
+	for _, img := range images {
+		//img := img
+		//errGrp.Go(func() error {
+		// cache metadata to metadata database
+		ext, err := NewExtractor(server, img, true)
+		if err != nil {
+			return err
+		}
+
+		_, err = ext.SaveToC()
+		if err != nil {
+			return err
+		}
+		//return nil
+		//})
+	}
+
+	//return errGrp.Wait()
+	return nil
+}
+
 func TestDatabase_GetImageByDigest(t *testing.T) {
 	_, _, server := InitDatabase()
 	b := &Builder{
 		server: server,
 	}
 
+	if err := PopulateDatabase(server, "starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a"); err != nil {
+		t.Error(err)
+		return
+	}
+
 	// if it is a multi-arch image, the digest is the platform digest
-	// docker pull harbor.yuri.moe/starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a
+	// docker pull reg.yuri.moe/starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a
 	i, err := b.getImageByDigest("starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a")
 	if err != nil {
 		t.Error(err)
@@ -75,6 +109,11 @@ func TestDatabase_GetImage(t *testing.T) {
 		server: server,
 	}
 
+	if err := PopulateDatabase(server, "starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
+
 	i, err := b.getImage("starlight/redis:7.0.5", "linux/amd64")
 	if err != nil {
 		t.Error(err)
@@ -84,6 +123,13 @@ func TestDatabase_GetImage(t *testing.T) {
 
 func TestNewBuilder(t *testing.T) {
 	_, _, server := InitDatabase()
+
+	if err := PopulateDatabase(server,
+		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
+		"starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
 
 	b, err := NewBuilder(server,
 		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
@@ -100,6 +146,13 @@ func TestNewBuilder(t *testing.T) {
 func TestNewBuilderWithDisabledSorting(t *testing.T) {
 	_, _, server := InitDatabase()
 
+	if err := PopulateDatabase(server,
+		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
+		"starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
+
 	b, err := NewBuilder(server,
 		"starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a",
 		"starlight/redis:7.0.5",
@@ -115,7 +168,14 @@ func TestNewBuilderWithDisabledSorting(t *testing.T) {
 func TestNewBuilder2(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	// docker pull harbor.yuri.moe/starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798
+	if err := PopulateDatabase(server,
+		"starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798",
+		"starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// docker pull reg.yuri.moe/starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798
 	b, err := NewBuilder(server,
 		"starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798",
 		"starlight/redis:7.0.5",
@@ -130,6 +190,12 @@ func TestNewBuilder2(t *testing.T) {
 
 func TestNewBuilder3(t *testing.T) {
 	_, _, server := InitDatabase()
+
+	if err := PopulateDatabase(server,
+		"starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
 
 	b, err := NewBuilder(server,
 		"",
@@ -151,10 +217,20 @@ func TestNewBuilder3(t *testing.T) {
 func TestBuilder_WriteHeader(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	// docker pull harbor.yuri.moe/starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6
-	b, err := NewBuilder(server, "starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6", "starlight/mariadb:10.11.4", "linux/amd64", false)
+	if err := PopulateDatabase(server,
+		"starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6",
+		"starlight/mariadb:10.11.4"); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// docker pull reg.yuri.moe/starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6
+	b, err := NewBuilder(server,
+		"starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6",
+		"starlight/mariadb:10.11.4", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if err = b.Load(); err != nil {
@@ -175,9 +251,20 @@ func TestBuilder_WriteHeader(t *testing.T) {
 func TestBuilder_WriteBody(t *testing.T) {
 	_, _, server := InitDatabase()
 
-	b, err := NewBuilder(server, "starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6", "starlight/mariadb:10.11.4", "linux/amd64", false)
+	if err := PopulateDatabase(server,
+		"starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6",
+		"starlight/mariadb:10.11.4"); err != nil {
+		t.Error(err)
+		return
+	}
+
+	b, err := NewBuilder(server,
+		"starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6",
+		"starlight/mariadb:10.11.4",
+		"linux/amd64", false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if err = b.Load(); err != nil {
@@ -198,9 +285,16 @@ func TestBuilder_WriteBody(t *testing.T) {
 func TestBuilder_WriteBody2(t *testing.T) {
 	_, _, server := InitDatabase()
 
+	if err := PopulateDatabase(server,
+		"starlight/mariadb:10.11.4"); err != nil {
+		t.Error(err)
+		return
+	}
+
 	b, err := NewBuilder(server, "", "starlight/mariadb:10.11.4", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if err = b.Load(); err != nil {
@@ -221,9 +315,16 @@ func TestBuilder_WriteBody2(t *testing.T) {
 func TestBuilder_WriteBody3(t *testing.T) {
 	_, _, server := InitDatabase()
 
+	if err := PopulateDatabase(server,
+		"starlight/redis:7.0.5"); err != nil {
+		t.Error(err)
+		return
+	}
+
 	b, err := NewBuilder(server, "", "starlight/redis:7.0.5", "linux/amd64", false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if err = b.Load(); err != nil {

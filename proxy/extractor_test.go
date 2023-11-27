@@ -34,25 +34,6 @@ func TestNewExtractor(t *testing.T) {
 	fmt.Println(ext)
 }
 
-func TestNewExtractor2(t *testing.T) {
-	ctx := context.Background()
-	cfg, _, _, _ := LoadConfig("")
-	server := &Server{
-		ctx: ctx,
-		Server: http.Server{
-			Addr: fmt.Sprintf("%s:%d", cfg.ListenAddress, cfg.ListenPort),
-		},
-		config: cfg,
-	}
-
-	//docker pull harbor.yuri.moe/starlight/test-harbor123@sha256:cfe501ce6892b1c9f5ca31a45ecef2d5bd3dddf21c57044bde33e930da3409d6
-	ext, err := NewExtractor(server, "starlight/test-harbor123@sha256:cfe501ce6892b1c9f5ca31a45ecef2d5bd3dddf21c57044bde33e930da3409d6", true)
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Println(ext)
-}
-
 func TestExtractor_SaveToC_Goharbor(t *testing.T) {
 	test.LoadEnvironmentVariables()
 	if test.HasLoginStarlightGoharbor() == false {

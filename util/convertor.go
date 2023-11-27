@@ -113,10 +113,10 @@ func NewConvertor(ctx context.Context, src, dst string, optsSrc, dstSrc []name.O
 		platforms:  platforms,
 	}
 	if c.src, err = name.ParseReference(src, optsSrc...); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "convertor failed to parse source image")
 	}
 	if c.dst, err = name.ParseReference(dst, dstSrc...); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "convertor failed to parse destination image")
 	}
 	return c, nil
 }
