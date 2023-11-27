@@ -81,7 +81,7 @@ and starting the Starlight snapshotter daemon
    ```shell
     ctr-starlight convert --notify \
       --platform=linux/amd64 \
-      docker.io/library/redis:6.2.7 harbor.yuri.moe/x/redis:6.2.7
+      docker.io/library/redis:6.2.7 reg.yuri.moe/x/redis:6.2.7
    ```
     In addition, the proxy needs some metadata about the list of files in the container to compute the data for deployment. 
     The `--nofity` flag tells the proxy to fetch the metadata from the registry and store it in the metadata database.
@@ -93,12 +93,12 @@ and starting the Starlight snapshotter daemon
    The **Starlight CLI tool** features trace collection, example:
    ```shell
    sudo ctr-starlight optimizer on
-   sudo ctr-starlight pull harbor.yuri.moe/x/redis:6.2.7 && \
+   sudo ctr-starlight pull reg.yuri.moe/x/redis:6.2.7 && \
    mkdir /tmp/redis-data && \
    sudo ctr c create --snapshotter=starlight \
         --mount type=bind,src=/tmp/redis-data,dst=/data,options=rbind:rw \
         --env-file ./demo/config/all.env --network=host \
-        harbor.yuri.moe/x/redis:6.2.7
+        reg.yuri.moe/x/redis:6.2.7
         instance1 && \
    sudo ctr t start instance1
    ```
@@ -127,27 +127,27 @@ The good news is that they should be quick, a few minutes for each container.
 
 Start a container using Starlight
 ```shell
-sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:6.2.7 && \
+sudo ctr-starlight pull reg.yuri.moe/starlight/redis:6.2.7 && \
 mkdir /tmp/test-redis-data && \
 sudo ctr c create \
     --snapshotter=starlight \
     --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
     --env-file ./demo/config/all.env \
     --net-host \
-    harbor.yuri.moe/x/redis:6.2.7 \
+    reg.yuri.moe/x/redis:6.2.7 \
     instance3 && \
 sudo ctr t start instance3
 ```
 
 Update a container using Starlight (Step 3 and Step 4 need to be done for `redis:7.0.5`)
 ```shell
-sudo ctr-starlight pull harbor.yuri.moe/starlight/redis:7.0.5 && \
+sudo ctr-starlight pull reg.yuri.moe/starlight/redis:7.0.5 && \
 sudo ctr c create \
     --snapshotter=starlight  \
     --mount type=bind,src=/tmp/test-redis-data,dst=/data,options=rbind:rw \
     --env-file ./demo/config/all.env \
     --net-host \
-    harbor.yuri.moe/x/redis:7.0.5 \
+    reg.yuri.moe/x/redis:7.0.5 \
     instance4 && \
 sudo ctr t start instance4
 ```

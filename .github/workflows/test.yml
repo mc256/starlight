@@ -46,9 +46,12 @@ jobs:
           sudo apt update -y
           sudo apt upgrade -y
           sudo apt install build-essential make -y
+      - name: Install Docker
+        uses: docker/setup-buildx-action@v1
       - name: Test
         run: |
           mkdir -p `pwd`/sandbox/etc/starlight
-          echo '${{ secrets.STARLIGHT_PROXY_CONFIG_JSON }}' > `pwd`/sandbox/etc/starlight/starlight-proxy.json
+          docker-compose -f demo/compose/docker-compose-example.yaml up -d
+          echo '{"port": 8090,"address": "0.0.0.0","log_level": "info","postgres": "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable","default_registry": "reg.yuri.moe","default_registry_alias": ["reg.yuri.moe"],"cache_timeout": 3600}' > `pwd`/sandbox/etc/starlight/starlight-proxy.json
           ls -al `pwd`
           make test

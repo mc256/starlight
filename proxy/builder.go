@@ -263,7 +263,7 @@ func (b Builder) getImageByDigest(refWithDigest string) (img *send.Image, err er
 	refName, refTag := ParseImageReference(img.Ref, b.server.config.DefaultRegistry, b.server.config.DefaultRegistryAlias)
 	img.Serial, err = b.server.db.GetImageByDigest(refName, refTag)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to find image by digest in metadata database")
 	}
 
 	// Load necessary layers
@@ -483,6 +483,7 @@ func (b *Builder) computeDelta() error {
 func (b *Builder) Load() error {
 	// Load compressed layers from registry
 	var errGrp errgroup.Group
+
 	for _, layer := range b.unavailableLayers {
 		layer := layer
 		errGrp.Go(func() error {
