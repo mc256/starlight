@@ -55,6 +55,9 @@ func LoadEnvironmentVariables() {
 	dir, _ := os.Getwd()
 	for !strings.HasSuffix(dir, "starlight") {
 		dir = path.Dir(dir)
+		if dir == "/" {
+			break
+		}
 	}
 	godotenv.Load(path.Join(dir, ".env"))
 }

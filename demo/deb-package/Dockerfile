@@ -16,6 +16,6 @@ ENV TZ=Etc/UTC
 
 RUN apt update -y && apt upgrade -y 
 RUN apt install -y tzdata curl wget git dpkg-dev gpg build-essential debhelper bind9-utils
-RUN wget -q https://go.dev/dl/go1.18.4.linux-$ARCH.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf go1.18.4.linux-$ARCH.tar.gz 
+RUN wget -q https://go.dev/dl/go1.20.8.linux-$ARCH.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.8.linux-$ARCH.tar.gz 
 COPY . .
 RUN ARCH=$ARCH && make create-deb-package.$ARCH upload-deb-package.$ARCH
