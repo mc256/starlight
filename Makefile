@@ -109,6 +109,15 @@ update-protobuf:
     --go-grpc_out=. --go-grpc_opt=paths=source_relative \
     client/api/daemon.proto
 
+.PHONY: check-env-file
+check-env-file:
+	@if [ ! -f .env ]; then cp .env_example .env; fi
+
+.PHONY: copy-env-file
+copy-env-file:
+	cp .env .env_example
+	sed -i 's/=.*/=/g' .env_example
+
 
 ######################################################################
 ###### Platform dependent build
