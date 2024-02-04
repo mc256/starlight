@@ -1,5 +1,6 @@
 # Starlight Proxy
 
+**⚠️ This document is outdated. Please use https://github.com/mc256/starlight/blob/master/docs/newbie.md instead**
 
 This is the **Step 1** to use Starlight:
 

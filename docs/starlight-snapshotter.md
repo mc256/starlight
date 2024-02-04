@@ -1,5 +1,7 @@
 # Starlight Snapshotter Plugin
 
+**⚠️ This document is outdated. Please use https://github.com/mc256/starlight/blob/master/docs/newbie.md instead**
+
 This is the **Step 2** to use Starlight:
 
 Set up the worker to be able to run Starlight. 
