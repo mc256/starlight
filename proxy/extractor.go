@@ -225,7 +225,7 @@ func (ex *Extractor) SaveToC() (res *ApiResponse, err error) {
 		return nil, errors.Wrapf(err, "failed to cache ToC")
 	}
 
-	if desc.MediaType == types.DockerManifestSchema2 {
+	if desc.MediaType == types.DockerManifestSchema2 || desc.MediaType == types.OCIManifestSchema1 {
 		// single manifest image
 		// "application/vnd.docker.distribution.manifest.v2+json"
 
