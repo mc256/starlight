@@ -51,9 +51,9 @@ Starlight is implemented on top of **containerd**. It is comprised of cloud and 
 Starlight is compatible with Kubernetes and can replace the default `overlayfs` snapshotter.
 We could use helm to deploy Starlight on a Kubernetes cluster.
 
-- [I am familiar with **K8s** & Helm. **TL;DR**](https://github.com/mc256/starlight/blob/master/docs/helm.md)
-- [I have 2 **Virtual Machines**, but **TL;DR**](https://github.com/mc256/starlight/blob/master/docs/2vm.md)
+- [I am familiar with **K8s** & Helm.](https://github.com/mc256/starlight/blob/master/docs/helm.md)
 - [I know **Terraform** and have an **AWS** account](https://github.com/mc256/starlight/blob/master/docs/terraform.md)
+- [I just have 2 **Virtual Machines**.](https://github.com/mc256/starlight/blob/master/docs/2vm.md)
 
 ---
 
