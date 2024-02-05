@@ -16,9 +16,15 @@ variable "ssh_public_key" {
   default     = ""
 }
 
-variable "instance_type" {
+variable "cloud_instance_type" {
   type        = string
-  default     = "t3a.nano"
+  default     = "m5a.large"
+  description = "the instance type to use"
+}
+
+variable "edge_instance_type" {
+  type        = string
+  default     = "t2.micro"
   description = "the instance type to use"
 }
 
@@ -28,7 +34,13 @@ variable "project_id" {
   description = "the project name"
 }
 
-variable "ebs_size_in_gb" {
+variable "cloud_ebs_size_in_gb" {
+  type        = number
+  default     = 20
+  description = "the ebs size in gb"
+}
+
+variable "edge_ebs_size_in_gb" {
   type        = number
   default     = 10
   description = "the ebs size in gb"

@@ -10,6 +10,12 @@ output "cloud-instance-public-ip" {
   sensitive   = false
 }
 
+output "cloud-instance-private-ip" {
+  description = "The ec2 instance private ip"
+  value       = aws_instance.starlight_cloud.private_ip
+  sensitive   = false
+}
+
 output "edge-instance-id" {
   description = "The ec2 instance id"
   value       = aws_instance.starlight_edge.id
@@ -21,3 +27,10 @@ output "edge-instance-public-ip" {
   value       = aws_instance.starlight_edge.public_ip
   sensitive   = false
 }
+
+output "edge-instance-private-ip" {
+  description = "The ec2 instance private ip"
+  value       = aws_instance.starlight_edge.private_ip
+  sensitive   = false
+}
+

@@ -118,6 +118,40 @@ resource "aws_vpc_security_group_ingress_rule" "ssh_ingress" {
   description = "Allow inbound traffic for Container Registry"
 }
 
+## Internet Gateway
+resource "aws_internet_gateway" "ec2_igw" {
+  vpc_id = aws_vpc.ec2_vpc.id
+
+  tags = merge(
+    var.default_tags,
+    {
+      Name = "${local.project_name}-ec2-igw"
+    },
+  )
+}
+
+## Route Table
+resource "aws_route_table" "ec2_route_table" {
+  vpc_id = aws_vpc.ec2_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.ec2_igw.id
+  }
+
+  tags = merge(
+    var.default_tags,
+    {
+      Name = "${local.project_name}-ec2-route-table"
+    },
+  )
+}
+
+resource "aws_route_table_association" "ec2_route_table_association" {
+  subnet_id      = aws_subnet.ec2_subnet_public.id
+  route_table_id = aws_route_table.ec2_route_table.id
+}
+
 
 ## Key Pair
 resource "aws_key_pair" "deployer" {
@@ -130,7 +164,7 @@ resource "aws_key_pair" "deployer" {
 ## EC2 Host
 resource "aws_instance" "starlight_cloud" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
+  instance_type          = var.cloud_instance_type
   subnet_id              = aws_subnet.ec2_subnet_public.id
   key_name               = var.ssh_public_key == "" ? var.ssh_key_name : aws_key_pair.deployer[0].key_name
   vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
@@ -143,7 +177,7 @@ resource "aws_instance" "starlight_cloud" {
 
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = var.ebs_size_in_gb
+    volume_size           = var.cloud_ebs_size_in_gb
     encrypted             = false
     delete_on_termination = true
   }
@@ -155,13 +189,51 @@ resource "aws_instance" "starlight_cloud" {
       Name = "${local.project_name}-ec2-cloud"
     },
   )
+
+  user_data = <<-EOF
+#!/bin/bash
+echo "cloud" | sudo tee /etc/hostname > /dev/null
+sudo hostname -F /etc/hostname
+echo "10.0.1.21 cloud.cluster.local" | sudo tee -a /etc/hosts > /dev/null
+
+sudo apt update && \
+sudo apt upgrade -y && \
+sudo apt install -y docker-compose git && \
+sudo usermod -aG docker ubuntu && \
+sudo systemctl enable docker && \
+sudo systemctl start docker
+
+cd /home/ubuntu && \
+git clone https://github.com/mc256/starlight.git && \
+cd /home/ubuntu/starlight && \
+git checkout v${var.starlight_version} && \
+cd /home/ubuntu/starlight/demo/compose/ && \
+cp docker-compose-example.yaml docker-compose.yaml && \
+docker-compose up -d
+
+cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
+net.core.wmem_max=125829120
+net.core.rmem_max=125829120
+net.ipv4.tcp_rmem= 10240 87380 125829120
+net.ipv4.tcp_wmem= 10240 87380 125829120
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_no_metrics_save = 1
+net.core.netdev_max_backlog = 10000
+EOT
+sudo sysctl -p
+
+touch /home/ubuntu/.completed
+              EOF
+
 }
 
 
 
 resource "aws_instance" "starlight_edge" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
+  instance_type          = var.edge_instance_type
   subnet_id              = aws_subnet.ec2_subnet_public.id
   key_name               = var.ssh_public_key == "" ? var.ssh_key_name : aws_key_pair.deployer[0].key_name
   vpc_security_group_ids = [aws_security_group.ec2_security_group.id]
@@ -174,7 +246,7 @@ resource "aws_instance" "starlight_edge" {
 
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = var.ebs_size_in_gb
+    volume_size           = var.edge_ebs_size_in_gb
     encrypted             = false
     delete_on_termination = true
   }
@@ -186,4 +258,66 @@ resource "aws_instance" "starlight_edge" {
       Name = "${local.project_name}-ec2-edge"
     },
   )
+
+  user_data = <<-EOF
+#!/bin/bash
+echo "edge" | sudo tee /etc/hostname > /dev/null
+sudo hostname -F /etc/hostname
+echo "10.0.1.21 cloud.cluster.local cloud" | sudo tee -a /etc/hosts > /dev/null
+
+sudo apt update && sudo apt upgrade -y && \
+sudo apt install -y build-essential containerd
+
+sudo systemctl enable containerd  && \
+sudo systemctl start containerd
+
+wget https://go.dev/dl/go1.20.8.linux-amd64.tar.gz && \
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.20.8.linux-amd64.tar.gz
+
+echo "export PATH=$PATH:/usr/local/go/bin" | sudo tee -a /home/ubuntu/.bashrc > /dev/null
+
+export PATH=$PATH:/usr/local/go/bin
+export GOPATH=/home/ubuntu/go
+export HOME=/home/
+source /home/ubuntu/.bashrc
+
+
+cat <<EOT | sudo tee -a /etc/sysctl.conf > /dev/null
+net.core.wmem_max=125829120
+net.core.rmem_max=125829120
+net.ipv4.tcp_rmem= 10240 87380 125829120
+net.ipv4.tcp_wmem= 10240 87380 125829120
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_no_metrics_save = 1
+net.core.netdev_max_backlog = 10000
+EOT
+sudo sysctl -p
+
+
+cd /home/ubuntu && \
+git clone https://github.com/mc256/starlight.git && \
+cd /home/ubuntu/starlight && \
+git checkout v${var.starlight_version} && \
+make starlight-daemon ctr-starlight && \
+sudo make install install-systemd-service 
+
+sudo systemctl enable starlight-daemon
+sudo systemctl start starlight-daemon
+
+sudo ctr-starlight add myproxy http cloud.cluster.local:8090
+
+sudo mkdir /etc/containerd/ && \
+cat <<EOT | sudo tee -a /etc/containerd/config.toml > /dev/null
+  [proxy_plugins]
+    [proxy_plugins.starlight]
+      type = "snapshot"
+      address = "/run/starlight/starlight-snapshotter.sock"
+EOT
+
+sudo systemctl restart containerd
+
+touch /home/ubuntu/.completed
+              EOF
 }
