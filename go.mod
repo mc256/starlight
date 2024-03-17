@@ -29,7 +29,7 @@ require (
 
 require (
 	github.com/pelletier/go-toml v1.9.5
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
