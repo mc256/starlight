@@ -148,6 +148,47 @@ func (d *Database) InitDatabase() error {
 	`); err != nil {
 		return err
 	}
+
+	// create index for the image table
+	if _, err := d.db.Exec(`
+		CREATE INDEX IF NOT EXISTS _ix_fs
+			ON file USING btree
+			(fs ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+
+		CREATE INDEX IF NOT EXISTS _ix_fs_file
+			ON file USING btree
+			(fs ASC NULLS LAST, file COLLATE pg_catalog."default" ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+		CREATE INDEX IF NOT EXISTS _ix_hash_size
+			ON file USING btree
+			(hash COLLATE pg_catalog."default" ASC NULLS LAST, size ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+		CREATE INDEX IF NOT EXISTS _ix_digest_size
+			ON filesystem USING btree
+			(digest COLLATE pg_catalog."default" ASC NULLS LAST, size ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+		CREATE INDEX IF NOT EXISTS _ix_id
+			ON filesystem USING btree
+			(id ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+		CREATE INDEX IF NOT EXISTS _ix_stack_index
+			ON layer USING btree
+			(image ASC NULLS LAST, "stackIndex" ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+
+		CREATE INDEX IF NOT EXISTS _ix_name_tag_platform
+			ON tag USING btree
+			(name COLLATE pg_catalog."default" ASC NULLS LAST, tag COLLATE pg_catalog."default" ASC NULLS LAST, platform COLLATE pg_catalog."default" ASC NULLS LAST)
+			WITH (deduplicate_items=True);
+	`); err != nil {
+		return err
+	}
 	return nil
 }
 
