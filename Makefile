@@ -219,5 +219,5 @@ install-systemd-service:
 	systemctl daemon-reload
 
 docker-image:
-	docker build -t reg.yuri.moe/public/starlight-proxy:latest -f Dockerfile --target starlight-proxy .
-	docker build -t reg.yuri.moe/public/starlight-cli:latest -f Dockerfile --target starlight-cli .
+	docker build -t registry.yuri.moe/public/starlight-proxy:latest -f Dockerfile --target starlight-proxy .
+	docker build -t registry.yuri.moe/public/starlight-cli:latest -f Dockerfile --target starlight-cli .

@@ -8,7 +8,7 @@ The prebuild image is available in
 
 ```url
 ghcr.io/mc256/starlight/proxy:latest
-reg.yuri.moe/starlight-proxy:latest
+registry.yuri.moe/starlight-proxy:latest
 ```
 
 Please first clone this project and go to the proxy demo folder
