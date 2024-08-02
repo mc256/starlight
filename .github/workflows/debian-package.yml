@@ -36,7 +36,7 @@ jobs:
           echo "minor="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 2` >> $GITHUB_OUTPUT
           echo "patch="`git describe --tags --match "v*" | cut -d '-' -f 1 | sed -e "s/^v//" | cut -d '.' -f 3` >> $GITHUB_OUTPUT
       - name: Build deb package
-        # This needs container image from reg.yuri.moe. It is a small image that you can upload your deb package to. and save in a patial directory.
+        # This needs container image from registry.yuri.moe. It is a small image that you can upload your deb package to. and save in a patial directory.
         # Please make sure that the registry is available
         # status is available at: http://status-production.mc256.workers.dev
         env:
@@ -48,7 +48,7 @@ jobs:
           curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
           sh /tmp/get-docker.sh
           docker run --privileged --rm tonistiigi/binfmt --install all
-          docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw reg.yuri.moe/public/helper:latest
+          docker run -d --hostname helper --expose 8080 --name helper -v "$(pwd)"/sandbox:/app/upload:rw registry.yuri.moe/public/helper:latest
           export UPLOAD_URL=http://`docker inspect helper | grep "IPAddress" | grep -o -E '[0-9.]+' | head -n 1`:8080/
           make docker-buildx-multi-arch
       - name: Release

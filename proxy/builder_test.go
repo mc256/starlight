@@ -95,7 +95,7 @@ func TestDatabase_GetImageByDigest(t *testing.T) {
 	}
 
 	// if it is a multi-arch image, the digest is the platform digest
-	// docker pull reg.yuri.moe/starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a
+	// docker pull registry.yuri.moe/starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a
 	i, err := b.getImageByDigest("starlight/redis@sha256:1a98eb2e5ef8dcbb007d3b821a62a96c93744db78581e99a669cee3ef1e0917a")
 	if err != nil {
 		t.Error(err)
@@ -175,7 +175,7 @@ func TestNewBuilder2(t *testing.T) {
 		return
 	}
 
-	// docker pull reg.yuri.moe/starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798
+	// docker pull registry.yuri.moe/starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798
 	b, err := NewBuilder(server,
 		"starlight/mariadb@sha256:a5c4423aed41c35e45452a048b467eb80ddec1856cbf76edbe92d42699268798",
 		"starlight/redis:7.0.5",
@@ -224,7 +224,7 @@ func TestBuilder_WriteHeader(t *testing.T) {
 		return
 	}
 
-	// docker pull reg.yuri.moe/starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6
+	// docker pull registry.yuri.moe/starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6
 	b, err := NewBuilder(server,
 		"starlight/mariadb@sha256:9c0c61b8c8c7e406f48ab2c9fb73181e2f0e07ec327f6a8409f7b64c8fc0a0d6",
 		"starlight/mariadb:10.11.4", "linux/amd64", false)

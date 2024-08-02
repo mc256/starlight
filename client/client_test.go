@@ -109,7 +109,7 @@ func TestClient_PullImageNotUpdate(t *testing.T) {
 
 	operator := snapshotter.NewOperator(c.ctx, c, client.SnapshotService("starlight"))
 	img, err := c.pullImageSync(client, nil,
-		"reg.yuri.moe/starlight/redis:6.2.7", "linux/amd64", "")
+		"registry.yuri.moe/starlight/redis:6.2.7", "linux/amd64", "")
 	if err != nil {
 		t.Error(err)
 		return
@@ -181,7 +181,7 @@ func TestClient_FindBaseImage(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	img, err := c.FindBaseImage(client, "", "reg.yuri.moe/starlight/redis:7.0.5")
+	img, err := c.FindBaseImage(client, "", "registry.yuri.moe/starlight/redis:7.0.5")
 	if err != nil {
 		t.Error(err)
 		return
@@ -201,21 +201,21 @@ func TestClient_PullImageWithUpdate(t *testing.T) {
 
 	//plt := platforms.Format(platforms.DefaultSpec())
 	//t.Log("pulling image", "platform", plt)
-	//"reg.yuri.moe/starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965"
+	//"registry.yuri.moe/starlight/redis@sha256:50a0f37293a4d0880a49e0c41dd71e1d556d06d8fa6c8716afc467b1c7c52965"
 
 	client, err := containerd.New(cfg.Containerd, containerd.WithDefaultNamespace(cfg.Namespace))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	base, err := c.FindBaseImage(client, "", "reg.yuri.moe/starlight/redis:7.0.5")
+	base, err := c.FindBaseImage(client, "", "registry.yuri.moe/starlight/redis:7.0.5")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	img, err := c.pullImageSync(client, base,
-		"reg.yuri.moe/starlight/redis:7.0.5",
+		"registry.yuri.moe/starlight/redis:7.0.5",
 		"linux/amd64",
 		"")
 	if err != nil {
