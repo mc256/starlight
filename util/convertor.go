@@ -327,7 +327,7 @@ func (c *Convertor) ToStarlightImage() (err error) {
 		return errors.Wrapf(err, "failed to read image")
 	}
 
-	if imgDesc.MediaType == types.DockerManifestSchema2 {
+	if imgDesc.MediaType == types.DockerManifestSchema2 || imgDesc.MediaType == types.OCIManifestSchema1 {
 		// single manifest image
 		// "application/vnd.docker.distribution.manifest.v2+json"
 		var (
