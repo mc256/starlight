@@ -68,7 +68,7 @@ If you are using AWS EC2, please add the following ports to the Security Group w
     curl http://cloud.cluster.local:8090/
     # {"status":"OK","code":200,"message":"Starlight Proxy"}
     # This checks the container registry
-    curl http://cloud.cluster.local:5000/v2/
+    curl http://cloud.cluster.local:5001/v2/
     # {}
     ```
 
@@ -186,7 +186,7 @@ Verify that the Starlight proxy is accessible from the worker.
 ```shell
 curl http://cloud.cluster.local:8090/
 # {"status":"OK","code":200,"message":"Starlight Proxy"}
-curl http://cloud.cluster.local:5000/v2/
+curl http://cloud.cluster.local:5001/v2/
 # {}
 ```
 If it does not work, please check the firewall configurations, 
